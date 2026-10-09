@@ -1,0 +1,296 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Freya Model APIs",
+    "description": "Speech-to-Text and Text-to-Speech APIs powered by Freya.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://stt.freyavoice.ai"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Bearer token issued by your workspace."
+      }
+    }
+  },
+  "paths": {
+    "/v1/audio/transcriptions": {
+      "post": {
+        "operationId": "createTranscription",
+        "summary": "Speech-to-Text",
+        "description": "Transcribe an audio file to text. Accepts multipart form upload with the audio file and optional parameters. Compatible with the OpenAI audio transcription API.",
+        "servers": [
+          { "url": "https://stt.freyavoice.ai" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The audio file to transcribe. Supported formats: `wav`, `mp3`, `flac`, `ogg`, `m4a`, `webm`. Maximum size: 15 MB."
+                  },
+                  "model": {
+                    "type": "string",
+                    "default": "freya-stt",
+                    "description": "The model to use for transcription."
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "default": "json",
+                    "enum": ["json", "text", "verbose_json"],
+                    "description": "The format of the response. `json` returns `{\"text\": \"...\"}`. `text` returns plain text. `verbose_json` includes language, timing, and word-level data."
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "default": 0.0,
+                    "description": "Sampling temperature between 0 and 1. Lower values are more deterministic."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcription successful.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "description": "Standard JSON response (response_format=json)",
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "description": "The transcribed text."
+                        },
+                        "inference_time_ms": {
+                          "type": "number",
+                          "description": "Server-side inference time in milliseconds."
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "description": "Verbose JSON response (response_format=verbose_json)",
+                      "properties": {
+                        "text": {
+                          "type": "string",
+                          "description": "The transcribed text."
+                        },
+                        "language": {
+                          "type": "string",
+                          "description": "Detected or specified language."
+                        },
+                        "inference_time_ms": {
+                          "type": "number",
+                          "description": "Server-side inference time in milliseconds."
+                        },
+                        "words": {
+                          "type": "array",
+                          "description": "Word-level data with confidence scores.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "word": { "type": "string" },
+                              "confidence": { "type": "number" }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "json": {
+                    "summary": "Standard response",
+                    "value": {
+                      "text": "Merhaba, bu bir test konuşmasıdır.",
+                      "inference_time_ms": 342.5
+                    }
+                  },
+                  "verbose_json": {
+                    "summary": "Verbose response",
+                    "value": {
+                      "text": "Merhaba, bu bir test konuşmasıdır.",
+                      "language": "Turkish",
+                      "inference_time_ms": 342.5,
+                      "words": [
+                        { "word": "Merhaba,", "confidence": 0.98 },
+                        { "word": "bu", "confidence": 0.95 },
+                        { "word": "bir", "confidence": 0.97 },
+                        { "word": "test", "confidence": 0.92 },
+                        { "word": "konuşmasıdır.", "confidence": 0.89 }
+                      ]
+                    }
+                  }
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "description": "Plain text transcription (response_format=text)"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — missing file, unsupported format, or file too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "type": { "type": "string" },
+                        "code": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authentication failed or insufficient credits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "type": { "type": "string" },
+                        "code": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "type": { "type": "string" },
+                        "code": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/speech": {
+      "post": {
+        "operationId": "createSpeech",
+        "summary": "Text-to-Speech",
+        "description": "Converts text into natural-sounding speech using Freya's TTS model. Returns a binary audio file. Supports the following emotion tags: [pause], [eee], [throat clearing], [mm-hmm], [laughter], [deep breath], [hmm], [cough], [breath]",
+        "servers": [
+          { "url": "https://tts.freyavoice.ai" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["input", "voice"],
+                "properties": {
+                  "input": {
+                    "type": "string",
+                    "description": "The text to synthesize audio for."
+                  },
+                  "voice": {
+                    "type": "string",
+                    "default": "leyla",
+                    "enum": ["leyla", "zeynep", "alev", "ali", "alper", "mustafa"],
+                    "description": "The voice ID to use."
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "default": "mp3",
+                    "enum": ["mp3", "opus", "aac", "flac", "wav", "pcm"],
+                    "description": "Response format for the API request."
+                  },
+                  "model": {
+                    "type": "string",
+                    "default": "tts-1",
+                    "enum": ["tts-1", "tts-1-hd"],
+                    "description": "Quality preset. `tts-1` is faster; `tts-1-hd` is higher quality."
+                  }
+                }
+              },
+              "example": {
+                "model": "tts-1",
+                "input": "Hello, testing Freya Voice API.",
+                "voice": "leyla"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio file generated successfully.",
+            "content": {
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "Binary WAV audio data."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request — missing or invalid parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
