@@ -420,3 +420,11 @@ def test_stage_caps_leave_room_for_cut_off_messages():
 
     assert CAPS["opening"] >= 25 and CAPS["third_party"] >= 40 and CAPS["identity"] >= 40
     assert CAPS["negotiate"] >= 120
+
+
+def test_negotiate_joins_dates_and_amounts_given_in_parts():
+    # 676e9df styled PUB-07 (pieces): "Monday the." then "26th." got the after-deadline answer (2 Nov)
+    # instead of the holiday line (27 Oct). The page: customers say "a number said in two parts".
+    nego = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "A date or an amount may come in parts over several messages" in nego
+    assert "join the parts the customer gave since your last question" in nego
