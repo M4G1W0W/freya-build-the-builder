@@ -198,6 +198,9 @@ Transcripts were read with `scripts/show_run.py <run.json> --calls`.
   - **The post-hook `what_to_do_next` reaches the model** inside the tool result, and the model followed it.
   - **An initial passthrough code node reading `vars.get('now')` works in a simulation.**
   - **Identity gating** on `verify_identity_response.data.all_verified` ("true"/"True") fired correctly.
+- **Reproducibility (E10, `experiments/exp06_reproducibility.py`, A+B, 2 independent extractions):** of 181 spec leaves,
+  only 1 typed leaf differed (`transferred_human.phases` included `third_party` in one run). 21 prose leaves differed in wording
+  (row triggers, failure rule text, one `say_before_end`). The graph, dates, amounts and outcome logic are reproducible.
 - **The organiser base workflow** (`docs/reference/workflows/organiser_base_2node.json`) closes the call with a
   **workflow-level `close_call` lifecycle tool** (`alwaysRunsAt: ["end_of_call"]`, body from `{{outcome}}`/`{{reason}}`)
   and ends with an `end_call` tool. It routes identity → collection on `verify_identity_response.data.all_verified`.
