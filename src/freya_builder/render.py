@@ -78,8 +78,9 @@ def _endings_text(spec: dict, stage: str) -> str:
         say = f" First say {say}." if say else ""
         if stage == "negotiate" and r["id"] in spec.get("_note_rows", {}):
             say += (
-                " Where the brief requires a note for each product without a promise, note them"
-                " instead of using this ending: the call then closes by itself."
+                " If products ended for different reasons, first note each one with its own reason;"
+                " every product still without a promise or a note is noted with this ending's"
+                " reason automatically."
             )
         lines.append(f"- {exit_tool_name(r['id'])}: {r['trigger']}.{say}")
     return "\n".join(lines)
@@ -124,6 +125,35 @@ def _notes_done_transitions(k: int, note_tool: str, with_promise: str, without: 
         for target, groups in split.items()
         if groups
     ]
+
+
+def _autonote_routes(first: int, k: int) -> list[dict]:
+    """From a note-derived ending (or an an_<n> node) to the next product slot from `first` on that
+    exists, has no recorded promise and no note from the model; then finalize. Brief rules like
+    Brief B rule 8 want a note for every product without a promise, and a model that ends with
+    "I already paid" skips them (styled PUB-08, 0/3 twice)."""
+
+    def open_slot(n: int) -> dict:
+        ok = f"{codegen.NOTE_TOOL}{n}_response.data.{OK_FIELD}"
+        return {
+            "logic": "and",
+            "conditions": [
+                {"variable": f"p{n}_id", "operator": "not_equals", "operand": "none"},
+                {"variable": hooks.recorded_flag(n), "operator": "not_equals", "operand": "yes"},
+                {"variable": ok, "operator": "not_equals", "operand": "true"},
+                {"variable": ok, "operator": "not_equals", "operand": "True"},
+            ],
+        }
+
+    routes = [
+        {
+            "target_node": f"{codegen.AUTONOTE_NODE}{n}",
+            "description": f"Product P{n} still needs a note",
+            "condition": {"logic": "or", "conditions": [open_slot(n)]},
+        }
+        for n in range(first, k + 1)
+    ]
+    return routes + [nodes.always("finalize")]
 
 
 def _exit_transitions(spec: dict, stage: str) -> list[dict]:
@@ -495,11 +525,26 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     cf = spec["close_fields"]
     ct = by["close_call"]
     xt = by.get("transfer_to_agent")
+    autonote = spec.get("_note_rows", {}) if notes else {}
+    if autonote:
+        nt = by["add_note"]
+        for n in range(1, k + 1):
+            body = _bake_customer(spec, nt) | {
+                spec["notes"]["product_field"]: "{{p" + str(n) + "_id}}",
+                spec["notes"]["reason_field"]: "{{autonote_reason}}",
+            }
+            wf_nodes[f"{codegen.AUTONOTE_NODE}{n}"] = nodes.api_node(
+                f"{codegen.AUTONOTE_NODE}{n}",
+                [engine_call(nt, body, retries=1)],
+                _autonote_routes(n + 1, k),
+            )
     for rid, row in rows.items():
         if "negotiate" in row["phases"]:
             # Outcome may depend on what was recorded: a code node records the event, finalize computes.
             wf_nodes[f"ev_{rid}"] = nodes.code_node(
-                f"ev_{rid}", codegen.exit_source(rid), [nodes.always("finalize")]
+                f"ev_{rid}",
+                codegen.exit_source(rid, autonote.get(rid, "")),
+                _autonote_routes(1, k) if rid in autonote else [nodes.always("finalize")],
             )
             continue
         # Nothing can have been recorded before negotiation: close with literal values, no sandbox.

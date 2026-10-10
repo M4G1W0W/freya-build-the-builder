@@ -20,6 +20,7 @@ FINALIZE_MODULES = ["flatvars", "facts"]
 ACCOUNT_NODE = "load_account"
 PROMISE_TOOL = "create_promise_p"
 NOTE_TOOL = "add_note_p"
+AUTONOTE_NODE = "an_"  # an_<k>: engine-run add_note after a note-derived ending
 EXIT_TOOL = "transition_to_ev_"
 OK_FIELD = "ok"
 
@@ -218,6 +219,7 @@ def finalize_config(spec: dict) -> dict:
         "arg_prefix": ARG_PREFIX,
         "promise_tool": PROMISE_TOOL,
         "note_tool": NOTE_TOOL,
+        "autonote_prefix": AUTONOTE_NODE if spec["notes"]["used"] else "",
         "ok_field": OK_FIELD,
         "defaults": {"xfer_queue": "none", "finalize_debug": ""},
         "debug_var": "finalize_debug",
@@ -240,14 +242,18 @@ def finalize_source(spec: dict) -> str:
     )
 
 
-def exit_source(event: str) -> str:
-    """ev_<event> node: records which exit the model took (a row id, 'done' or 'cap_<stage>')."""
+def exit_source(event: str, autonote: str = "") -> str:
+    """ev_<event> node: records which exit the model took (a row id, 'done' or 'cap_<stage>').
+
+    With `autonote` (a note reason), the an_<k> nodes after it note every open product with it."""
     if not event:
         raise ValueError("exit event must not be empty")
     main = (
         "try:\n"
         "    vars['end_event'] = str(CONFIG['event'])\n"
+        "    if CONFIG.get('autonote'):\n"
+        "        vars['autonote_reason'] = str(CONFIG['autonote'])\n"
         "except Exception:\n"
         "    vars['end_event'] = 'none'\n"
     )
-    return assemble([], main, {"event": event})
+    return assemble([], main, {"event": event, "autonote": autonote})

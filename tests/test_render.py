@@ -2,6 +2,7 @@ import copy
 import json
 from pathlib import Path
 
+from freya_builder.nodes import always as nodes_always
 from freya_builder.render import exit_tool_name, render
 from freya_builder.spec import check_spec
 from freya_builder.toolapi import load_tool_api
@@ -173,6 +174,8 @@ def _holds(cond: dict, vs: dict) -> bool:
         return value is not None and str(value) == str(cond["operand"])
     if op == "contains":
         return value is not None and cond["operand"].lower() in str(value).lower()
+    if op == "not_equals":  # kit: the inverse of equals, so an unset variable is not equal
+        return not (value is not None and str(value) == str(cond["operand"]))
     if op == "is_not_set":
         return value is None
     raise AssertionError(op)
@@ -243,7 +246,11 @@ def test_ev_notes_speak_fixed_closings_then_end_through_the_default_negotiate_ev
                 "condition": {"operator": "always"},
             }
         ]
-        assert ev["pre_actions"] == default["pre_actions"]  # same event as the default ending
+        # the same event as the default ending (its auto-notes are moot: every product is settled)
+        vs, dvs = {}, {}
+        exec(_code(ev), {"vars": vs})
+        exec(_code(default), {"vars": dvs})
+        assert vs["end_event"] == dvs["end_event"] == SPEC_A["default_rows"]["negotiate"]
     assert validate(wf) == []
 
 
@@ -465,8 +472,8 @@ def test_with_notes_note_endings_stay_but_point_to_the_notes_route():
     assert {f"ev_{rid}" for rid in NOTE_ROWS} <= targets
     for rid in NOTE_ROWS:
         line = next(x for x in nego.splitlines() if x.startswith(f"- {exit_tool_name(rid)}:"))
-        assert "note them instead of using this ending" in line
-    assert "note them instead" not in next(
+        assert "noted with this ending's reason automatically" in line
+    assert "automatically" not in next(
         x for x in nego.splitlines() if x.startswith(f"- {exit_tool_name('promise')}:")
     )
     # Notes come last and only where the brief requires them; the duties of a situation first.
@@ -516,3 +523,50 @@ def test_attempts_name_the_forbidden_today_question():
     # today?" after the opening question (Brief B rule 4 forbids it); the rule alone was ignored.
     nego = render(spec_ab(), TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert 'never "can you pay <this product> today?"' in nego
+
+
+def _code(node: dict) -> str:
+    return node["pre_actions"][0]["function"]["parameters"]["properties"]["code"]["default"]
+
+
+def _next(node: dict, vs: dict) -> str:
+    for tr in node["transitions"]:
+        cond = tr["condition"]
+        if cond.get("operator") == "always" or ("logic" in cond and _holds(cond, vs)):
+            return tr["target_node"]
+    raise AssertionError("no route")
+
+
+def test_a_note_ending_adds_the_missing_notes_in_code():
+    # 676e9df and a8b70ea styled A-under-A+B PUB-08 (0/3 twice): "I already paid" took the paid
+    # ending with no note, though Brief B rule 8 wants one per product without a promise. With
+    # notes in use, a note-derived ending now notes every open product with its reason, in code.
+    wf = render(_notes_spec(3), TOOLS, BRIEF)
+    n = wf["nodes"]
+    assert validate(wf) == []
+    vs = {}
+    exec(_code(n["ev_paid"]), {"vars": vs})
+    assert vs == {"end_event": "paid", "autonote_reason": "paid"}
+    for k in (1, 2, 3):
+        call = n[f"an_{k}"]["pre_actions"][0]["function"]
+        assert call["name"] == "add_note"
+        body = {
+            f: v["default"]
+            for f, v in call["parameters"]["properties"]["body"]["properties"].items()
+        }
+        assert body["product_id"] == f"{{{{p{k}_id}}}}" and body["reason"] == "{{autonote_reason}}"
+    # one product, nothing recorded or noted: note it, then finalize
+    vs = _products(1)
+    assert _next(n["ev_paid"], vs) == "an_1" and _next(n["an_1"], vs) == "finalize"
+    # three products: P1 promised, P2 noted by the model, P3 open: only P3 gets a note
+    vs = _products(3) | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "True"}
+    assert _next(n["ev_paid"], vs) == "an_3" and _next(n["an_3"], vs) == "finalize"
+    # every product settled: straight to finalize
+    vs = _products(2) | {"p1_recorded": "yes", "p2_recorded": "yes"}
+    assert _next(n["ev_paid"], vs) == "finalize"
+
+
+def test_without_notes_endings_go_straight_to_finalize():
+    n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
+    assert n["ev_paid"]["transitions"] == [nodes_always("finalize")]
+    assert not [k for k in n if k.startswith("an_")]

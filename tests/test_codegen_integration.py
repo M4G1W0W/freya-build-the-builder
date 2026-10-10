@@ -142,3 +142,22 @@ def test_no_floor_line_without_a_floor():
         t["floor_field"], t["floor_percent"] = "", 0
     facts = _account(spec, "2026-10-14T11:00", LOAN_5)
     assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts
+
+
+def test_finalize_counts_the_notes_added_in_code():
+    # P2 was noted 'paid' by the model; the refused ending then noted P1 in code. Counting only the
+    # model's note, every note would be 'paid' and the call would close as paid.
+    spec = copy.deepcopy(SPEC_A)
+    spec["notes"]["used"] = True
+    vs = {
+        "end_event": "no_promise_refused",
+        "autonote_reason": "refused",
+        "p1_id": "p1",
+        "p2_id": "p2",
+        "p3_id": "none",
+        "an_1_response.data.ok": "true",
+        "add_note_p2_response.data.ok": "true",
+        "add_note_p2_args.arg_reason": "paid",
+    }
+    exec(codegen.finalize_source(spec), {"vars": vs})
+    assert (vs["close_outcome"], vs.get("close_reason")) == ("no_promise", "refused")

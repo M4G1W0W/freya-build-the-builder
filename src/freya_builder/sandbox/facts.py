@@ -727,6 +727,10 @@ def finalize_main(vs, C):
                     if reason in (None, ""):
                         reason = vs.get(note_tool + key)
                 notes.append((k, str(reason or "").strip()))
+            elif C.get("autonote_prefix") and _succeeded(
+                vs, str(C.get("autonote_prefix")) + str(k), ok_field
+            ):
+                notes.append((k, str(vs.get("autonote_reason") or "").strip()))
         event_row = _event_row(event, vs, C, rows)
         # A row that precedence gives only for a recorded promise is never closed on the model's
         # word alone: without a recorded promise the event counts as 'done'.
