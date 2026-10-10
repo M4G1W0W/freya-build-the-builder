@@ -123,9 +123,10 @@ Never mention the debt, the product, an amount or why you are calling in this st
 def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     slots = ", ".join(f"create_promise_p{n}" for n in range(1, k + 1))
     note_line = (
-        "NOTES: only as the very last step, after every product is settled, and only where the brief "
-        "requires a note: call add_note_pN for that product with the reason. Never add notes when "
-        "the call is transferred."
+        "NOTES: after every product is settled and BEFORE you say goodbye, and only where the brief "
+        "requires a note: call add_note_pN for that product with the reason. Then say goodbye and, "
+        "in the same message, call the transition tool of the matching ENDING. Never add notes "
+        "when the call is transferred."
         if notes
         else "Notes are not used."
     )

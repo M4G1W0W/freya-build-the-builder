@@ -738,9 +738,10 @@ def note_post(spec: dict) -> str:
     del spec  # same text for every brief; the signature matches the other hooks
     values = {
         "SUCCESS": lit(
-            "Note saved. Continue with what the brief requires next; when everything is done, "
-            "say the closing lines and goodbye and, in the same message, call the transition tool "
-            "of the matching ENDING of this step."
+            "Note saved. If another product still needs a note, call its add_note tool now. "
+            "Otherwise your next message must say the closing lines and goodbye (again, even if "
+            "you already said goodbye) and, in that same message, call the transition tool of the "
+            "matching ENDING of this step. Never reply with an empty message."
         ),
         "FAIL_HEAD": lit("The note was NOT saved"),
         "FAIL_TAIL": lit(". Do not say it was saved."),

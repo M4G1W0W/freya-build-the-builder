@@ -150,3 +150,13 @@ def test_negotiate_has_no_attempt_procedure_without_an_attempt_plan():
     s["attempts"] = []
     task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "ATTEMPTS:" not in task
+
+
+def test_notes_come_before_the_goodbye():
+    # PUB-05 on the A+B agent: "only as the very last step" led to goodbye first, add_note after,
+    # then an empty reply and no close_call.
+    s = copy.deepcopy(SPEC_A)
+    s["notes"]["used"] = True
+    task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "NOTES: after every product is settled and BEFORE you say goodbye" in task
+    assert "very last step" not in task
