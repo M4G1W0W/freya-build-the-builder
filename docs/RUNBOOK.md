@@ -36,11 +36,21 @@ python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --export submission
    simulation slot needed).
 3. Read each trace. Check for:
    - `END ok=True`;
-   - `spec check: PASS`;
+   - `spec check: PASS` (in round 1 or after repair);
    - `local workflow validation: PASS` and `platform dry-run validation: PASS`;
    - `chat smoke test: PASS`;
    - the number of steps and tools;
    - for the raw-material brief, the `amendment:` lines. **Every memo change must be listed.**
+
+   New since 10 Oct evening, so grep the trace for each:
+   - `UNRESOLVED spec problem (deployed anyway)`: the LLM could not repair it. Read each one. If it is a builder bug,
+     make a generic fix and re-run; if the brief really cannot be expressed, keep the agent (better than none) and
+     note it.
+   - `date check:`: the date self-test found an expression that gives past, missing or after-deadline dates on some
+     call day. A repair round normally fixes it; if it is still listed as UNRESOLVED, read it carefully.
+   - `engine call: … sent without required field(s)`: the bank's API requires a field that engine-run calls do not
+     send. This is a builder gap; decide quickly whether a generic fix is possible.
+   - `falling back to`: the primary model was unavailable; fine, but note it.
 4. If a build fails or looks wrong, **re-run the same command.** That updates the same slot in place and the new
    trace replaces the old one. Never edit the agent by hand. If it fails again, read the error. A **generic** fix to
    the builder is allowed: commit it, then re-run.
