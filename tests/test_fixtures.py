@@ -50,3 +50,22 @@ def test_raw_a_code_list_maps_to_kit_enums():
     assert len(rows) == 16
     listed = set(re.findall(r"^\| Q-[A-Z]+ \| [^|]+ \| `(\w+)` \|$", text, re.M))
     assert listed == queues
+
+
+def test_extra_cases_match_the_public_accounts_they_reuse():
+    # run_cases.py seeds the mock bank by case id, so an extra case must keep that case's customer.
+    public = {
+        c["id"]: c for c in json.loads((KIT_API.parents[1] / "public-test-set.json").read_text())
+    }
+    extra = json.loads((FIX.parent / "cases" / "extra-b.json").read_text())
+    assert len({c["id"] for c in extra}) == len(extra)
+    for c in extra:
+        p = public[c["id"]]
+        assert (c["brief"], c["variables"], c["identity"]) == (
+            p["brief"],
+            p["variables"],
+            p["identity"],
+        )
+        assert {n["product_id"] for n in c["expected"]["notes"]} <= {
+            f"p{i + 1}" for i in range(len(p["products"]))
+        }
