@@ -158,7 +158,7 @@ def test_notes_come_before_the_goodbye():
     s = copy.deepcopy(SPEC_A)
     s["notes"]["used"] = True
     task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
-    assert "NOTES: after every product is settled and BEFORE any goodbye" in task
+    assert "After every product is settled and BEFORE any goodbye" in task
     assert "very last step" not in task
 
 
@@ -433,3 +433,34 @@ def test_negotiate_joins_dates_and_amounts_given_in_parts():
     # PUB-06 talkative, twice: "this Friday" became "Friday, October 17th" (a Friday in 2025).
     assert "never pair a weekday with a date from memory" in nego
     assert "join the parts the customer gave since your last question" in nego
+
+
+NOTE_ROWS = (
+    "paid",
+    "no_promise_refused",
+    "no_promise_hardship",
+    "no_promise_dispute",
+    "no_promise_service_error",
+)
+
+
+def test_with_notes_the_endings_the_notes_route_produces_leave_negotiate():
+    # Styled extra-B at 676e9df: "I paid both" took the paid ending with no notes (Brief B rule 8
+    # wants a note per product); paid + disputed + refused were noted all at once, without the paid
+    # sentence and without the car loan's persuasion attempt.
+    n = render(spec_ab(), TOOLS, BRIEF)["nodes"]
+    targets = {t["target_node"] for t in n["negotiate"]["transitions"] if t.get("is_tool_call")}
+    nego = n["negotiate"]["task_message"]
+    for rid in NOTE_ROWS:
+        assert f"ev_{rid}" not in targets and exit_tool_name(rid) not in nego
+        assert f"ev_{rid}" in n  # still the target of the turn cap and of other stages
+    assert {"ev_promise", "ev_transferred_restructuring"} <= targets
+    assert "do for that product what the brief says for that ending" in nego
+    assert "only after that product's last listed attempt was refused" in nego
+    assert 'paid: say "Payments can take one business day to appear."' in nego
+
+
+def test_without_notes_every_negotiate_ending_stays():
+    n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
+    targets = {t["target_node"] for t in n["negotiate"]["transitions"] if t.get("is_tool_call")}
+    assert {f"ev_{rid}" for rid in NOTE_ROWS} <= targets

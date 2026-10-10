@@ -38,7 +38,31 @@ def _rows_for(spec: dict, stage: str) -> list[dict]:
             for r in spec["rows"]
             if "third_party" in r["phases"] or (r["phases"] and set(r["phases"]) <= before)
         ]
-    return [r for r in spec["rows"] if stage in r["phases"]]
+    rows = [r for r in spec["rows"] if stage in r["phases"]]
+    if stage == "negotiate":  # with notes, the notes route ends these calls (see _note_rows)
+        rows = [r for r in rows if r["id"] not in spec.get("_note_rows", {})]
+    return rows
+
+
+def _note_rows(spec: dict, note_reasons: tuple[str, ...]) -> dict[str, str]:
+    """Rows the brief's close rules derive from notes, with the note reason each stands for.
+
+    With notes, a product's paid/dispute/refusal situation is noted and the call goes on; the
+    notes-done route closes it and finalize picks these rows (styled extra-B at 676e9df: "I paid
+    both" took the paid ending with no notes). So they are no ending of negotiate.
+    """
+    out: dict[str, str] = {}
+    for c in spec["close_precedence"]:
+        if c["when"] not in ("all_notes_reason", "any_note"):
+            continue
+        if c["then"] == "row" and c["row"]:
+            out[c["row"]] = c["note_reason"]
+        elif c["then"] == "first_note_reason_not":
+            for r in spec["rows"]:
+                if r["outcome"] == c["outcome"] and r["reason"] in note_reasons:
+                    if r["reason"] != c["note_reason"]:
+                        out[r["id"]] = r["reason"]
+    return out
 
 
 def exit_tool_name(row_id: str) -> str:
@@ -205,11 +229,26 @@ Never mention the debt, the product, an amount or why you are calling in this st
 
 def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     slots = ", ".join(f"create_promise_p{n}" for n in range(1, k + 1))
+    rows = {r["id"]: r for r in spec["rows"]}
+    says = [
+        f"{reason}: say " + " ".join(_quote(x) for x in rows[rid]["say_before_end"])
+        for rid, reason in spec.get("_note_rows", {}).items()
+        if rid in rows and rows[rid]["say_before_end"]
+    ]
     note_line = (
-        "NOTES: after every product is settled and BEFORE any goodbye, and only where the brief "
-        "requires a note: call add_note_pN for that product with the reason, one per message, "
-        "with no other words. When every product is settled the call moves on to its closing by "
-        "itself. Never add notes when the call is transferred."
+        "NOTES: a product without a promise gets a note, and the call closes by itself once every "
+        "product has a recorded promise or a note. When a product's situation matches one of the "
+        "brief's endings (for example already paid, a dispute, hardship or a refusal), do for that "
+        "product what the brief says for that ending (its required sentence, no promise; a refusal "
+        "only after that product's last listed attempt was refused), then note it with that reason. "
+        + (
+            "Sentences for a note reason, said before that note: " + "; ".join(says) + ". "
+            if says
+            else ""
+        )
+        + "After every product is settled and BEFORE any goodbye, and only where the brief requires a "
+        "note: call add_note_pN for that product with the reason, one per message, with no other "
+        "words. Never add notes when the call is transferred."
         if notes
         else "Notes are not used."
     )
@@ -304,6 +343,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     by = _tools_by_name(tools)
     k = codegen._slots(spec)
     notes = bool(spec["notes"]["used"]) and "add_note" in by
+    if notes:
+        reason = by["add_note"].field(spec["notes"]["reason_field"])
+        spec["_note_rows"] = _note_rows(spec, reason.enum if reason else ())
     rows = {r["id"]: r for r in spec["rows"]}
 
     engine = ["get_account", "close_call"] + (
