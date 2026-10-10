@@ -1,5 +1,6 @@
 import copy
 import json
+import re
 from pathlib import Path
 
 from freya_builder.nodes import always as nodes_always
@@ -571,3 +572,17 @@ def test_without_notes_endings_go_straight_to_finalize():
     n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
     assert n["ev_paid"]["transitions"] == [nodes_always("finalize")]
     assert not [k for k in n if k.startswith("an_")]
+
+
+def test_a_named_date_is_answered_by_first_saying_it_as_written_in_facts():
+    # exp07 echodate (15bcbad, PUB-07): every failing call answered "Monday the 26th" (a holiday)
+    # without naming it ("The latest date I can record is ..."); every passing call began with the
+    # date. Making the reply start with the date as FACTS writes it: 6 of 6 calls right (F1: 4 of 6).
+    nego = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    dates = next(x for x in nego.split("\n") if x.startswith("DATES: "))
+    assert (
+        "When you answer a date the customer named, start your reply with that date as written in"
+        ' FACTS (for example "<weekday> <day> <month> <year> is ..."), then say what its line in'
+        " FACTS says." in dates
+    )
+    assert not re.search(r"\d{4}-\d{2}-\d{2}|\b(January|October|November)\b", dates)
