@@ -34,7 +34,7 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 **chain9** (`<scratchpad>/chain9.sh`, output `chain9.out`). Agents built at **c45758f** (builder code = aa94ccb;
 c45758f only added `dashboard/`): dev-a-llm2 v6 (from `runs/dev/spec-a-llm.json`), dev-ab-llm **v13** (fresh LLM
 build, spec `runs/dev/spec-ab-llm-c45758f.json`; its paid row now has the "Payments can take one business day to
-appear." sentence: 92d91ea works). Result files are named `runs/dev/r3/<name>-c45758f.*`.
+appear." sentence: the 92d91ea extraction rule is verified in the spec only, not yet in a call). Result files are named `runs/dev/r3/<name>-c45758f.*`.
 1. Waits until Freya answers again (**503 "API key validation is temporarily unavailable" from 19:53 UTC**) and the
    orphaned styled-ab-a rep-2 simulation 9c0f7e8c is completed/failed/paused.
 2. PUB-07 ablation, `--only PUB-07 --style asks_back --reps 3`: control dev-a-llm (52b947c v6, c6a57c76), then
@@ -44,7 +44,7 @@ appear." sentence: 92d91ea works). Result files are named `runs/dev/r3/<name>-c4
 All runs go through `scripts/run_cases_retry.py` (the kit script plus GET 5xx retries; e4d2b12).
 
 **Done in chain7 before the outage:** PUB-07 asks_back 1/3, pieces 0/3 (real, logged in the Score log at 22:28 and
-22:39). styled-ab-a rep 1 was 8/10 (PUB-08 passes with the auto-note; PUB-03 failed with a customer hang-up; PUB-07);
+22:39). styled-ab-a rep 1 was 8/10 (PUB-08 passed in that one rep with an add_note: one observation, not yet 3/3; PUB-03 failed with a customer hang-up; PUB-07);
 its JSON was never written (the kit script died on the 503).
 
 **Results so far tonight** (styled = every case in one of the 5 kit speech styles; a case counts at 3/3):

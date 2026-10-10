@@ -16,6 +16,7 @@ Variants:
 - nounused: 3 slots, but FACTS leaves out the "P<k>: not in use" lines;
 - noperiodrows: the DATE TABLE without its "next week" / "the week after next" rows;
 - notoomuch: FACTS without the "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH" line (35c030a);
+- nofactsdiff: all three FACTS patches at once (the runtime FACTS of the passing 52b947c agent);
 - ctltext:<export.json>: HEAD code and FACTS, but the system prompt and negotiate task text of an
   exported workflow (the passing 52b947c agent);
 - ctlsys:<export.json> / ctltask:<export.json>: only its system prompt / only its negotiate text.
@@ -53,6 +54,7 @@ CODE_PATCHES = {
         " attempt 1 (no other date: not today unless that is this date)')"
     ),
 }
+COMBOS = {"nofactsdiff": ("nounused", "noperiodrows", "notoomuch")}
 CTL_PARTS = {"ctltext": ("sys", "task"), "ctlsys": ("sys",), "ctltask": ("task",)}
 
 
@@ -99,7 +101,7 @@ def main() -> int:
     variant, argv = sys.argv[1], sys.argv[2:]
     kind, _, ctl_path = variant.partition(":")
     ctl = json.loads(Path(ctl_path).read_text())["workflow"] if kind in CTL_PARTS else None
-    known = ("noweekday", "noperiod", "old", "1slot", *CODE_PATCHES)
+    known = ("noweekday", "noperiod", "old", "1slot", *CODE_PATCHES, *COMBOS)
     if not ctl and variant not in known:
         raise SystemExit(f"unknown variant {variant}")
     if variant == "1slot":
@@ -114,8 +116,9 @@ def main() -> int:
             wf["system_prompt"] = ctl["system_prompt"]
         if ctl and "task" in CTL_PARTS[kind]:
             node["task_message"] = ctl["nodes"]["negotiate"]["task_message"]
-        if variant in CODE_PATCHES and _patch_code(wf, CODE_PATCHES[variant]) == 0:
-            raise SystemExit(f"{variant}: statement not found in the generated code")
+        for patch in COMBOS.get(variant, (variant,)):
+            if patch in CODE_PATCHES and _patch_code(wf, CODE_PATCHES[patch]) == 0:
+                raise SystemExit(f"{patch}: statement not found in the generated code")
         changed = before != node["task_message"]
         print(f"exp07 variant={variant} negotiate changed={changed}", file=sys.stderr)
         print(f"exp07 DATES: {_dates_line(node['task_message'])}", file=sys.stderr)
