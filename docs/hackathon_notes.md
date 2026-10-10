@@ -231,6 +231,10 @@ Transcripts were read with `scripts/show_run.py <run.json> --calls`.
   persona restarts its chatter (19664c6 PUB-04). A second fragment in a row gets the last question again (a1499a8).
   Agent VAD keys (`vadStopSecs`, `waitSeconds`) exist in the API, but the kit says speech settings matter on voice
   only: not used.
+- **2026-10-10 15:4x UTC, extraction reproducibility at HEAD** (exp06, 3 independent builds each, with the current
+  repair loop and date self-test): Briefs A+B gave 2 typed differences in 181 leaves; raw-material variant-r gave 3.
+  Every difference is prose inside a list (attempt `note`, a hint instruction, the forbidden-words list). Amounts,
+  bands and date expressions are identical in all builds, and attempt 1 is always the correct `>` form.
 
 ## Decision log
 
