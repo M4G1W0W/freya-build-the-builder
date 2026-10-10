@@ -865,8 +865,11 @@ def test_offer_plan_sets_the_attempt_counts_side_by_side():
     assert "- persuasion attempts in this band: 1 (ONE offer only)" in block(facts, "P1")
     plan = next(line for line in facts.splitlines() if line.startswith("OFFER PLAN"))
     assert "not even the floor" in plan
-    assert "P1: 1 offer only: 1) 300.00 on 2026-10-16" in plan
-    assert "P2: 2 offers: 1) 900.00 on 2026-10-16, 2) floor 300.00 on 2026-10-23" in plan
+    assert 'P1: 1 offer only: 1) 300.00 (or floor 90.00 after "too much") on 2026-10-16' in plan
+    assert (
+        'P2: 2 offers: 1) 900.00 (or floor 300.00 after "too much") on 2026-10-16, 2) floor 300.00'
+        " on 2026-10-23" in plan
+    )
 
 
 def test_finalize_wrap_up_default_ending_takes_the_note_reason():

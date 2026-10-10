@@ -137,6 +137,21 @@ def test_attempt_1_line_names_the_floor_and_its_date_without_a_separate_too_much
     line = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
     assert "2026-10-16 (Friday 16 October 2026)" in line and "the floor 637.50" in line
     assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts
+    # F1 styled PUB-06 r2, r3 (15bcbad): without that line the floor was offered "today" again.
+    # The rule now sits in the two lines that already carry attempt 1's date.
+    assert "either amount only on this date (not today, unless today is this date)" in line
+    plan = next(x for x in facts.splitlines() if x.startswith("OFFER PLAN"))
+    assert '1) 2125.10 (or floor 637.50 after "too much") on 2026-10-16' in plan
+
+
+def test_full_or_floor_without_a_floor_offers_the_full_amount_only():
+    spec = copy.deepcopy(SPEC_A)
+    for t in spec["products"]["types"]:
+        t["floor_field"], t["floor_percent"] = "", 0
+    facts = _account(spec, "2026-10-14T11:00", LOAN_5)
+    assert "the floor not available" not in facts and "floor not available after" not in facts
+    line = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
+    assert line.endswith(": the full past-due amount 540.00")
 
 
 def test_finalize_counts_the_notes_added_in_code():

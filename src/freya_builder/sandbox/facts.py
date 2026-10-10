@@ -377,18 +377,24 @@ def _attempt_amount(kind, past_due, floor):
     full = "the full past-due amount " + _amount(past_due)
     if kind == "floor":
         return "the floor " + _amount(floor)
-    if kind == "full_or_floor":
+    if kind == "full_or_floor" and floor is not None:
+        # The date rule lives on this line: without it the floor was offered "today" (F1 PUB-06).
         return (
             full
             + ", or instead the floor "
             + _amount(floor)
-            + " only if the customer said the full amount is too much before this offer"
+            + " only if the customer said the full amount is too much before this offer;"
+            + " either amount only on this date (not today, unless today is this date)"
         )
     return full
 
 
 def _plan_amount(kind, past_due, floor):
-    return "floor " + _amount(floor) if kind == "floor" else _amount(past_due)
+    if kind == "floor":
+        return "floor " + _amount(floor)
+    if kind == "full_or_floor" and floor is not None:
+        return _amount(past_due) + " (or floor " + _amount(floor) + ' after "too much")'
+    return _amount(past_due)
 
 
 def _named_date_lines(today, low, high, C):
