@@ -19,6 +19,8 @@ Variants:
 - nofactsdiff: all three FACTS patches at once (the runtime FACTS of the passing 52b947c agent);
 - isokey: the after-deadline catch-all keyed by the ISO date only ("a date after 2026-11-02:"), without
   the spoken weekday that matches the customer's weekday;
+- echodate (on F1, 15bcbad; the example uses placeholders, no brief value): the DATES line also says to start the answer to a named date with that date
+  as written in FACTS, then say what its line says (every failing call skipped naming the date);
 - ctltext:<export.json>: HEAD code and FACTS, but the system prompt and negotiate task text of an
   exported workflow (the passing 52b947c agent);
 - ctlsys:<export.json> / ctltask:<export.json>: only its system prompt / only its negotiate text.
@@ -39,6 +41,10 @@ WEEKDAY = (
     " date."
 )
 PERIOD = re.compile(r" If the customer first named a period .*?not a later one\)\.")
+ECHO = (
+    " When you answer a date the customer named, start your reply with that date as written in FACTS"
+    ' (for example "<weekday> <day> <month> <year> is ..."), then say what its line in FACTS says.'
+)
 OLD_DATES = (
     "DATES: when the customer names a date, find it in that product's \"IF THE CUSTOMER NAMES A"
     " DATE\" lines in FACTS and do exactly what they say (they already apply the brief's date"
@@ -83,6 +89,11 @@ def _edit(task: str, variant: str) -> str:
         return task.replace(line, new)
     if variant == "old":
         return task.replace(line, OLD_DATES)
+    if variant == "echodate":
+        anchor = " Never offer the latest date unless those lines say so."
+        if anchor not in line:
+            raise SystemExit("echodate: anchor sentence not found")
+        return task.replace(line, line.replace(anchor, ECHO + anchor))
     return task
 
 
@@ -106,7 +117,7 @@ def main() -> int:
     variant, argv = sys.argv[1], sys.argv[2:]
     kind, _, ctl_path = variant.partition(":")
     ctl = json.loads(Path(ctl_path).read_text())["workflow"] if kind in CTL_PARTS else None
-    known = ("noweekday", "noperiod", "old", "1slot", *CODE_PATCHES, *COMBOS)
+    known = ("noweekday", "noperiod", "old", "1slot", "echodate", *CODE_PATCHES, *COMBOS)
     if not ctl and variant not in known:
         raise SystemExit(f"unknown variant {variant}")
     if variant == "1slot":
