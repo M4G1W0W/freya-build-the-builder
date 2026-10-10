@@ -31,12 +31,13 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Running right now
 
-- **chain5** (`<scratchpad>/chain5.sh`, job `blvy0u0cw`, monitor `bl5dj1p1p`), started 17:49 UTC at **347e01d**:
-  deploy dev-a-llm2 + dev-ab-llm from the saved specs, then the same four styled 3-rep runs as chain4
-  (`runs/dev/r3/{styledA-a2,styledB-ab,styledXB-ab,styledABA-ab}-347e01d.*`). Compare case by case with chain4
-  (676e9df): styledA 7/10, styledB 2/3, styledXB 1/3, styledABA 5/10 (all in the Score log, every failure read).
-  Log each result; read every failure; classify simulator vs real.
-- Fixed since 676e9df and measured by chain5: 96c37ad (parts), 35c030a (loop breaker, floor date line, weekday
+- **chain6** (`<scratchpad>/chain6.sh`, job `b9hrc5jlp`, monitor `b5rkw2q4o`), started 18:01 UTC at **a8b70ea**:
+  deploy dev-a-llm2 + dev-ab-llm from the saved specs, then the four styled 3-rep runs
+  (`runs/dev/r3/{styledA-a2,styledB-ab,styledXB-ab,styledABA-ab}-a8b70ea.*`). Compare case by case with chain4
+  (676e9df): styledA 7/10, styledB 2/3, styledXB 1/3, styledABA 5/10. Log each result; read every failure.
+  chain5 (347e01d) was stopped after styledA rep 1 (9/10): PUB-03 corrects looped "Please go on." on a repeated
+  part and the customer hung up; fixed in a8b70ea (the loop breaker covers parts).
+- Fixed since 676e9df and measured by chain6: 96c37ad (parts), 35c030a (loop breaker, floor date line, weekday
   rule), a3e6c77 (EVERY DAY weeks in the DATE TABLE: the 2025-calendar date slips), 347e01d (diff-review fixes:
   note endings stay with a pointer to the notes route, deferred notes, one "complete" definition, transfer
   precedence, failed repair keeps the best spec, engine_fields checks), e233cb8 superseded by 347e01d.
