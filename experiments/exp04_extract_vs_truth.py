@@ -49,16 +49,14 @@ def get(d, path):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    api = next(
-        (sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--api"),
-        str(ROOT / "kit/tools/openapi.json"),
-    )
-    out = next(
-        (sys.argv[i + 1] for i, a in enumerate(sys.argv) if a == "--out"),
-        str(ROOT / "runs/exp04_spec.json"),
-    )
-    briefs = args or [str(ROOT / "kit/briefs/brief-a.md")]
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("briefs", nargs="*", default=[str(ROOT / "kit/briefs/brief-a.md")])
+    ap.add_argument("--api", default=str(ROOT / "kit/tools/openapi.json"))
+    ap.add_argument("--out", default=str(ROOT / "runs/exp04_spec.json"))
+    a = ap.parse_args()
+    briefs, api, out = a.briefs, a.api, a.out
     spec = extract(Trace(), read_briefs(briefs), load_tool_api(api))
     Path(out).write_text(json.dumps(spec, indent=1))
     truth = json.loads((ROOT / "tests/fixtures/spec_a.json").read_text())
