@@ -32,7 +32,7 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 ## Running right now (updated 22:52 UTC; the user asked to stop starting new work for a context save)
 
 - **qrun3** (`<scratchpad>/qrun3.sh`, queue `queue3.txt`, output `qrun3.out`, result names `-bd4da7c` whatever the
-  agent): **G1-p06-talkative** running (since 22:49), then **G2-p06-talkative** queued. Nothing else is queued. When it
+  agent): **G1-p06-talkative** running (since 22:49). **G2 was NOT run** (removed from the queue at the user's request; run it next session: `exp-g2-a` agent efb690fd, `--only PUB-06 --style talkative --reps 3`). When it
   ends, the runner prints "queue empty" and stops. Read `runs/dev/r3/G1-p06-talkative-bd4da7c.json` / `G2-...`.
 - All runs use `scripts/run_cases_retry.py` (GET 5xx retries + report-only STUCK detection, fed67b1). A stuck
   simulation was paused once with the user's OK (21:55 UTC); **ask again before any further PUT** on Freya.
@@ -49,7 +49,7 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 | F2 | bd4da7c | F1 + DATES: "start your reply to a named date with that date as written in FACTS" | **6/6** | 1/3 in styled-a | **styled-a 8/10** (PUB-07 3/3) |
 | F3 = **HEAD code** | a069dd2 | F2 + too-much rule on the attempt-1 line and OFFER PLAN item | dates 6/6 (1 judge fail: re-asked after a question back) | **1/3** (still "floor ... today?") | not run |
 | G1 (candidate) | a069dd2 + `runs/dev/exp07/g1-on-a069dd2.patch` | F3 + the old trigger line "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH ... offer exactly the floor X on <date> ... not today" | not run | **running** | |
-| G2 (candidate) | a069dd2 + `exp07 offerdate` | F3 + ATTEMPTS: "Each offer of yours names its amount and its date as written in FACTS; the only today question is the opening one" | not run | queued | |
+| G2 (candidate) | a069dd2 + `exp07 offerdate` | F3 + ATTEMPTS: "Each offer of yours names its amount and its date as written in FACTS; the only today question is the opening one" | not run | **not run (cancelled for the context save)** | |
 
 **Next steps, in order:**
 1. Read G1 and G2 PUB-06. Pick the one that fixes PUB-06 (target 3/3), then run PUB-07 asks + pieces on it (the
