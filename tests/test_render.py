@@ -509,3 +509,10 @@ def test_engine_owns_its_fields_over_engine_fields():
     wf = render(s, TOOLS, BRIEF)
     close = wf["nodes"]["close"]["pre_actions"][0]["function"]["parameters"]["properties"]
     assert close["body"]["properties"]["outcome"]["default"] == "{{close_outcome}}"
+
+
+def test_attempts_name_the_forbidden_today_question():
+    # a8b70ea styled extra-B PUB-12 r3: "Regarding the car loan, can you make the payment of 140
+    # today?" after the opening question (Brief B rule 4 forbids it); the rule alone was ignored.
+    nego = render(spec_ab(), TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert 'never "can you pay <this product> today?"' in nego

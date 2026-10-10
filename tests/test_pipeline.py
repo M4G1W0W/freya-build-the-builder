@@ -148,3 +148,9 @@ def test_a_failed_repair_call_keeps_the_best_spec(monkeypatch):
     spec = pipeline.extract_spec(Trace(out), "brief", TOOLS)
     assert spec["default_rows"]["opening"] == "nope"
     assert "keeping the best spec" in out.getvalue()
+
+
+def test_extraction_turns_say_that_rules_into_required_sentences():
+    # a8b70ea styled extra-B PUB-12: the A+B spec's paid row had no say_before_end, because the
+    # brief says "say that payments can take one business day to appear" rather than quoting it.
+    assert 'a rule "say that X" gives the sentence X' in pipeline.SPEC_SYSTEM
