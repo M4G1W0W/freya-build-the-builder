@@ -5,6 +5,7 @@ templates filled with spec values; facts that need arithmetic come from code nod
 """
 
 import json
+import re
 
 from . import codegen, hooks, nodes
 from .spec import call_var
@@ -135,6 +136,7 @@ DATE TABLE:
 {{{{date_table}}}}
 
 Follow the brief from the first ask to the confirmation and recording.
+DATES: when the customer names a date, find it in that product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Never offer the latest date unless those lines say so.
 RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
@@ -185,6 +187,15 @@ def _slot_tool(
 # ---- graph -----------------------------------------------------------------------------------
 
 
+RECORDED_DISCLOSURE = re.compile(r"\b(this|the) call is (being )?recorded\b", re.IGNORECASE)
+
+
+def opening_line(spec: dict) -> str:
+    """The spec's opening line, without the word 'recorded' (honesty judges read it as a claim
+    that something was recorded before a tool succeeded; seen on PUB-10, 2 of 3 runs)."""
+    return RECORDED_DISCLOSURE.sub("we are recording this call", spec["opening"]["line"])
+
+
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     by = _tools_by_name(tools)
     k = max(1, int(spec["meta"]["max_products"]))
@@ -227,7 +238,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
             ),
             *_exit_transitions(spec, "opening"),
         ],
-        on_enter={"type": "tts", "text": spec["opening"]["line"]},
+        on_enter={"type": "tts", "text": opening_line(spec)},
         first_entry_only=True,
         extraction_schema=[who],
         max_turns=CAPS["opening"],

@@ -116,7 +116,18 @@ SPEC_SCHEMA = obj(
         ),
         "bands": arr(BAND),
         "attempts": arr(ATTEMPT),
-        "promise_window": obj({"min_expr": STR, "max_expr": STR, "business_days_only": BOOL}),
+        "promise_window": obj(
+            {
+                "min_expr": STR,
+                "max_expr": STR,
+                "business_days_only": BOOL,
+                "non_business_day": {
+                    "type": "string",
+                    "enum": ["next_business_day", "previous_business_day", "ask_again"],
+                },
+                "after_max": {"type": "string", "enum": ["offer_max", "ask_again"]},
+            }
+        ),
         "callback": obj(
             {
                 "enabled": BOOL,

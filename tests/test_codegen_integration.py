@@ -51,3 +51,60 @@ def test_attempt1_on_weekend_is_not_in_the_past():
     facts = vs["account_facts"]
     assert "2026-10-23" in facts  # Friday of the following week
     assert "already past" not in facts
+
+
+def _account(spec, now, product):
+    vs = {"now": now, "load_account_response.data.ok": "true"}
+    for key, value in product.items():
+        vs[f"load_account_response.data.products.0.{key}"] = value
+    exec(codegen.account_source(spec), {"vars": vs})
+    return vs["account_facts"]
+
+
+LOAN_5 = {
+    "product_id": "p1",
+    "type": "personal_loan",
+    "past_due": "540",
+    "days_late": "5",
+    "instalment_amount": "180",
+}
+
+
+def test_named_date_lines_apply_holiday_and_deadline_rules():
+    facts = _account(SPEC_A, "2026-10-14T11:00", LOAN_5)
+    assert "IF THE CUSTOMER NAMES A DATE" in facts
+    assert (
+        "2026-10-26 (Monday 26 October 2026): not a business day (holiday); offer 2026-10-27"
+        in facts
+    )
+    assert (
+        "2026-10-17 (Saturday 17 October 2026): not a business day (weekend); offer 2026-10-19"
+        in facts
+    )
+    assert (
+        "a date after 2026-11-02 (Monday 2 November 2026): say the latest date you can record is 2026-11-02"
+        in facts
+    )
+
+
+def test_named_date_lines_previous_business_day_mode():
+    spec = copy.deepcopy(SPEC_A)
+    spec["promise_window"]["non_business_day"] = "previous_business_day"
+    facts = _account(spec, "2026-10-14T11:00", LOAN_5)
+    assert (
+        "2026-10-26 (Monday 26 October 2026): not a business day (holiday); offer 2026-10-23"
+        in facts
+    )
+
+
+def test_opening_line_never_says_recorded():
+    from freya_builder.render import opening_line
+
+    spec = copy.deepcopy(SPEC_A)
+    spec["opening"]["line"] = (
+        "Hi, this call is recorded. Am I speaking with {{title}} {{last_name}}?"
+    )
+    assert (
+        opening_line(spec)
+        == "Hi, we are recording this call. Am I speaking with {{title}} {{last_name}}?"
+    )

@@ -12,8 +12,22 @@ OPEN, CLOSE = "{" * 2, "}" * 2
 
 
 def module_source(name: str) -> str:
-    """Source of a sandbox module, without its module docstring line noise kept (harmless)."""
-    return (HERE / f"{name}.py").read_text()
+    """Source of a sandbox module, minified: docstrings and comments removed (same AST semantics).
+
+    Code nodes carry several modules plus CONFIG; minifying keeps them well under the size we
+    have verified on the platform. ast.unparse re-renders equivalent Python.
+    """
+    import ast
+
+    tree = ast.parse((HERE / f"{name}.py").read_text())
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if isinstance(body, list) and body:
+            first = body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                if isinstance(first.value.value, str):
+                    node.body = body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
 
 
 def hex_json(value: object) -> str:

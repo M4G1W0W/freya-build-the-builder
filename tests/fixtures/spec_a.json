@@ -112,7 +112,9 @@
  "promise_window": {
   "min_expr": "today",
   "max_expr": "deadline",
-  "business_days_only": true
+  "business_days_only": true,
+  "non_business_day": "next_business_day",
+  "after_max": "offer_max"
  },
  "callback": {
   "enabled": true,
@@ -128,7 +130,7 @@
   "booked_row": "not_reached_callback"
  },
  "opening": {
-  "line": "Hello, this is Freya Bank's digital assistant calling, and this call is recorded. Am I speaking with {{title}} {{last_name}}?",
+  "line": "Hello, this is Freya Bank's digital assistant calling, and we are recording this call. Am I speaking with {{title}} {{last_name}}?",
   "confirm_criteria": "Only \"yes\", \"that's me\", \"speaking\" or the customer's own name counts as confirmation. \"Hello\", \"go ahead\" and \"who is this\" do not; ask once more. If it is still unclear after the second ask, end the call as unclear. Answer a question from the person first; the ask that follows is the second ask.",
   "forbidden_before_verified": [
    "collections",

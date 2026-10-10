@@ -186,6 +186,8 @@ def account_config(spec: dict) -> dict:
             for a in spec["attempts"]
         ],
         "business_days_only": spec["promise_window"]["business_days_only"],
+        "non_business_day": spec["promise_window"]["non_business_day"],
+        "after_max": spec["promise_window"]["after_max"],
         "disclosure": dict(disclosure),
         "K": _slots(spec),
         "notes_used": spec["notes"]["used"],

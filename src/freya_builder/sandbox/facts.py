@@ -395,6 +395,49 @@ def _attempt_amount(kind, past_due, floor):
     return full
 
 
+def _named_date_lines(today, low, high, C):
+    """What to do when the customer names a date: the brief's adjustment rules, applied in code."""
+    mode = C.get("non_business_day") or "next_business_day"
+    after = C.get("after_max") or "offer_max"
+    out = ["- IF THE CUSTOMER NAMES A DATE (already follows the brief; do exactly this):"]
+    out.append("  - a date before " + _ds(low) + ": not possible; ask for another date")
+    if C.get("business_days_only"):
+        out.append(
+            "  - a business day from " + _ds(low) + " to " + _ds(high) + ": accept that date"
+        )
+    else:
+        out.append("  - any date from " + _ds(low) + " to " + _ds(high) + ": accept that date")
+    if after == "offer_max":
+        tail = "say the latest date you can record is " + _ds(high) + " and offer that date"
+    else:
+        tail = "say that date cannot be recorded and ask for another date"
+    if C.get("business_days_only"):
+        d = low
+        while d <= high:
+            if not is_business_day(d):
+                what = "weekend" if d.weekday() >= 5 else "not a business day"
+                if d.isoformat() in HOLIDAYS:
+                    what = "holiday"
+                if mode == "ask_again":
+                    act = "not a business day; ask for another date"
+                else:
+                    adj = (
+                        business_day_on_or_after(d)
+                        if mode == "next_business_day"
+                        else business_day_on_or_before(d)
+                    )
+                    if adj is None or adj < low:
+                        act = "not a business day and no earlier valid day; ask for another date"
+                    elif adj > high:
+                        act = "not a business day; " + tail
+                    else:
+                        act = "not a business day (" + what + "); offer " + _ds(adj) + " instead"
+                out.append("  - " + _ds(d) + ": " + act)
+            d = d + datetime.timedelta(days=1)
+    out.append("  - a date after " + _ds(high) + ": " + tail)
+    return out
+
+
 def _product(k, raw, today, C, vs):
     """(facts block, disclosure sentence, deadline) for slot k."""
     slot = "P" + str(k)
@@ -466,6 +509,8 @@ def _product(k, raw, today, C, vs):
             + _ds(high)
             + ", both included"
         )
+    if low is not None and high is not None and low <= high:
+        lines += _named_date_lines(today, low, high, C)
     tools = C.get("promise_tool", "") + str(k)
     if C.get("notes_used"):
         tools += ", " + C.get("note_tool", "") + str(k)
