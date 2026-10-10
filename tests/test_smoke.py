@@ -71,13 +71,15 @@ def test_submission_files_are_committable(rel_path):
     assert result.returncode == 1, f"{rel_path} must be committable"
 
 
-def test_env_example_has_no_real_values():
-    """Every non-URL value in .env.example must be empty (placeholders only)."""
+SECRET_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD")
+
+
+def test_env_example_has_no_secret_values():
+    """Secret variables in .env.example must be empty; plain config (URLs, model ids) may default."""
     for line in (ROOT / ".env.example").read_text().splitlines():
-        line = line.strip()
+        line = line.strip().removeprefix("export ").strip()
         if not line or line.startswith("#"):
             continue
         key, _, value = line.partition("=")
-        if value.startswith("https://"):
-            continue
-        assert value == "", f"{key} has a value in .env.example; keep it empty"
+        if any(marker in key.upper() for marker in SECRET_MARKERS):
+            assert value == "", f"{key} is a secret; keep it empty in .env.example"

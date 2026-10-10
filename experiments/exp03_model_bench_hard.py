@@ -11,7 +11,6 @@ twice per fixture.
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from exp02_model_bench import DEFAULT_MODELS, ROOT, SCHEMA, SYSTEM, one  # noqa: F401
 
