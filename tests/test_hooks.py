@@ -459,7 +459,9 @@ NOT_RECORDED = ". Do not say it was recorded. Per the brief: " + PROMISE_RULE
 @pytest.mark.parametrize("ok", [True, "true", "True"])
 def test_promise_success_says_the_brief_line(ok, split):
     result = post(PROMISE_POST, envelope({"ok": ok, "promise_id": "pr_1"}), split)
-    assert what(result) == "Recorded (P1). Now say exactly: " + PROMISE_LINE
+    assert what(result) == (
+        "Recorded (P1). When every agreed promise is recorded, say exactly once: " + PROMISE_LINE
+    )
     assert "header" not in result
 
 

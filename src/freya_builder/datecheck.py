@@ -71,7 +71,7 @@ def check_dates(spec: dict) -> list[str]:
     """Problems found by running the generated date logic; [] when every day looks sane."""
     setup = compile(codegen.setup_source(spec), "<setup>", "exec")
     account = compile(codegen.account_source(spec), "<account>", "exec")
-    k = max(1, codegen._slots(spec))
+    k = codegen._slots(spec)
     p = spec["products"]
     prefix = f"{codegen.ACCOUNT_NODE}_response.data.{p['list_field']}"
     items = _products(spec)

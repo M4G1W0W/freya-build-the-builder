@@ -287,7 +287,7 @@ def opening_line(spec: dict) -> str:
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     spec = dict(spec, _customer_field=customer_field(spec, tools))
     by = _tools_by_name(tools)
-    k = max(1, int(spec["meta"]["max_products"]))
+    k = codegen._slots(spec)
     notes = bool(spec["notes"]["used"]) and "add_note" in by
     rows = {r["id"]: r for r in spec["rows"]}
 

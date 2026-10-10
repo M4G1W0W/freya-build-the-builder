@@ -11,7 +11,7 @@ No brief knowledge: every value comes from the spec. Node and tool names are the
 from .expr import check_expr, normalise
 from .hooks import ARG_PREFIX
 from .sandbox import assemble
-from .spec import call_var
+from .spec import call_var, product_slots
 
 MODULES = ["calendar_core", "flatvars", "policy_helpers", "facts"]
 # Each node gets only the modules its main uses (smaller nodes; E8 has not measured the limit).
@@ -85,7 +85,7 @@ def _source(spec: dict, modules: list[str], call: str, config: dict) -> str:
 
 
 def _slots(spec: dict) -> int:
-    return max(1, int(spec["meta"]["max_products"]))
+    return product_slots(spec)
 
 
 def _calendar(spec: dict) -> dict:

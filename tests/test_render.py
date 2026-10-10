@@ -40,7 +40,7 @@ def test_stage_tools_are_restricted():
     assert tool_names(n["opening"]) == []
     assert tool_names(n["identity"]) == ["verify_identity"]
     assert tool_names(n["third_party"]) == ["schedule_callback"]
-    assert tool_names(n["negotiate"]) == ["create_promise_p1"]
+    assert tool_names(n["negotiate"]) == [f"create_promise_p{i}" for i in (1, 2, 3)]
     model_called = {name for node in n.values() for name in tool_names(node)}
     assert not model_called & {"get_account", "close_call", "transfer_to_agent"}
 
@@ -388,3 +388,13 @@ def test_engine_calls_missing_a_required_field_are_reported(tmp_path):
     assert found and all(
         "close_call is sent without required field(s) ['summary']" in w for w in found
     )
+
+
+def test_a_single_product_brief_still_gets_three_product_slots():
+    # Review gap 2: the page says hidden-brief customers have one to three products.
+    assert SPEC_A["meta"]["max_products"] == 1
+    n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
+    assert tool_names(n["negotiate"]) == [f"create_promise_p{i}" for i in (1, 2, 3)]
+    wide = copy.deepcopy(SPEC_A)
+    wide["meta"]["max_products"] = 5
+    assert len(tool_names(render(wide, TOOLS, BRIEF)["nodes"]["negotiate"])) == 5

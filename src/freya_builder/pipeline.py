@@ -11,7 +11,7 @@ from . import platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
 from .llm import chat_json
-from .spec import SPEC_SCHEMA, check_spec, schema_problems
+from .spec import MIN_SLOTS, SPEC_SCHEMA, check_spec, schema_problems
 from .toolapi import Tool
 from .trace import Trace
 
@@ -182,6 +182,11 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     spec = extract_spec(trace, rules_text, tools)
     for u in spec["unmodeled"]:
         trace.warn(f"NOT ENFORCED BY CODE (kept in prompt): {u[:200]}")
+    if spec["meta"]["max_products"] < MIN_SLOTS:
+        trace.warn(
+            f"brief read as {spec['meta']['max_products']} product(s); rendering {MIN_SLOTS} product"
+            " slots (the official page: customers have one to three products)"
+        )
     spec["_prompt_brief"] = rules_text
     return spec
 

@@ -643,10 +643,8 @@ def promise_post(spec: dict, k: int) -> str:
     head = f"Recorded (P{k})."
     if not line:
         success = head + " Tell the customer the promise is recorded."
-    elif spec["meta"]["max_products"] > 1:
+    else:  # every agent has several product slots (spec.product_slots)
         success = head + " When every agreed promise is recorded, say exactly once: " + line
-    else:
-        success = head + " Now say exactly: " + line
     tail = ". Do not say it was recorded."
     tail += " Per the brief: " + rule if rule else " Tell the customer it could not be recorded."
     values = {

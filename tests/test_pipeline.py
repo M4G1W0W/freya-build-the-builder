@@ -93,3 +93,12 @@ def test_smoke_test_does_not_retry_a_client_error(monkeypatch):
     pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS)
     assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
     assert fake.calls.count("/api/v2/chat/message") == 1
+
+
+def test_a_brief_read_as_single_product_is_flagged_in_the_trace(monkeypatch):
+    # Review gap 2: the agent gets 3 product slots anyway; the trace says why.
+    monkeypatch.setattr(pipeline, "consolidate", lambda trace, text, tools: {"kind": "clean"})
+    monkeypatch.setattr(pipeline, "extract_spec", lambda trace, text, tools: copy.deepcopy(SPEC_A))
+    out = io.StringIO()
+    pipeline.extract(Trace(out), "brief", TOOLS)
+    assert "brief read as 1 product(s); rendering 3 product slots" in out.getvalue()

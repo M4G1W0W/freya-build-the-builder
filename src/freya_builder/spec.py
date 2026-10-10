@@ -364,6 +364,15 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     return p
 
 
+# The official page (Evaluation tab): hidden-brief customers have "one to three products". A brief whose
+# extraction says fewer still gets 3 product slots, so a misread never drops a product (review gap 2).
+MIN_SLOTS = 3
+
+
+def product_slots(spec: dict) -> int:
+    return max(MIN_SLOTS, int(spec["meta"]["max_products"]))
+
+
 def call_var(spec: dict, role: str) -> str:
     return next((v["name"] for v in spec["meta"]["call_vars"] if v["role"] == role), "")
 
