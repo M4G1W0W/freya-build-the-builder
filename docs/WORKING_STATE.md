@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 20:50 Istanbul (17:50 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+**Snapshot:** 2026-10-10 21:42 Istanbul (18:42 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
 Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Phase
@@ -31,18 +31,36 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Running right now
 
-- **chain6** (`<scratchpad>/chain6.sh`, job `b9hrc5jlp`, monitor `b5rkw2q4o`), started 18:01 UTC at **a8b70ea**:
-  deploy dev-a-llm2 + dev-ab-llm from the saved specs, then the four styled 3-rep runs
-  (`runs/dev/r3/{styledA-a2,styledB-ab,styledXB-ab,styledABA-ab}-a8b70ea.*`). Compare case by case with chain4
-  (676e9df): styledA 7/10, styledB 2/3, styledXB 1/3, styledABA 5/10. Log each result; read every failure.
-  chain5 (347e01d) was stopped after styledA rep 1 (9/10): PUB-03 corrects looped "Please go on." on a repeated
-  part and the customer hung up; fixed in a8b70ea (the loop breaker covers parts).
-- Fixed since 676e9df and measured by chain6: 96c37ad (parts), 35c030a (loop breaker, floor date line, weekday
-  rule), a3e6c77 (EVERY DAY weeks in the DATE TABLE: the 2025-calendar date slips), 347e01d (diff-review fixes:
-  note endings stay with a pointer to the notes route, deferred notes, one "complete" definition, transfer
-  precedence, failed repair keeps the best spec, engine_fields checks), e233cb8 superseded by 347e01d.
-- Reviews: `docs/reviews/2026-10-10-direction-review.md` (page vs repo) and `docs/reviews/2026-10-10-diff-review.md`
-  (the evening's diff; open: 13, 17, 18 and part of 5).
+**Nothing is running.** chain7 (aa94ccb) was stopped by the user at 18:42 UTC for a context save. It had only
+republished dev-a-llm2 at aa94ccb (killed in its smoke test); dev-ab-llm is still v12 (a8b70ea) and was NOT rebuilt.
+
+**Next session, first thing:** re-run chain7 (`<scratchpad>/chain7.sh`; the scratchpad may be gone: recreate it
+from the description below). It (1) redeploys dev-a-llm2 from `runs/dev/spec-a-llm.json`, (2) does a **fresh LLM
+build** of A+B into dev-ab-llm with `--save-spec runs/dev/spec-ab-llm-<sha>.json` (tests the "say that X" extraction
+rule), (3) runs PUB-07 only on dev-a-llm2 with `--style asks_back` and `--style pieces` at 3 reps (fast check of
+aa94ccb), then (4) `styled-ab-a.json` and `styled-extra-b.json` on dev-ab-llm, `styled-b.json` on dev-ab-llm,
+`styled-a.json` on dev-a-llm2, all `--reps 3 --out runs/dev/r3/<name>-<sha>.json`. Use bash, one simulation at a time.
+
+**Results so far tonight** (styled = every case in one of the 5 kit speech styles; a case counts at 3/3):
+
+| Set | 676e9df (17:00) | a8b70ea (17:55) | What is fixed since a8b70ea (not yet measured) |
+|---|---|---|---|
+| A agent, styled-a | 7/10 | 7/10 (2 simulator, 1 sandbox-output, PUB-07) | bd944df size revert; aa94ccb period rows |
+| A+B, styled-b | 2/3 | 2/3 (script/style conflict only) | |
+| A+B, styled-extra-b | 1/3 | 2/3 (paid sentence, "today?" re-ask) | 92d91ea |
+| A+B, styled-ab-a | 5/10 | 7/10 (PUB-08 no note, PUB-07) | 39d7dd9 auto-notes; aa94ccb |
+
+Every failure is read and classified in the Score log (rows 10-10 20:09 to 21:35).
+
+**Open problems, in order:**
+1. PUB-07 dates: "Monday" after "the week after next" was resolved to the deadline Monday (2 Nov). aa94ccb lists
+   the period's days in the DATE TABLE (1401 chars; the guard is 1450). Measure with the targeted runs first.
+2. Sandbox output size: a 1920-char date table broke every verify_identity post-hook in one call ("Sandbox did not
+   return a parseable result"); reverted in bd944df. Keep the date table and other variables small.
+3. Simulator artefacts seen: customers hanging up early (7 s, 19 s), dates garbled ("26 August"), cut-off messages
+   that never complete, and corrects-style answers that conflict with case scripts. Classify, do not chase.
+4. Diff-review open items: 13 (engine_fields typed as strings), 17 (EVERY DAY gone, moot), 18 (Freya calls after the
+   model budget), part of 5 (a band-mandated transfer with notes). Direction-review gaps 7, 9, 11 and 8b remain.
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
@@ -87,8 +105,12 @@ the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
 - dcb3915 (gap 13): 25-min model-call budget, 240 s per call, a stall falls back, repair skipped under 5 min.
 - 4e6629f (gap 16): variant-c/-r rebuilt at dcb3915 with the real LLM (both PASS, 11 tools) and are pytest fixtures.
 - e233cb8: with notes, note-derived rows are no negotiate ending; NOTES says do the ending's duty, then note.
-- a3e6c77: DATE TABLE EVERY DAY weeks. 347e01d: diff-review fixes (see Running right now).
-- `make verify`: **751 passed**.
+- 347e01d: diff-review fixes (note endings stay; deferred notes; one "complete" definition; transfer precedence; failed repair keeps the best spec; engine_fields checks). a8b70ea: the loop breaker covers repeated parts.
+- bd944df: EVERY DAY weeks (a3e6c77) reverted after a sandbox-output failure; size guard test.
+- 92d91ea: the forbidden "can you pay <product> today?" named; extraction turns "say that X" into sentences.
+- 39d7dd9: note-derived endings add missing notes in code (an_<k> chain; platform dry run valid).
+- aa94ccb: "next week" / "the week after next" rows list their seven days.
+- `make verify`: **759 passed**.
 
 
 ## What changed earlier today (all committed; details in the Decision log and git log)
