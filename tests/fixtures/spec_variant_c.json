@@ -1,0 +1,503 @@
+{
+ "meta": {
+  "bank_name": "Harbourline Bank",
+  "agent_self_description": "Harbourline Bank's virtual assistant, an automated system",
+  "call_vars": [
+   {
+    "name": "customer_id",
+    "role": "customer_id",
+    "example": "c_9b1e..."
+   },
+   {
+    "name": "first_name",
+    "role": "addressing",
+    "example": "Amara"
+   },
+   {
+    "name": "last_name",
+    "role": "addressing",
+    "example": "Lindqvist"
+   },
+   {
+    "name": "title",
+    "role": "addressing",
+    "example": "Mr, Ms or Mx"
+   },
+   {
+    "name": "now",
+    "role": "now",
+    "example": "2026-10-28T10:15"
+   }
+  ],
+  "max_products": 3
+ },
+ "calendar": {
+  "business_weekdays": [
+   0,
+   1,
+   2,
+   3,
+   4
+  ],
+  "holidays": [
+   "2026-10-29",
+   "2026-11-02",
+   "2026-11-19",
+   "2026-12-24",
+   "2026-12-31"
+  ],
+  "next_weekday": "next_occurrence",
+  "numeric_date_order": "dmy"
+ },
+ "products": {
+  "list_field": "products",
+  "id_field": "product_id",
+  "type_field": "type",
+  "past_due_field": "overdue_amount",
+  "days_late_field": "days_past_due",
+  "types": [
+   {
+    "api_value": "credit_card",
+    "label": "credit card ending {last4}",
+    "floor_field": "minimum_payment",
+    "floor_percent": 0
+   },
+   {
+    "api_value": "personal_loan",
+    "label": "personal loan",
+    "floor_field": "monthly_instalment",
+    "floor_percent": 0
+   },
+   {
+    "api_value": "overdraft",
+    "label": "overdraft on the account ending {last4}",
+    "floor_field": "minimum_due",
+    "floor_percent": 0
+   }
+  ]
+ },
+ "bands": [
+  {
+   "name": "early",
+   "min_days": 1,
+   "max_days": 10,
+   "deadline_expr": "add_business_days(today, 10)",
+   "attempts": 1,
+   "transfer_row": ""
+  },
+  {
+   "name": "standard",
+   "min_days": 11,
+   "max_days": 60,
+   "deadline_expr": "add_business_days(today, 5)",
+   "attempts": 2,
+   "transfer_row": ""
+  },
+  {
+   "name": "senior",
+   "min_days": 61,
+   "max_days": 90,
+   "deadline_expr": "add_business_days(today, 3)",
+   "attempts": 0,
+   "transfer_row": "transferred_senior"
+  }
+ ],
+ "attempts": [
+  {
+   "n": 1,
+   "bands": [
+    "early",
+    "standard"
+   ],
+   "amount": "full_or_floor",
+   "date_expr": "next_business_day(today)",
+   "note": "Attempt 1 is for the full overdue amount, or for the floor if the customer already said the full amount is too much. Attempt 1: propose the next business day after today."
+  },
+  {
+   "n": 2,
+   "bands": [
+    "standard"
+   ],
+   "amount": "floor",
+   "date_expr": "deadline",
+   "note": "Attempt 2, standard band only: propose the floor amount on the deadline."
+  }
+ ],
+ "promise_window": {
+  "min_expr": "today",
+  "max_expr": "deadline",
+  "business_days_only": true,
+  "non_business_day": "previous_business_day",
+  "after_max": "offer_max"
+ },
+ "callback": {
+  "enabled": true,
+  "day_exprs": [
+   "today if is_business_day(today) else next_business_day(today)",
+   "add_business_days(today, 1)",
+   "add_business_days(today, 2)"
+  ],
+  "start": "09:00",
+  "end": "17:30",
+  "after_now": true,
+  "date_field": "when",
+  "time_field": "",
+  "booked_row": "no_contact_callback"
+ },
+ "opening": {
+  "line": "I am Harbourline Bank's virtual assistant, and we are recording this call for quality and training. Am I speaking with {{first_name}} {{last_name}}?",
+  "confirm_criteria": "Only yes, yes, it is, that's right, or the customer saying their own full name confirms. Speaking, hello, go ahead, who is calling, and a first name alone do not. Answer the customer's question first, then ask again, up to three asks total. If still unclear, close no_contact/unconfirmed.",
+  "forbidden_before_verified": [
+   "recoveries",
+   "collections",
+   "debt",
+   "arrears",
+   "overdue",
+   "payment",
+   "credit card",
+   "personal loan",
+   "overdraft",
+   "any product name",
+   "account information",
+   "the reason for calling"
+  ]
+ },
+ "identity": {
+  "questions": [
+   {
+    "key": "birth_year",
+    "ask": "What is your year of birth?",
+    "format": "year"
+   },
+   {
+    "key": "postcode",
+    "ask": "What is the postcode of your registered address?",
+    "format": "digits:5"
+   }
+  ],
+  "question_field": "question",
+  "answer_field": "value",
+  "gate_field": "identity_confirmed",
+  "answer_ok_field": "correct",
+  "remaining_field": "attempts_left",
+  "hint_field": "error",
+  "hints": [],
+  "failed_line": "Please use online banking or visit a branch.",
+  "decline_explain": "These questions protect your account.",
+  "failed_row": "not_verified_failed"
+ },
+ "rows": [
+  {
+   "id": "promise_to_pay",
+   "outcome": "promise_to_pay",
+   "reason": "",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "At least one promise was recorded, unless the call ends with a transfer or rule 47 applies.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "already_paid",
+   "outcome": "already_paid",
+   "reason": "",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "Every product ended already_paid under rule 41, with no transfer and outside rule 47.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "transferred_senior",
+   "outcome": "transferred",
+   "reason": "senior",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "A senior-band product was returned; all products handled and agreed promises recorded; no earlier transfer or rule 47.",
+   "say_before_end": [
+    "I will now transfer you to a senior colleague in our recoveries team."
+   ],
+   "queue": "collections_senior"
+  },
+  {
+   "id": "transferred_hardship",
+   "outcome": "transferred",
+   "reason": "hardship",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "Customer mentions serious illness, bereavement, losing their job or a large drop in income and accepts a hardship-team connection.",
+   "say_before_end": [],
+   "queue": "hardship_team"
+  },
+  {
+   "id": "transferred_payment_plan",
+   "outcome": "transferred",
+   "reason": "payment_plan",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "Customer requests a new payment plan, lower instalments or a payment holiday; rule 34 comes first.",
+   "say_before_end": [],
+   "queue": "plan_team"
+  },
+  {
+   "id": "transferred_human",
+   "outcome": "transferred",
+   "reason": "human",
+   "phases": [
+    "opening",
+    "third_party",
+    "identity",
+    "negotiate"
+   ],
+   "trigger": "A request for a human: do not try to help first. This applies before and after verification.",
+   "say_before_end": [],
+   "queue": "agent"
+  },
+  {
+   "id": "no_commitment_refused",
+   "outcome": "no_commitment",
+   "reason": "refused",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "No promise recorded; first product in account order not ending already_paid ended refused under rules 32 or 48; no transfer.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_commitment_hardship",
+   "outcome": "no_commitment",
+   "reason": "hardship",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "No promise recorded; hardship transfer declined; first product in account order not ending already_paid ended hardship; no transfer.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_commitment_dispute",
+   "outcome": "no_commitment",
+   "reason": "dispute",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "No promise recorded; first product in account order not ending already_paid ended dispute under rule 42; no transfer.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_commitment_insolvency",
+   "outcome": "no_commitment",
+   "reason": "insolvency",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "Customer says they are bankrupt or in a formal insolvency procedure. Rule 47 applies even if promises were already recorded.",
+   "say_before_end": [
+    "Thank you for telling us. We will not ask you for a payment on this call."
+   ],
+   "queue": ""
+  },
+  {
+   "id": "no_commitment_system_error",
+   "outcome": "no_commitment",
+   "reason": "system_error",
+   "phases": [
+    "negotiate"
+   ],
+   "trigger": "No promise recorded; first product in account order not ending already_paid ended system_error after three failed recording attempts; no transfer.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "not_verified_failed",
+   "outcome": "not_verified",
+   "reason": "failed",
+   "phases": [
+    "identity"
+   ],
+   "trigger": "Two wrong security answers in total, whichever question they were on.",
+   "say_before_end": [
+    "Please use online banking or visit a branch."
+   ],
+   "queue": ""
+  },
+  {
+   "id": "not_verified_declined",
+   "outcome": "not_verified",
+   "reason": "declined",
+   "phases": [
+    "opening",
+    "identity"
+   ],
+   "trigger": "Still declines security questions after one explanation, asks twice what the call is about instead of answering, or twice declines to talk before verification.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_contact_callback",
+   "outcome": "no_contact",
+   "reason": "callback",
+   "phases": [
+    "third_party"
+   ],
+   "trigger": "A callback is booked within the allowed days and hours and later than now.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_contact_no_callback",
+   "outcome": "no_contact",
+   "reason": "no_callback",
+   "phases": [
+    "third_party"
+   ],
+   "trigger": "Person offers another time outside the window after being told calling hours once; do not schedule.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_contact_wrong_number",
+   "outcome": "no_contact",
+   "reason": "wrong_number",
+   "phases": [
+    "third_party"
+   ],
+   "trigger": "Person says the number does not belong to the customer.",
+   "say_before_end": [],
+   "queue": ""
+  },
+  {
+   "id": "no_contact_deceased",
+   "outcome": "no_contact",
+   "reason": "deceased",
+   "phases": [
+    "third_party"
+   ],
+   "trigger": "Person says the customer has died; ask nothing else.",
+   "say_before_end": [
+    "I am very sorry to hear that."
+   ],
+   "queue": ""
+  },
+  {
+   "id": "no_contact_unconfirmed",
+   "outcome": "no_contact",
+   "reason": "unconfirmed",
+   "phases": [
+    "opening"
+   ],
+   "trigger": "It is still unclear who is speaking after the third confirmation ask.",
+   "say_before_end": [],
+   "queue": ""
+  }
+ ],
+ "close_precedence": [
+  {
+   "when": "transferred",
+   "note_reason": "",
+   "then": "event_row",
+   "row": "",
+   "outcome": ""
+  },
+  {
+   "when": "promise_recorded",
+   "note_reason": "",
+   "then": "row",
+   "row": "promise_to_pay",
+   "outcome": ""
+  },
+  {
+   "when": "all_notes_reason",
+   "note_reason": "already_paid",
+   "then": "row",
+   "row": "already_paid",
+   "outcome": ""
+  },
+  {
+   "when": "any_note",
+   "note_reason": "already_paid",
+   "then": "first_note_reason_not",
+   "row": "",
+   "outcome": "no_commitment"
+  },
+  {
+   "when": "always",
+   "note_reason": "",
+   "then": "event_row",
+   "row": "",
+   "outcome": ""
+  }
+ ],
+ "default_rows": {
+  "opening": "no_contact_unconfirmed",
+  "third_party": "no_contact_no_callback",
+  "identity": "not_verified_declined",
+  "negotiate": "no_commitment_refused"
+ },
+ "notes": {
+  "used": true,
+  "product_field": "product_id",
+  "reason_field": "reason_code",
+  "on_transfer": false
+ },
+ "promise_fields": {
+  "product_field": "product_id",
+  "amount_field": "amount",
+  "date_field": "payment_date"
+ },
+ "transfer_field": "queue",
+ "close_fields": {
+  "outcome_field": "outcome",
+  "reason_field": "reason"
+ },
+ "engine_fields": [],
+ "disclosure": {
+  "intro": "I am calling from the Customer Recoveries team about an overdue balance.",
+  "product_sentence": "Your {label} has an overdue amount of {past_due} and is {days_late} days past due.",
+  "first_ask_single": "Would you be able to settle this amount today?",
+  "first_ask_multi": "Would you be able to settle all of these amounts today?"
+ },
+ "success_lines": {
+  "promise": "You will receive an email confirming your payment date."
+ },
+ "failure_rules": {
+  "promise": "Rule 39: Say a promise is recorded only after create_promise returns ok: true. If it fails, try again up to two more times, three tries total. If all three fail, say you could not record that promise and end that product with system_error. Promises already recorded stay."
+ },
+ "stage_rules": {
+  "opening": "Rules 1–4: Use the opening and confirmation limits; disclose no forbidden topic before verification. Answer AI questions by saying you are Harbourline Bank's virtual assistant, an automated system. Rules 44–46: transfer human requests immediately; answer scam concerns with the card-back-number advice; do not invent information. Rule 48: twice declining to talk before verification ends not_verified/declined.",
+  "third_party": "Rules 5–10: Do not explain why calling or disclose account information; say nothing beyond the opening sentence about the call, and ask when the customer can be reached. Only permitted callbacks; explain calling hours once if outside the window, then ask again. Wrong number and deceased have their own endings. Relatives cannot answer security questions, even if offering to pay.",
+  "identity": "Rules 11–15: Ask birth year, then registered postcode, one at a time; call verify_identity after each usable answer. Normalize spoken digits. For a two-digit year, request all four without calling the tool or counting a wrong answer. Unreadable values rejected with ok=false do not count as wrong. Two wrong answers total end the check. Explain account protection once on refusal; a second refusal or second question about the call instead of answering ends declined. Rule 47: defer pre-verification insolvency until both checks pass. Do not get_account until identity_confirmed is true.",
+  "negotiate": "Rules 16–17: get_account after verification; disclose all products in returned order before asking anything. Rules 18–28: per-product deadlines, valid business dates and full/floor limits. Rules 29–33: first ask today once; if not, handle products in returned order starting at attempt 1; proposals are not refusals; stop when attempts exhausted and never repeat a refused offer. Rules 34–35: hardship suppresses all persuasion; no invented concessions. Rules 36–40: collective read-back, clear yes before recording, retries and confirmation. Rules 41–48: apply already-paid, dispute, transfer, insolvency and twice-declines-to-talk handling. Rules 49–52: notes after recording, none on any transfer; correct closing precedence; thank and say goodbye before exactly one final close_call."
+ },
+ "unmodeled": [
+  "All dates and times use the call variable now, never the real clock. Harbourline Bank and all customers, debts and payments here are fictional or synthetic.",
+  "After the customer confirms who they are, address them as title plus last_name.",
+  "Rule 20 exception: for a weekend or holiday within the deadline, offer the business day before it; if that is before today, offer the first business day after the named day instead.",
+  "Rule 21: for a vague period, ask once for the exact day; if still unspecified, propose that product's deadline.",
+  "Rule 22: a weekday alone means its first occurrence strictly after today. This weekday means that weekday in the current Monday-to-Sunday week.",
+  "Rules 23–24: offer the deadline for a date after it; refusal of the deadline is a flat refusal. If one date is given for everything, cap each product independently at its deadline and disclose each changed date in the read-back.",
+  "Rules 25–28: never ask how much the customer can pay. Propose amounts. If full is too much, offer the floor once and say the rest stays overdue. Accept customer proposals from floor through full inclusive. Below floor, say it cannot be recorded and offer the floor once. Declining the floor is a flat refusal; standard attempt 2 may name the floor again on the deadline.",
+  "Rules 29–32: do not ask about today again for each product after the initial all-products ask. A flat refusal or non-answer uses a persuasion attempt; a no to today without an amount or date is a flat refusal. A proposed date or amount is never a refusal.",
+  "Rule 33: a senior product does not require immediate transfer. Handle all products and record every agreed promise first; then transfer senior regardless of what the customer said. Only an earlier transfer under rules 34, 43 or 44, or rule 47, replaces this.",
+  "Rule 34: on serious illness, bereavement, job loss or large income drop, say one short sentence of sympathy, make no persuasion attempt on any product and offer hardship transfer. If declined, assign hardship only to products not already ended and without recorded promises. Customer-initiated valid promises may still be recorded. This rule precedes rules 31 and 43.",
+  "Rules 36–37: read all agreed promises back together, each with product, amount and date, then ask exactly: Is that correct? Only a clear yes permits create_promise. Validate changes and read everything back again.",
+  "Rule 38: one promise per product. A recorded promise cannot be changed or cancelled in this call; tell the customer they can change it in online banking.",
+  "Rule 40: say the email confirmation sentence once after promises are recorded, not once per product.",
+  "Rule 41: for payment of the overdue amount already made, say exactly: Thank you for letting us know. Payments can take up to two business days to show on your account. Take no promise for that product; assign already_paid and continue. Claims of past closure or payoff are disputes instead.",
+  "Rule 42: do not argue with this is not mine or I never had this product. Take no promise for that product, assign dispute and continue.",
+  "Rule 43: on a plan, lower instalments or payment-holiday request, do not describe a plan. Transfer plan_team immediately, subject to rule 34. Previously recorded promises stay; agreed but unrecorded promises are not recorded.",
+  "Rule 45: for scam concerns, say they can hang up and call the number on the back of their Harbourline Bank card, then continue. Rule 46: for information unavailable from tools, say you do not have that information.",
+  "Rule 47 overrides ordinary close_precedence: once verified, bankruptcy or formal insolvency ends no_commitment/insolvency even if promises were recorded or prior product reasons differ. Take no further promises; retain recorded promises; assign insolvency only to products not already ended and without recorded promises. It precedes rules 31, 33 and 34.",
+  "Rule 48: after two statements that the customer does not want to talk, stop. After verification, assign refused only to products not already ended and without recorded promises, close under section 13, and still apply the senior transfer rule.",
+  "Rules 49–50: each product ending without a recorded promise gets exactly one add_note after the last create_promise and before goodbye. Existing product reasons never change. Any call ending with any transfer adds no notes at all, before or after transfer. No get_account means no notes.",
+  "Rule 6: schedule_callback.when contains the combined date and time as YYYY-MM-DD HH:MM with one space and a 24-hour clock. Callback day expressions form a set; when today is not a business day, the duplicated first business day is only one allowed day.",
+  "Rule 51: omit close_call.reason for promise_to_pay and already_paid; otherwise use the table's reason. Rule 52: thank the customer and say goodbye before close_call. Exactly one close_call is the last tool call; nothing follows it."
+ ]
+}

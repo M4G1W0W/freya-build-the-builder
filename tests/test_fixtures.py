@@ -12,7 +12,11 @@ from pathlib import Path
 
 import pytest
 
+from freya_builder.datecheck import check_dates
+from freya_builder.render import render
+from freya_builder.spec import SPEC_SCHEMA, check_spec, product_slots, schema_problems
 from freya_builder.toolapi import load_tool_api
+from freya_builder.validate import unsent_required, validate
 
 FIX = Path(__file__).resolve().parent / "fixtures" / "briefs"
 KIT_API = Path(__file__).resolve().parents[1] / "kit" / "tools" / "openapi.json"
@@ -69,3 +73,19 @@ def test_extra_cases_match_the_public_accounts_they_reuse():
         assert {n["product_id"] for n in c["expected"]["notes"]} <= {
             f"p{i + 1}" for i in range(len(p["products"]))
         }
+
+
+@pytest.mark.parametrize("variant", ["c", "r"])
+def test_single_file_multi_product_variants_build_cleanly(variant):
+    # Review gap 16: the hidden briefs are one file each, with customers of one to three products.
+    # These specs were extracted at dcb3915 from our own made-up variants (with their changed tool
+    # APIs); every check the build runs must stay clean on them.
+    fx = Path(__file__).resolve().parent / "fixtures"
+    spec = json.loads((fx / f"spec_variant_{variant}.json").read_text())
+    tools = load_tool_api(fx / "briefs" / f"variant-{variant}.openapi.json")
+    assert schema_problems(spec, SPEC_SCHEMA) == []
+    assert check_spec(spec, tools) == []
+    assert check_dates(spec) == []
+    assert product_slots(spec) == 3
+    wf = render(spec, tools, (fx / "briefs" / f"variant-{variant}.md").read_text())
+    assert validate(wf) == [] and unsent_required(wf, tools) == []
