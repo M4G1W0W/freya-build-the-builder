@@ -114,3 +114,32 @@ def test_model_id_requires_env(monkeypatch):
     monkeypatch.delenv("BUILDER_MODEL", raising=False)
     with pytest.raises(llm.LLMError):
         llm.model_id()
+
+
+def test_rate_limit_after_retries_falls_back_to_the_next_model(monkeypatch):
+    # audit F77: a 429 on the primary model used to fail the whole build after 2 retries.
+    trace, buf = make_trace(monkeypatch)
+    monkeypatch.setenv("BUILDER_MODEL", "busy-model")
+    monkeypatch.setenv("BUILDER_MODEL_FALLBACKS", "spare-model")
+    monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    tried = []
+
+    def post(path, body, timeout):
+        tried.append(body["model"])
+        if body["model"] == "busy-model":
+            raise urllib.error.HTTPError(
+                "u", 429, "rate", {}, io.BytesIO(b'{"error": "rate limit"}')
+            )
+        return fake_response('{"x": 3}')
+
+    monkeypatch.setattr(llm, "_post", post)
+    assert llm.chat_json(trace, "p", "s", "u", SCHEMA) == {"x": 3}
+    assert tried == ["busy-model"] * 3 + ["spare-model"]
+    out = buf.getvalue()
+    assert "model call 'p' to busy-model failed" in out  # audit F80: failed calls name the model
+    assert "falling back to spare-model" in out and "model=spare-model" in out
+
+
+def test_strict_json_unsupported_counts_as_unavailable():
+    assert llm._unavailable(400, '{"error": "response_format json_schema is not supported"}')
+    assert not llm._unavailable(400, '{"error": "bad request: messages missing"}')

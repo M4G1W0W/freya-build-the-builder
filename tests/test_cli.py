@@ -52,3 +52,23 @@ def test_needs_brief_and_tool_api():
 def test_multiple_briefs_are_concatenated_in_order():
     text = cli.read_briefs([BRIEF, str(KIT / "briefs" / "brief-b.md")])
     assert text.index("brief-a.md") < text.index("brief-b.md")
+
+
+def test_brief_in_cp1252_is_read(tmp_path):
+    # audit F79: a pasted e-mail saved as cp1252 crashed the strict UTF-8 read.
+    brief = tmp_path / "raw.md"
+    brief.write_bytes("Kunde schuldet 420 € – bitte prüfen".encode("cp1252"))
+    assert "420 € – bitte prüfen" in cli.read_briefs([str(brief)])
+
+
+def test_a_failing_build_exits_1_with_a_redacted_traceback(capsys, monkeypatch):
+    # audit F80: the re-raised traceback bypassed the trace's secret redaction.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-SECRET-abcdef")
+
+    def boom(trace, brief_text, tools):
+        raise RuntimeError("upstream said: key sk-test-SECRET-abcdef invalid")
+
+    assert cli.run([BRIEF, API, "--dry"], boom, fake_render) == 1
+    err = capsys.readouterr().err
+    assert "ERROR" in err and "RuntimeError" in err and "Traceback" in err
+    assert "sk-test-SECRET-abcdef" not in err

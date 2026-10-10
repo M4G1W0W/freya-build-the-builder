@@ -10,6 +10,7 @@ The last positional argument is the tool API (OpenAPI JSON); everything before i
 import argparse
 import json
 import sys
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 
@@ -44,8 +45,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def read_briefs(paths: list[str]) -> str:
     parts = []
     for p in paths:
-        parts.append(f"===== FILE: {Path(p).name} =====\n{Path(p).read_text(encoding='utf-8')}")
+        parts.append(f"===== FILE: {Path(p).name} =====\n{_read_text(Path(p))}")
     return "\n\n".join(parts)
+
+
+def _read_text(path: Path) -> str:
+    """UTF-8, else cp1252 (pasted e-mails), else UTF-8 with replacement: never crash (audit F79)."""
+    data = path.read_bytes()
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
 
 
 def count_tools(wf: dict) -> int:
@@ -122,9 +134,11 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         print(json.dumps(saved))
         ok = True
         return 0
-    except Exception as e:  # the trace must record why a run failed
+    except Exception as e:  # the trace must record why a run failed, redacted (audit F80)
         trace.line("ERROR", f"{type(e).__name__}: {e}")
-        raise
+        for row in traceback.format_exc().rstrip().splitlines():
+            trace.line("ERROR", row)
+        return 1
     finally:
         trace.end(ok)
 

@@ -54,7 +54,7 @@ def model_chain() -> list[str]:
 
 def _unavailable(code: int, text: str) -> bool:
     low = text.lower()
-    return (
+    missing = (
         code in (400, 403, 404)
         and "model" in low
         and (
@@ -64,6 +64,9 @@ def _unavailable(code: int, text: str) -> bool:
             or "model_not_found" in low
         )
     )
+    # A model that cannot do strict JSON output is as good as missing for this builder.
+    unsupported = code == 400 and ("json_schema" in low or "response_format" in low)
+    return missing or unsupported
 
 
 def chat_json(
@@ -116,16 +119,22 @@ def _chat_once(trace, purpose, system, user, schema, schema_name, model, retries
             if _unavailable(e.code, text):
                 raise ModelUnavailable(f"{purpose}: {last}") from None
             if e.code in RETRY_STATUS and attempt < retries:
-                trace.warn(f"model call '{purpose}' failed ({last[:120]}), retrying")
+                trace.warn(f"model call '{purpose}' to {model} failed ({last[:120]}), retrying")
                 time.sleep(2 * (attempt + 1))
                 continue
+            trace.warn(f"model call '{purpose}' to {model} failed ({last[:120]})")
+            if e.code in RETRY_STATUS:  # rate limit or outage after retries: try the next model
+                raise ModelUnavailable(f"{purpose}: {last}") from None
             raise LLMError(f"{purpose}: {last}") from None
         except (urllib.error.URLError, TimeoutError) as e:
             last = str(e)
             if attempt < retries:
-                trace.warn(f"model call '{purpose}' network error ({last[:120]}), retrying")
+                trace.warn(
+                    f"model call '{purpose}' to {model} network error ({last[:120]}), retrying"
+                )
                 time.sleep(2 * (attempt + 1))
                 continue
+            trace.warn(f"model call '{purpose}' to {model} network error ({last[:120]})")
             raise LLMError(f"{purpose}: {last}") from None
         message = resp["choices"][0]["message"]
         if message.get("refusal"):
