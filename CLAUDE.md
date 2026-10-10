@@ -28,8 +28,8 @@ The **kit** (emailed at the start) overrides it. The full digest is in `docs/hac
   code, prompts, tests or fixtures.
 - The phone agent may call **only the kit's tool API**. Any other service fails the case.
 - The phone agent runs on the **Freya model set in the kit's `freya.py`. Do not change it.**
-- **One Freya key per team. Do not probe or load-test the platform.** At most **10 workflows**
-  per workspace (update in place). Only **1 practice simulation** can run at a time.
+- **One Freya key per team. Do not probe or load-test the platform.** At most **200 workflows**
+  per workspace (update in place via `freya.save_workflow`). Only **1 practice simulation** can run at a time.
 - Submit a builder, not a hand-built agent. Never edit a generated phone agent by hand.
 
 ## Freya reference (details: `docs/freya_api_notes.md`; the kit's `docs/` and `freya.py` win)
@@ -79,7 +79,24 @@ runs/                     (gitignored) per-run artefacts: generated configs, tra
 submission/               (COMMITTED) exported phone agents: hidden-N.workflow.json
 traces/                   (COMMITTED) builder traces: hidden-N.log (keys stripped)
 ```
-Kit location: TBD when it arrives. Keep it separate from our `docs/` (the kit also has a `docs/`), e.g. `kit/`.
+**Kit: `kit/`**, unmodified, from <https://www.freyavoice.ai/hackathon/build-the-builder.zip> (Data tab,
+downloaded 2026-10-10; sha256 0d7e816a…). Read `kit/README.md` and `kit/docs/*.md` before touching workflows.
+Don't edit files in `kit/`. Wrap or copy them instead, so it stays diffable against the official zip.
+
+## Kit facts (verified 2026-10-10)
+
+- **Env:** `source .env` sets `FREYA_API_KEY` (fak_…), `FREYA_API_URL=https://staging-app.freyavoice.ai`,
+  `FREYA_BANK_TEAM_KEY` (ours, ≥16 chars, never change it) and `FREYA_WORKSPACE_ID`. **No MCP exists or is needed**:
+  everything goes through `kit/freya.py` (REST, stdlib, browser-like User-Agent required).
+- **Workflow API:** `POST /api/v2/workflow` (`?dryRun=true` validates), `PUT /api/v2/workflow/{id}` (full replace,
+  **unpublished**), publish via `POST /api/v2/versions/workflow/{id}/publish`. Use `freya.save_workflow(slot, wf)`,
+  which creates, updates and publishes in one call. A workspace holds **200 workflows**.
+- **Phone-agent model:** `freya.AGENT_LLM` = `experimental-5`. Never change it. The simulator and judge use gemini-3-flash-preview.
+- **Bank tools:** `api_call` tools posting to `https://freya-bank-mock.freyavoice.workers.dev/v1/<tool>`, with
+  `customer_id` baked from `{{customer_id}}`. A result lands as `<tool>_response.data.*` (booleans as "true"/"True").
+- **Scoring:** `python3 kit/tools/run_cases.py <agent_id> --brief A|B [--reps 3] [--style pieces|corrects|talkative|asks_back|in_words] [--out results/x.json]`.
+  Debug with `freya.get_call(call_id)["messages"]` (system events show `route_evaluated` and tool calls).
+- **Fast check without a simulation:** `POST /api/v2/chat/message {workflowId, message, customerVariables}`.
 
 Preliminary pipeline **hypothesis** (not a plan; validate against the kit first):
 brief + tool API → requirements extraction → structured policy → workflow config → Freya deploy →

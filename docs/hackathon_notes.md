@@ -5,6 +5,12 @@
 `docs/reference/hackathon_practice_cases.json`. The kit (emailed at the start) supersedes both.
 Event listing: <https://events.ycombinator.com/AI-FDE-Build-the-Builder26>.
 
+> **Update 2026-10-10 ~14:30 Istanbul.** The page changed at kickoff. The kit is now a download
+> (`build-the-builder.zip`, Data tab), saved unmodified in `kit/`. The workflow limit is **200** (was 10). The API key and
+> support channel come by email. The platform is **staging-app.freyavoice.ai**, the phone-agent model is `experimental-5`,
+> and there is **no MCP**: everything goes through `kit/freya.py`. The workspace contains an organiser base workflow
+> "Freya Bank Collections Base (2 nodes)" (`2f14ba80-…`). The kit README is the authority; key facts are in `CLAUDE.md` → Kit facts.
+
 ## Objective in one paragraph
 
 A synthetic bank (Freya Bank) phones customers who are late on a payment. We write a **builder**: one
