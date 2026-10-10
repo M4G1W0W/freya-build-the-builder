@@ -187,6 +187,11 @@ fail a case, how the team key is wired in exported workflows, what form hidden b
   the bank call succeeded**: the model retries, and the ledger gets duplicates or a service_error note. Hooks on
   ledger-writing tools amplify sandbox flakes into ledger damage. Candidate change, if it recurs outside outage windows:
   no post-hooks on create_promise/add_note.
+- **2026-10-10 19:53–20:03 UTC: Freya API 503** "API key validation is temporarily unavailable"; the kit's run_cases
+  died while polling (no retry). `scripts/run_cases_retry.py` now retries GET 5xx.
+- **2026-10-10 21:17–21:55 UTC: a simulation stuck in `running`** (1f458199, styled-extra-b rep 3) after its 3 calls had
+  ended normally; it blocked every new simulation. Paused with `PUT /simulations/{id} {"status": "paused"}` (user
+  approved); the queue resumed at once. Check `GET /api/v2/simulations?workspaceId=..&limit=3` when a run hangs.
 - **2026-10-10 13:41–14:14 UTC: platform outage.** `/chat/message` returned 503 for every workflow, and simulation agents
   went silent after the first customer turn. For about 5 minutes after recovery, sandbox and tool latency was 6–11 s and
   calls still stalled. Treat runs in such windows as invalid (check the setup and verify latency in transcripts).

@@ -262,6 +262,10 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
   Live response defaults: concurrency 1, 240 s per call, 3 retries, 1 run per persona [C].
 - **Results are async.**
   - `GET /simulations/{id}` gives status `draft|running|paused|completed`, metrics and `latestPassRate`.
+  - **A simulation can get stuck in `running`** after all its calls ended (10 Oct, 1f458199: calls ended 21:16 UTC,
+    status still `running` at 21:55). It blocks every new simulation ("concurrent simulations"), and the kit's
+    `run_simulation` polls with no timeout. `PUT /simulations/{id}` with `{"status": "paused"}` (live spec; not in the
+    kit) set it to `paused`, keeping its data, and the next queued simulation started 1 s later [C, user-approved].
   - `GET /simulations/{id}/iterations` gives passed, failed, inconclusive, error and analyzing counts, `passRate` and `agentVersionId`.
   - `GET /simulations/version-checks` and `GET /simulations/version-persona-runs` take `workspaceId` and `entityVersionId`.
   - `POST /simulations/{id}/rerun` starts a new iteration [C].
