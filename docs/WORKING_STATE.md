@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 16:56 Istanbul (13:56 UTC). Last commit `03ee6b0`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 17:08 Istanbul (14:08 UTC). Last commit `cd6970c`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -22,8 +22,8 @@ The phases come from `docs/design.md` §7:
   completion endpoint, maxTokens 4000 < our 4.2–4.6k outputs, undocumented model strings); see the Decision log. Still
   open: how the organisers get an OpenAI key for their re-run (ask them on the support channel).
 - **PLATFORM OUTAGE since about 13:41 UTC:** `/chat/message` returns 503 for every workflow, and simulation agents go
-  silent after the first customer turn. Runs llmA@d46b807 rep 3 and extraB@d46b807 are invalid. A background probe
-  checks again around 14:04 UTC. When Freya is back, run `bash <scratchpad>/chain.sh` (redeploy at HEAD, then PUB-05 on
+  silent after the first customer turn. Runs llmA@d46b807 rep 3 and extraB@d46b807 are invalid. Background job `bu0m04miu`
+  probes every 10 min and starts `chain.sh` by itself once Freya answers (the 14:03 probe was still 503). When Freya is back, run `bash <scratchpad>/chain.sh` (redeploy at HEAD, then PUB-05 on
   the A+B agent, abB, extraB, llmA, abA, and a 1-rep style sweep). The script is reproduced in the next-steps section.
 - Commits this session:
   - `90b737d`: PUB-03 identity + PUB-12 stop line.
@@ -36,6 +36,7 @@ The phases come from `docs/design.md` §7:
   - **`92b83b5`: notes-done route into a speaking passthrough `wrap_up`** (structural fix for the goodbye-with-note
     stall; not yet measured).
   - `03ee6b0`: DATES resolve weekday phrases first.
+  - `cd6970c`: facts OFFER PLAN line (attempt counts side by side, early band "ONE offer only").
   - `make verify`: 688 passed.
 - Measured (3 reps):
   - fixA@90b737d 10/10, llmA@90b737d 10/10, rawA@fe1d7ef 10/10 (raw-material brief).
