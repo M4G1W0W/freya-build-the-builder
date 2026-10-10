@@ -1,4 +1,4 @@
-"""Experiment 07: which negotiate DATES wording makes the model answer a holiday as "the latest date"?
+"""Experiment 07: what makes the model answer a holiday as "the latest date" (PUB-07)?
 
 PUB-07 ("the week after next", then "Monday the 26th", a holiday 7 days before the Monday deadline)
 was answered right in ~11 of 12 calls up to d46b807 and in ~3 of 15 calls from 676e9df on: the model
@@ -8,8 +8,17 @@ own slot, so the variants can be simulated one after the other with run_cases.py
 
     python experiments/exp07_p07_dates_ablation.py <variant> <brief> <tool_api> --spec <spec> --slot <slot>
 
-Variants: noweekday (drop the same-weekday sentence of 03ee6b0), noperiod (drop the period sentence
-of 19664c6), old (the DATES line of 90b737d), 1slot (one product slot instead of 3, 773b0dd).
+Variants:
+- noweekday: drop the same-weekday sentence of 03ee6b0 from the DATES line;
+- noperiod: drop the period sentence of 19664c6 from the DATES line;
+- old: the DATES line of 90b737d;
+- 1slot: one product slot instead of 3 (773b0dd);
+- nounused: 3 slots, but FACTS leaves out the "P<k>: not in use" lines;
+- noperiodrows: the DATE TABLE without its "next week" / "the week after next" rows;
+- notoomuch: FACTS without the "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH" line (35c030a);
+- ctltext:<export.json>: HEAD code and FACTS, but the system prompt and negotiate task text of an
+  exported workflow (the passing 52b947c agent);
+- ctlsys:<export.json> / ctltask:<export.json>: only its system prompt / only its negotiate text.
 """
 
 import json
@@ -27,14 +36,24 @@ WEEKDAY = (
     " date."
 )
 PERIOD = re.compile(r" If the customer first named a period .*?not a later one\)\.")
-UNUSED_LINE = (
-    "parts.append('P' + str(k) + ': not in use (never call ' + unused + ')')"  # as generated
-)
 OLD_DATES = (
     "DATES: when the customer names a date, find it in that product's \"IF THE CUSTOMER NAMES A"
     " DATE\" lines in FACTS and do exactly what they say (they already apply the brief's date"
     " rules). Never offer the latest date unless those lines say so."
 )
+# Statements as they appear in the generated sandbox code; each variant replaces one with `pass`.
+CODE_PATCHES = {
+    "nounused": "parts.append('P' + str(k) + ': not in use (never call ' + unused + ')')",
+    "noperiodrows": (
+        "lines.append(label + ' (Monday-to-Sunday): ' + ', '.join((_wd(x) for x in days)))"
+    ),
+    "notoomuch": (
+        "lines.append('- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer:"
+        " offer' + ' exactly the floor ' + _amount(floor) + ' on ' + _ds(first[1]) + '; this IS"
+        " attempt 1 (no other date: not today unless that is this date)')"
+    ),
+}
+CTL_PARTS = {"ctltext": ("sys", "task"), "ctlsys": ("sys",), "ctltask": ("task",)}
 
 
 def _dates_line(task: str) -> str:
@@ -60,28 +79,28 @@ def _edit(task: str, variant: str) -> str:
     return task
 
 
-def _drop_unused_lines(node) -> int:
-    """Replace the unused-slot FACTS line in every generated code string; return the count."""
+def _patch_code(node, old: str) -> int:
+    """Replace the statement `old` with `pass` in every string of the workflow; return the count."""
     n = 0
     if isinstance(node, dict):
         for key, value in node.items():
-            if isinstance(value, str) and UNUSED_LINE in value:
-                node[key] = value.replace(UNUSED_LINE, "pass")
+            if isinstance(value, str) and old in value:
+                node[key] = value.replace(old, "pass")
                 n += 1
             else:
-                n += _drop_unused_lines(value)
+                n += _patch_code(value, old)
     elif isinstance(node, list):
         for value in node:
-            n += _drop_unused_lines(value)
+            n += _patch_code(value, old)
     return n
 
 
 def main() -> int:
     variant, argv = sys.argv[1], sys.argv[2:]
-    ctl = None
-    if variant.startswith("ctltext:"):
-        ctl = json.loads(Path(variant.split(":", 1)[1]).read_text())["workflow"]
-    elif variant not in ("noweekday", "noperiod", "old", "1slot", "nounused"):
+    kind, _, ctl_path = variant.partition(":")
+    ctl = json.loads(Path(ctl_path).read_text())["workflow"] if kind in CTL_PARTS else None
+    known = ("noweekday", "noperiod", "old", "1slot", *CODE_PATCHES)
+    if not ctl and variant not in known:
         raise SystemExit(f"unknown variant {variant}")
     if variant == "1slot":
         spec_mod.MIN_SLOTS = 1
@@ -91,11 +110,12 @@ def main() -> int:
         node = wf["nodes"]["negotiate"]
         before = node["task_message"]
         node["task_message"] = _edit(before, variant)
-        if ctl:
+        if ctl and "sys" in CTL_PARTS[kind]:
             wf["system_prompt"] = ctl["system_prompt"]
+        if ctl and "task" in CTL_PARTS[kind]:
             node["task_message"] = ctl["nodes"]["negotiate"]["task_message"]
-        if variant == "nounused" and _drop_unused_lines(wf) == 0:
-            raise SystemExit("unused-slot FACTS line not found in the generated code")
+        if variant in CODE_PATCHES and _patch_code(wf, CODE_PATCHES[variant]) == 0:
+            raise SystemExit(f"{variant}: statement not found in the generated code")
         changed = before != node["task_message"]
         print(f"exp07 variant={variant} negotiate changed={changed}", file=sys.stderr)
         print(f"exp07 DATES: {_dates_line(node['task_message'])}", file=sys.stderr)
