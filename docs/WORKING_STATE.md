@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 21:42 Istanbul (18:42 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+**Snapshot:** 2026-10-10 22:57 Istanbul (19:57 UTC). Last commit: see `git log` (after `e4d2b12`). Hidden briefs open
 Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Phase
@@ -29,17 +29,23 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 - The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
-## Running right now
+## Running right now (updated 19:57 UTC)
 
-**Nothing is running.** chain7 (aa94ccb) was stopped by the user at 18:42 UTC for a context save. It had only
-republished dev-a-llm2 at aa94ccb (killed in its smoke test); dev-ab-llm is still v12 (a8b70ea) and was NOT rebuilt.
+**chain9** (`<scratchpad>/chain9.sh`, output `chain9.out`). Agents built at **c45758f** (builder code = aa94ccb;
+c45758f only added `dashboard/`): dev-a-llm2 v6 (from `runs/dev/spec-a-llm.json`), dev-ab-llm **v13** (fresh LLM
+build, spec `runs/dev/spec-ab-llm-c45758f.json`; its paid row now has the "Payments can take one business day to
+appear." sentence: 92d91ea works). Result files are named `runs/dev/r3/<name>-c45758f.*`.
+1. Waits until Freya answers again (**503 "API key validation is temporarily unavailable" from 19:53 UTC**) and the
+   orphaned styled-ab-a rep-2 simulation 9c0f7e8c is completed/failed/paused.
+2. PUB-07 ablation, `--only PUB-07 --style asks_back --reps 3`: control dev-a-llm (52b947c v6, c6a57c76), then
+   `experiments/exp07_p07_dates_ablation.py` variants in slots exp-p07-old (1e4e771a), -noweekday (89d79f0d),
+   -noperiod (86d2f6d1), -1slot (9b2d1e85).
+3. The 4 styled 3-rep sets of chain7 (styled-ab-a, styled-extra-b, styled-b on dev-ab-llm; styled-a on dev-a-llm2).
+All runs go through `scripts/run_cases_retry.py` (the kit script plus GET 5xx retries; e4d2b12).
 
-**Next session, first thing:** re-run chain7 (`<scratchpad>/chain7.sh`; the scratchpad may be gone: recreate it
-from the description below). It (1) redeploys dev-a-llm2 from `runs/dev/spec-a-llm.json`, (2) does a **fresh LLM
-build** of A+B into dev-ab-llm with `--save-spec runs/dev/spec-ab-llm-<sha>.json` (tests the "say that X" extraction
-rule), (3) runs PUB-07 only on dev-a-llm2 with `--style asks_back` and `--style pieces` at 3 reps (fast check of
-aa94ccb), then (4) `styled-ab-a.json` and `styled-extra-b.json` on dev-ab-llm, `styled-b.json` on dev-ab-llm,
-`styled-a.json` on dev-a-llm2, all `--reps 3 --out runs/dev/r3/<name>-<sha>.json`. Use bash, one simulation at a time.
+**Done in chain7 before the outage:** PUB-07 asks_back 1/3, pieces 0/3 (real, logged in the Score log at 22:28 and
+22:39). styled-ab-a rep 1 was 8/10 (PUB-08 passes with the auto-note; PUB-03 failed with a customer hang-up; PUB-07);
+its JSON was never written (the kit script died on the 503).
 
 **Results so far tonight** (styled = every case in one of the 5 kit speech styles; a case counts at 3/3):
 
@@ -53,8 +59,12 @@ aa94ccb), then (4) `styled-ab-a.json` and `styled-extra-b.json` on dev-ab-llm, `
 Every failure is read and classified in the Score log (rows 10-10 20:09 to 21:35).
 
 **Open problems, in order:**
-1. PUB-07 dates: "Monday" after "the week after next" was resolved to the deadline Monday (2 Nov). aa94ccb lists
-   the period's days in the DATE TABLE (1401 chars; the guard is 1450). Measure with the targeted runs first.
+1. PUB-07 dates, **still failing at aa94ccb (1 of 6 calls right)**. The model answers "Monday the 26th" (a holiday;
+   FACTS has the exact line "offer 2026-10-27") with "The latest date I can record is Monday 2 November". A scan of
+   every saved PUB-07 call: right in ~11 of 12 up to d46b807, in ~3 of 15 from 676e9df on; attempt order does not
+   matter. Suspects (added in that window): DATES same-weekday sentence 03ee6b0, period sentence 19664c6, 3 slots
+   773b0dd, OFFER PLAN cd6970c. chain9 runs the ablation. Then fix generically, and re-check PUB-11 (the same-weekday
+   sentence was added for PUB-11 rep 3).
 2. Sandbox output size: a 1920-char date table broke every verify_identity post-hook in one call ("Sandbox did not
    return a parseable result"); reverted in bd944df. Keep the date table and other variables small.
 3. Simulator artefacts seen: customers hanging up early (7 s, 19 s), dates garbled ("26 August"), cut-off messages
