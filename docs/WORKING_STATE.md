@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 19:58 Istanbul (16:58 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+**Snapshot:** 2026-10-10 20:27 Istanbul (17:27 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
 Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Phase
@@ -31,19 +31,18 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Running right now
 
-- **chain4** (`<scratchpad>/chain4.sh`, background job `b9brwzcqx`, started 16:57 UTC at `676e9df`; both deploys PASS: dev-a-llm2 v3 27 steps 8 tools,
-  dev-ab-llm v10 29 steps 11 tools):
-  deploy dev-a-llm2 (spec-a-llm, now with 3 product slots) and dev-ab-llm (spec-ab-llm) from saved specs, then
-  four styled 3-rep runs, one at a time:
-  1. `styledA-a2`: dev-a-llm2 on `tests/fixtures/cases/styled-a.json` (Brief A, each case one of 5 styles);
-  2. `styledB-ab`: dev-ab-llm on `styled-b.json`;
-  3. `styledXB-ab`: dev-ab-llm on `styled-extra-b.json`;
-  4. `styledABA-ab`: dev-ab-llm on `styled-ab-a.json` (Brief A cases with A+B ledgers: PUB-05 and PUB-08 get notes,
-     Brief B rule 8).
-  Results: `runs/dev/r3/<name>-676e9df.{json,log}`, deploy logs `runs/dev/deploy/*-676e9df.log`. **Log each in the
-  Score log** and read every failure (`all_rows`). Classify platform vs real before changing code.
-- chain3 (276302f) died with the previous session after its first run (A talkative 6/10, 0 platform errors). Its
-  four failures were read (`runs/dev/style/calls-276302f/`) and fixed in 557161d.
+- **chain4** (`<scratchpad>/chain4.sh`, job `b9brwzcqx`, monitor `bzqzi7p8k`) at **676e9df**, styled 3-rep runs:
+  - `styledA-a2` (A spec, 3 slots): **7/10** at 3/3 (reps 9, 7, 9). Logged and read: PUB-07 date in pieces (fixed
+    96c37ad), PUB-06 floor "today" + "this Friday" = 17 Oct + a cut-off loop (fixed 35c030a), PUB-09 r2 simulator.
+  - `styledB-ab`: **2/3** (PUB-12 1/3: car-loan attempt count; r1 judge wanted the phone question re-asked, not
+    "Please go on.").
+  - `styledXB-ab`: **1/3** (PUB-12 0/3: paid sentence missing, "today" re-asked, notes without the car-loan attempt;
+    PUB-13 1 rep: "I paid both" took the paid ending with no notes). Fixed in e233cb8.
+  - `styledABA-ab` (A cases with A+B ledgers): running, rep 1 7/10.
+- **evening-diff-review** workflow (`w9bdf1mrl`): 4 adversarial lenses over `git diff 3a55e6d..HEAD`. Read its
+  report, fix confirmed defects, THEN start chain5.
+- **chain5 (to start):** deploy HEAD to dev-a-llm2 (spec-a-llm) and dev-ab-llm (spec-ab-llm) with `--spec`, then the
+  same four styled runs at 3 reps. Compare with chain4 case by case.
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
@@ -77,7 +76,18 @@ the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
   never repeat a question, offer, amount or date because of a cut-off; caps opening 25, third_party 40, identity 40,
   negotiate 120; endings whose rule says transfer or close happen at once, ask first only when the rule says so.
 - 676e9df: `scripts/make_style_cases.py` and `tests/fixtures/cases/styled-*.json`.
-- `make verify`: **725 passed**.
+- 1a5245f (gaps 10, 12, 14): trace START has sha256 of inputs, git commit, dirty flag, python, model chain; RUNBOOK
+  Sunday mechanics (mkdir/pipefail, `--slot hidden-N`, verified greps, one brief file, same commit in both traces).
+- 96c37ad: negotiate joins dates and amounts given in parts.
+- 7dadfcb (gap 8a): `spec.engine_fields` fills new required fields on get_account/close_call/transfer_to_agent.
+  **Gap 8b (all-at-once verify_identity) deferred**: speculative without the API shape.
+- 1bd07ee (gap 15): smoke test sends a real `now`; a failed smoke test ends `ok=False`, exit 3.
+- 35c030a: loop breaker "Sorry, your message was cut off. Could you answer in a few words?" on a second cut-off;
+  FACTS states the floor offer's date (attempt 1); DATES: never pair weekday and date from memory.
+- dcb3915 (gap 13): 25-min model-call budget, 240 s per call, a stall falls back, repair skipped under 5 min.
+- 4e6629f (gap 16): variant-c/-r rebuilt at dcb3915 with the real LLM (both PASS, 11 tools) and are pytest fixtures.
+- e233cb8: with notes, note-derived rows are no negotiate ending; NOTES says do the ending's duty, then note.
+- `make verify`: **743 passed**.
 
 
 ## What changed earlier today (all committed; details in the Decision log and git log)
