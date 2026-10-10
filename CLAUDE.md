@@ -101,6 +101,12 @@ Don't edit files in `kit/`. Wrap or copy them instead, so it stays diffable agai
 - **Scoring:** `python3 kit/tools/run_cases.py <agent_id> --brief A|B [--reps 3] [--style pieces|corrects|talkative|asks_back|in_words] [--out results/x.json]`.
   Debug with `freya.get_call(call_id)["messages"]` (system events show `route_evaluated` and tool calls).
 - **Fast check without a simulation:** `POST /api/v2/chat/message {workflowId, message, customerVariables}`.
+- **Verified by our experiment** (`experiments/exp01_mechanics.py`; details in hackathon_notes → Observations):
+  - On an `api_request` node, read results from the flattened `<node>_response.data.<path>` keys. The node-level
+    `response_mapping` of a list did not set the variable.
+  - To close: the model says goodbye and fires an `is_tool_call` transition → an `api_request` node runs `close_call`
+    (baked outcome) → `end_call`. This avoids the parallel-tool race.
+  - The post-hook `what_to_do_next` steers the model.
 
 Preliminary pipeline **hypothesis** (not a plan; validate against the kit first):
 brief + tool API → requirements extraction → structured policy → workflow config → Freya deploy →

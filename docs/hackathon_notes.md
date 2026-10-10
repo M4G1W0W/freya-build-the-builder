@@ -188,6 +188,16 @@ Transcripts were read with `scripts/show_run.py <run.json> --calls`.
   26 Oct (a holiday) should have become 27 Oct. Compute these dates in a code step from `now` and the brief's calendar.
 - **Speed is fine:** the slowest agent turn was ~1 s per call. A 10-case run took 104 s.
 - **Cost:** one 10-case simulation used about 0.3 of 200 credits (`runs/credits_log.jsonl`). Credits are not a constraint.
+- **Experiment 01** (`experiments/exp01_mechanics.py`, PUB-01 and PUB-08 both passed, `runs/exp01.json`):
+  - **Node-level `response_mapping` on an `api_request` node did NOT set the variable** (`data.products → products`
+    stayed None in the next code node). The result IS available as flattened keys named after the **node**:
+    `fetch_account_response.data.products.0.past_due`, `....0.product_id`, and so on. Code must rebuild lists from these keys.
+  - **Deterministic ordered close works.** The model says goodbye and in the same message fires an `is_tool_call`
+    transition to an `api_request` node whose `pre_actions` run `close_call` with a baked outcome, then `end_call`.
+    The goodbye comes before close_call, with no race. A model-called `close_call` tool is no longer needed.
+  - **The post-hook `what_to_do_next` reaches the model** inside the tool result, and the model followed it.
+  - **An initial passthrough code node reading `vars.get('now')` works in a simulation.**
+  - **Identity gating** on `verify_identity_response.data.all_verified` ("true"/"True") fired correctly.
 - **The organiser base workflow** (`docs/reference/workflows/organiser_base_2node.json`) closes the call with a
   **workflow-level `close_call` lifecycle tool** (`alwaysRunsAt: ["end_of_call"]`, body from `{{outcome}}`/`{{reason}}`)
   and ends with an `end_call` tool. It routes identity → collection on `verify_identity_response.data.all_verified`.

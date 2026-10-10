@@ -29,3 +29,4 @@ extend-exclude = ["kit"]  # official kit, kept unmodified
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]  # `ruff format` keeps code at 100 cols; prompt strings may be longer
