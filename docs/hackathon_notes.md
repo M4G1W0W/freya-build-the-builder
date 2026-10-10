@@ -272,6 +272,32 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   3.2–4.6k tokens. The kit warns that long chat turns can return 504. The Freya credits are needed for simulations:
   200 → 181.3 credits after the whole day (~0.9 credits per 10-case 3-rep run).
 
+- 2026-10-10 18:25 — **Generalisation audit (6 auditors + critic; 81 findings, 76 with executed evidence; the full
+  result is in the scratchpad audit_result.json) → fixes for the score-relevant ones.**
+  - Fixed:
+    - F72: the build never aborts on an unrepairable spec. It deploys the best schema-valid spec with UNRESOLVED
+      warnings.
+    - F17/F41/F58/F20: the notes route uses our slot ids, with a linear expansion.
+    - F01/F02/F62: the identity gate and answer fields must be non-empty booleans.
+    - F32/F33/F36: a build-time date self-test runs the generated code over 42+ days and every holiday ±1, inside
+      the repair loop. It caught variant-r's `!=` attempt-1 bug.
+    - F04/F31/F61: a combined callback field uses the API's own format text.
+    - F03: third_party gets the "who answered" endings.
+    - F05: API field descriptions are kept.
+    - F09/F56: a renamed customer-id field is resolved generically.
+    - F46/F64/F71/F74: the note-reason vs close-reason rows are checked.
+    - F77/F79/F80: model fallback on 429/5xx and on missing json_schema support; failed calls are traced with
+      their model; tolerant decoding; redacted traceback.
+  - **Deliberately not done:**
+    - F48 (a fallback close outcome in the ev nodes). Writing the ev row's reason would leak into a finalize that
+      chooses a reasonless row (promise + "refused"), and the outcome-only version helps only when the ev sandbox
+      run succeeds while finalize fails, which is rare in a burst.
+  - **Deferred:**
+    - F15/F16: percentage or fixed floors and other attempt amounts. These need a schema change across all
+      fixtures.
+    - F57: extra required fields on engine-run tools; low plausibility.
+    - The sandbox-hook reduction: weighed and recorded in the Observations.
+
 ## Score log
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |

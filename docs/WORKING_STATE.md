@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 17:28 Istanbul (14:28 UTC). Last commit `6b4e08a`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 18:26 Istanbul (15:26 UTC). Last commit: see `git log` (after `4f45d87`). Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -16,6 +16,21 @@ The phases come from `docs/design.md` §7:
   fresh-clone timed build not done yet.
 
 ## Latest work (13:56 UTC)
+
+- **USER IS TESTING `dev-a-llm` (v6, frozen) through the `voice-test` slot** (workflow `39e29145-…`, a copy with
+  `test_variables`; `scripts/voice_test.py <src_wf> --case PUB-xx` gives it a fresh customer). Do NOT redeploy
+  dev-a-llm or voice-test until the user's feedback is in.
+- Since 52b947c: 54e094a (no "today" re-ask), the audit fixes 62caf5a…4f45d87 (see the Decision log, 18:25), and
+  5139440 (voice_test). make verify: 713 passed. **None of these is deployed or measured yet.**
+- Style sweep at 52b947c (1 rep):
+  - A: asks_back 10/10, corrects 10/10, in_words 10/10, pieces 8/10, **talkative 6/10**.
+  - B: corrects 3/3, the others 2/3 (PUB-12 every time).
+  - 0 sandbox errors: all real. The 7-agent diagnosis workflow `style-failure-diagnosis` is running; its fixes come
+    next.
+- Next: implement the style fixes, then redeploy dev-ab-llm and dev-a-fixture (NOT dev-a-llm), then measure abB,
+  extraB, abA and the styles. Earlier queued abB/extraB at 7d075ac never ran (an argument-quoting bug; nothing was
+  simulated).
+
 
 - **USER DECISIONS (10 Oct):** team **Pistalogic**; the repo stays **private** for now (the user will share it or make
   it public later). The user asked about running the builder LLM on Freya. We recommended staying on OpenAI (no
