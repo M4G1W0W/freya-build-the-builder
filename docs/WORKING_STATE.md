@@ -3,8 +3,8 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 22:57 Istanbul (19:57 UTC). Last commit: see `git log` (after `e4d2b12`). Hidden briefs open
-Sun 11 Oct 17:00 UTC (about 24 h from now).
+**Snapshot:** 2026-10-11 00:20 Istanbul (21:20 UTC Sat). Last commit: see `git log` (after `23bddd9`). Hidden briefs
+open Sun 11 Oct 17:00 UTC (about 20 h from now). Tag `good-pre-f1` = the builder before F1.
 
 ## Phase
 
@@ -29,23 +29,29 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 - The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
-## Running right now (updated 19:57 UTC)
+## Running right now (updated 21:20 UTC)
 
-**chain9** (`<scratchpad>/chain9.sh`, output `chain9.out`). Agents built at **c45758f** (builder code = aa94ccb;
-c45758f only added `dashboard/`): dev-a-llm2 v6 (from `runs/dev/spec-a-llm.json`), dev-ab-llm **v13** (fresh LLM
-build, spec `runs/dev/spec-ab-llm-c45758f.json`; its paid row now has the "Payments can take one business day to
-appear." sentence: the 92d91ea extraction rule is verified in the spec only, not yet in a call). Result files are named `runs/dev/r3/<name>-c45758f.*`.
-1. Waits until Freya answers again (**503 "API key validation is temporarily unavailable" from 19:53 UTC**) and the
-   orphaned styled-ab-a rep-2 simulation 9c0f7e8c is completed/failed/paused.
-2. PUB-07 ablation, `--only PUB-07 --style asks_back --reps 3`: control dev-a-llm (52b947c v6, c6a57c76), then
-   `experiments/exp07_p07_dates_ablation.py` variants in slots exp-p07-old (1e4e771a), -noweekday (89d79f0d),
-   -noperiod (86d2f6d1), -1slot (9b2d1e85).
-3. The 4 styled 3-rep sets of chain7 (styled-ab-a, styled-extra-b, styled-b on dev-ab-llm; styled-a on dev-a-llm2).
-All runs go through `scripts/run_cases_retry.py` (the kit script plus GET 5xx retries; e4d2b12).
+Two file-driven queue runners in `<scratchpad>` (one simulation at a time, all through `scripts/run_cases_retry.py`):
+- `qrun.sh` (queue `queue.txt`, output `qrun.out`, names `-c45758f`): running **styledXB-ab** on dev-ab-llm v13
+  (c45758f build; measures the 92d91ea paid sentence in a call). Its queue is otherwise empty.
+- `qrun2.sh` (queue `queue2.txt`, output `qrun2.out`, names `-15bcbad`, started by `takeover2.sh` when qrun empties):
+  **F1 checks on dev-a-llm2 v7 (15bcbad)**: PUB-07 asks_back, PUB-07 pieces, then the full styled-a set.
+- **Not yet done:** redeploy dev-ab-llm at F1 (`--spec runs/dev/spec-ab-llm-c45758f.json`, only after styledXB-ab ends;
+  never while a run uses it), then styled-ab-a, styled-extra-b, styled-b on it. Append lines to `queue2.txt`
+  ("name agent brief args...") to queue runs.
 
-**Done in chain7 before the outage:** PUB-07 asks_back 1/3, pieces 0/3 (real, logged in the Score log at 22:28 and
-22:39). styled-ab-a rep 1 was 8/10 (PUB-08 passed in that one rep with an add_note: one observation, not yet 3/3; PUB-03 failed with a customer hang-up; PUB-07);
-its JSON was never written (the kit script died on the 503).
+**PUB-07 root cause (exp07, `experiments/exp07_p07_dates_ablation.py`, Score log 10-10 22:28 to 11-10 00:10):** the
+runtime FACTS, not the prompt text. The passing 52b947c agent's exact prompts on HEAD FACTS failed 0/3. The failure
+needs both the DATE TABLE period rows (19664c6/aa94ccb) and the FACTS "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO
+MUCH" line (35c030a). Over 6 calls: HEAD 1, isokey 2, noperiodrows 4, notoomuch 5, both removed 5. **F1 (15bcbad)**
+removes both and the DATES row reference. Wording tops out near 5/6 here; 6/6 would need the date decision in code
+(a code_exec check tool, ~4 h, undocumented platform links; see the design workflow notes in the Score log row).
+Experiment slots exp-p07-* (11 workflows) are throwaway.
+
+**styled-ab-a at c45758f (v13): 6/10** (reps 8, 8, 9). PUB-08 3/3 (39d7dd9 verified on the A+B agent). PUB-05 r2
+**real**: after refusing a discount the agent offered "our restructuring team for a new payment plan" (rules 32,
+33). PUB-09 r1 mixed (the too-much line made the floor salient on a cut-off "can't afford"; F1 removes that line).
+PUB-04 r2 simulator.
 
 **Results so far tonight** (styled = every case in one of the 5 kit speech styles; a case counts at 3/3):
 
@@ -59,18 +65,20 @@ its JSON was never written (the kit script died on the 503).
 Every failure is read and classified in the Score log (rows 10-10 20:09 to 21:35).
 
 **Open problems, in order:**
-1. PUB-07 dates, **still failing at aa94ccb (1 of 6 calls right)**. The model answers "Monday the 26th" (a holiday;
-   FACTS has the exact line "offer 2026-10-27") with "The latest date I can record is Monday 2 November". A scan of
-   every saved PUB-07 call: right in ~11 of 12 up to d46b807, in ~3 of 15 from 676e9df on; attempt order does not
-   matter. Suspects (added in that window): DATES same-weekday sentence 03ee6b0, period sentence 19664c6, 3 slots
-   773b0dd, OFFER PLAN cd6970c. chain9 runs the ablation. Then fix generically, and re-check PUB-11 (the same-weekday
-   sentence was added for PUB-11 rep 3).
-2. Sandbox output size: a 1920-char date table broke every verify_identity post-hook in one call ("Sandbox did not
-   return a parseable result"); reverted in bd944df. Keep the date table and other variables small.
-3. Simulator artefacts seen: customers hanging up early (7 s, 19 s), dates garbled ("26 August"), cut-off messages
-   that never complete, and corrects-style answers that conflict with case scripts. Classify, do not chase.
-4. Diff-review open items: 13 (engine_fields typed as strings), 17 (EVERY DAY gone, moot), 18 (Freya calls after the
-   model budget), part of 5 (a band-mandated transfer with notes). Direction-review gaps 7, 9, 11 and 8b remain.
+1. Measure F1: PUB-07 (both styles), styled-a, then the A+B sets after the dev-ab-llm redeploy. Watch PUB-06 (the
+   too-much line was its fix; the ATTEMPTS prompt line and the attempt-1 line still carry the floor date) and "Monday"
+   said alone after a period (what the rows were for).
+2. PUB-05 real (improvised restructuring offer after a refused discount). Generic fix idea from the classifier: "When
+   the customer asks for something the brief says never to offer, say once that you cannot offer it; offer nothing
+   in its place. An ending tied to a request applies only when the customer makes that request." Not implemented.
+3. Review finding 2 (variant-c rule 47 = direction-review gap 7): close_precedence puts `promise_recorded` above an
+   insolvency ending that the brief says overrides a promise. Proposed: a generic `event_row_in` precedence entry
+   with extracted row ids, ordered before `promise_recorded`; test "promise recorded -> overriding ending". Not started.
+4. PUB-09 r1: a cut-off without final punctuation ("I really can't afford to pay") was read as a complete reply.
+   Optional: treat a message with no final punctuation as possibly cut off. Measure before adopting.
+5. Sandbox output size: keep the date table and other variables small (F1 makes the table shorter).
+6. Simulator artefacts: hang-ups, garbled dates, endless cut-offs, corrects-style conflicts. Classify, do not chase.
+7. Diff-review 13, 18, part of 5; direction-review 9, 11, 8b.
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
