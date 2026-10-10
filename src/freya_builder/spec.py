@@ -261,6 +261,18 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
         if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
             p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
+        if c["then"] == "first_note_reason_not" and spec["notes"]["used"] and "add_note" in by:
+            # finalize closes with the first note's reason as the close_call reason: every note
+            # reason it can meet needs a row with this outcome and that reason (audit F46/F64/F71)
+            field = by["add_note"].field(spec["notes"]["reason_field"])
+            pairs = {(r["outcome"], r["reason"]) for r in spec["rows"]}
+            for reason in field.enum if field else ():
+                if reason != c["note_reason"] and (c["outcome"], reason) not in pairs:
+                    p.append(
+                        f"close_precedence[{i}] closes as {c['outcome']!r} with the note reason, "
+                        f"but there is no row ({c['outcome']!r}, {reason!r}) for add_note reason "
+                        f"{reason!r}"
+                    )
     if spec["identity"]["failed_row"] not in rows:
         p.append(f"identity.failed_row is unknown: {spec['identity']['failed_row']!r}")
     if spec["callback"]["enabled"] and spec["callback"]["booked_row"] not in rows:

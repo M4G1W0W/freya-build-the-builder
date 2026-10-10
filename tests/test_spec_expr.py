@@ -94,3 +94,23 @@ def test_good_expressions(expr):
 )
 def test_bad_expressions(expr):
     assert check_expr(expr) != []
+
+
+def test_every_note_reason_finalize_can_close_with_has_a_row():
+    # audit F46/F64/F71: finalize's first_note_reason_not closes with the note's reason; without a
+    # matching row that reason may not exist in close_call's vocabulary.
+    spec = copy.deepcopy(SPEC_A)
+    spec["notes"]["used"] = True
+    spec["close_precedence"].insert(
+        -1,
+        {
+            "when": "any_note",
+            "note_reason": "paid",
+            "then": "first_note_reason_not",
+            "row": "",
+            "outcome": "no_promise",
+        },
+    )
+    assert not [p for p in check_spec(spec, TOOLS) if "no row" in p]
+    spec["rows"] = [r for r in spec["rows"] if r["id"] != "no_promise_dispute"]
+    assert any("no row ('no_promise', 'dispute')" in p for p in check_spec(spec, TOOLS))
