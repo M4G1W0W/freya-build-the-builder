@@ -609,7 +609,8 @@ def finalize_main(vs, C):
         for k in range(1, K + 1):
             if str(vs.get("p" + str(k) + "_id") or "none") in ("", "none"):
                 continue
-            if _succeeded(vs, C.get("promise_tool", "") + str(k), ok_field):
+            sticky = str(vs.get("p" + str(k) + "_recorded") or "").strip().lower() == "yes"
+            if sticky or _succeeded(vs, C.get("promise_tool", "") + str(k), ok_field):
                 promises.append(k)
             note_tool = C.get("note_tool", "") + str(k)
             if C.get("notes_used") and _succeeded(vs, note_tool, ok_field):

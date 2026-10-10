@@ -650,8 +650,27 @@ def promise_post(spec: dict, k: int) -> str:
         "SUCCESS": lit(success),
         "FAIL_HEAD": lit(f"NOT recorded (P{k})"),
         "FAIL_TAIL": lit(tail),
+        "FLAG": lit(recorded_flag(k)),
     }
-    return _post("", _SIMPLE_POST, values)
+    return _post("", _PROMISE_POST, values)
+
+
+def recorded_flag(k: int) -> str:
+    """Sticky variable set by promise_post on success; finalize reads it (a later duplicate call
+    would overwrite <tool>_response with a failure)."""
+    return f"p{k}_recorded"
+
+
+_PROMISE_POST = """
+if _done:
+    _d['what_to_do_next'] = $SUCCESS
+    try:
+        vars[$FLAG] = 'yes'
+    except Exception:
+        pass
+else:
+    _d['what_to_do_next'] = $FAIL_HEAD + _bank + $FAIL_TAIL
+"""
 
 
 # A string amount is parsed only when it holds exactly one number ("EUR 420,50"); text with

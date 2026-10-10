@@ -329,9 +329,16 @@ def test_grid_invariants_over_eight_weeks():
 
 
 def test_past_attempt_date_is_flagged():
-    # Spec A's attempt-1 expression said on a Saturday gives the Friday before (a spec issue).
+    # A spec expression that yields a past date is labelled, never offered silently.
+    spec = spec_a()
+    spec["attempts"][0]["date_expr"] = "add_days(today, -1)"
+    p1 = block(call(spec, [CAR], now="2026-10-14T11:00")["account_facts"], "P1")
+    assert "attempt 1, on 2026-10-13 (Tuesday 13 October 2026) (already past" in p1
+
+
+def test_attempt1_on_saturday_is_next_weeks_friday():
     p1 = block(call(spec_a(), [CAR], now="2026-10-17T11:00")["account_facts"], "P1")
-    assert "attempt 1, on 2026-10-16 (Friday 16 October 2026) (already past" in p1
+    assert "attempt 1, on 2026-10-23" in p1 and "already past" not in p1
 
 
 def test_account_keeps_leading_zeros_and_decimal_amounts():
@@ -677,7 +684,7 @@ def test_brief_a_dates_match_the_reference_calendar_day_by_day():
             deadline = ref.nth_after(day, n)
             assert f"- deadline: {deadline.isoformat()}" in p1, day
             week_end = ref.last_of_week(day)
-            first = week_end if week_end != day else ref.last_of_week(day + dt.timedelta(days=7))
+            first = week_end if week_end > day else ref.last_of_week(day + dt.timedelta(days=7))
             assert f"attempt 1, on {first.isoformat()}" in p1, day
             assert (f"attempt 2, on {deadline.isoformat()}" in p1) is (product is CAR), day
         slots = [line[2:12] for line in vs["callback_slots"].splitlines()[1:]]

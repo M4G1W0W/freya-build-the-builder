@@ -58,7 +58,7 @@ EXPRESSIONS (deadline_expr, date_expr, min_expr, max_expr, day_exprs) are tiny P
 - Functions: {", ".join(sorted(FUNCS))}.
   add_business_days(d, n) = the n-th business day strictly after d; next_business_day(d) = the first business day strictly after d; business_day_on_or_after(d) / business_day_on_or_before(d); last_business_day_of_week(d) (Monday-Sunday week); last_business_day_of_month(d); end_of_month(d); add_days(d, n); weekday_in_week(d, weekday 0=Mon, weeks_ahead); is_business_day(d); date(y, m, d).
 - Allowed syntax: calls, names, integers, comparisons, and/or/not, + and -, and "x if condition else y". No attributes, no keywords, no lambdas, no braces.
-- Generic examples: "the 9th business day after today" -> add_business_days(today, 9); "the last business day of this week, or of next week if today is that day" -> last_business_day_of_week(today) if last_business_day_of_week(today) != today else last_business_day_of_week(add_days(today, 7)); "the next business day" -> next_business_day(today); "the deadline" -> deadline.
+- Generic examples: "the 9th business day after today" -> add_business_days(today, 9); "the last business day of this week, or of next week if today is that day" -> last_business_day_of_week(today) if last_business_day_of_week(today) > today else last_business_day_of_week(add_days(today, 7)); "the next business day" -> next_business_day(today); "the deadline" -> deadline.
 
 FIELDS
 - meta.call_vars: every variable the call starts with. role: customer_id (the id passed to the bank tools), now (current date and time), addressing (used to name or address the customer), other. example: the example value given, else "".

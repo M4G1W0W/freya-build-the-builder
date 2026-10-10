@@ -53,7 +53,9 @@ def test_engine_runs_account_transfer_and_close_in_order():
     assert [t["target_node"] for t in n["finalize"]["transitions"]] == ["xfer", "close"]
     assert n["xfer"]["transitions"][-1]["target_node"] == "close"
     assert n["close"]["transitions"][-1]["target_node"] == "hang_up"
-    body = n["close"]["pre_actions"][0]["function"]["parameters"]["properties"]["body"]["properties"]
+    body = n["close"]["pre_actions"][0]["function"]["parameters"]["properties"]["body"][
+        "properties"
+    ]
     assert body["outcome"]["default"] == "{{close_outcome}}"
     assert body["reason"]["default"] == "{{close_reason}}"
     assert body["customer_id"]["default"] == "{{customer_id}}"
@@ -83,7 +85,9 @@ def test_multi_product_slots_bake_product_ids():
     assert check_spec(s, TOOLS) == []
     n = render(s, TOOLS, BRIEF)["nodes"]
     names = tool_names(n["negotiate"])
-    assert names == [f"create_promise_p{k}" for k in (1, 2, 3)] + [f"add_note_p{k}" for k in (1, 2, 3)]
+    assert names == [f"create_promise_p{k}" for k in (1, 2, 3)] + [
+        f"add_note_p{k}" for k in (1, 2, 3)
+    ]
     for tool in n["negotiate"]["tools"]:
         k = tool["function"]["name"][-1]
         body = tool["function"]["parameters"]["properties"]["body"]["properties"]

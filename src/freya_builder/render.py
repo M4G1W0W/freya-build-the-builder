@@ -171,7 +171,9 @@ def _callback_tool(spec: dict, t: Tool) -> dict:
     return tool
 
 
-def _slot_tool(spec: dict, t: Tool, k: int, product_field: str, desc: str, post: str, pre: str) -> dict:
+def _slot_tool(
+    spec: dict, t: Tool, k: int, product_field: str, desc: str, post: str, pre: str
+) -> dict:
     baked = _bake_customer(spec, t) | {product_field: "{{p" + str(k) + "_id}}"}
     tool = model_tool(t, desc, baked, post_process_code=post)
     tool["function"]["name"] = f"{t.name}_p{k}"
@@ -189,10 +191,14 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     notes = bool(spec["notes"]["used"]) and "add_note" in by
     rows = {r["id"]: r for r in spec["rows"]}
 
-    engine = ["get_account", "close_call"] + (["transfer_to_agent"] if "transfer_to_agent" in by else [])
+    engine = ["get_account", "close_call"] + (
+        ["transfer_to_agent"] if "transfer_to_agent" in by else []
+    )
     wf_nodes: dict[str, dict] = {}
 
-    wf_nodes["setup"] = nodes.code_node("setup", codegen.setup_source(spec), [nodes.always("opening")])
+    wf_nodes["setup"] = nodes.code_node(
+        "setup", codegen.setup_source(spec), [nodes.always("opening")]
+    )
 
     who = {
         "name": "who_answered",
@@ -210,7 +216,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         "opening",
         _opening_task(spec),
         [
-            nodes.when_equals("identity", "The customer confirmed who they are", "who_answered", ["confirmed"]),
+            nodes.when_equals(
+                "identity", "The customer confirmed who they are", "who_answered", ["confirmed"]
+            ),
             nodes.when_equals(
                 "third_party",
                 "Someone other than the customer answered",
@@ -226,7 +234,11 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         max_turn_target="ev_cap_opening",
     )
 
-    tp_tools = [_callback_tool(spec, by["schedule_callback"])] if spec["callback"]["enabled"] and "schedule_callback" in by else []
+    tp_tools = (
+        [_callback_tool(spec, by["schedule_callback"])]
+        if spec["callback"]["enabled"] and "schedule_callback" in by
+        else []
+    )
     wf_nodes["third_party"] = nodes.conversation(
         "third_party",
         _third_party_task(spec),
@@ -242,7 +254,11 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         "identity",
         _identity_task(spec),
         [
-            nodes.when_true("load_account", "Both security answers are verified", f"verify_identity_response.data.{gate}"),
+            nodes.when_true(
+                "load_account",
+                "Both security answers are verified",
+                f"verify_identity_response.data.{gate}",
+            ),
             *_exit_transitions(spec, "identity"),
         ],
         tools=[_verify_tool(spec, by["verify_identity"])],
@@ -251,8 +267,12 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         max_turn_target="ev_cap_identity",
     )
 
-    account_call = engine_call(by["get_account"], _bake_customer(spec, by["get_account"]), retries=2)
-    wf_nodes["load_account"] = nodes.api_node("load_account", [account_call], [nodes.always("account_facts")])
+    account_call = engine_call(
+        by["get_account"], _bake_customer(spec, by["get_account"]), retries=2
+    )
+    wf_nodes["load_account"] = nodes.api_node(
+        "load_account", [account_call], [nodes.always("account_facts")]
+    )
     wf_nodes["load_account"]["suppress_tool_results"] = True
     wf_nodes["account_facts"] = nodes.code_node(
         "account_facts", codegen.account_source(spec), [nodes.always("negotiate")]
@@ -297,10 +317,14 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     )
 
     for rid in rows:
-        wf_nodes[f"ev_{rid}"] = nodes.code_node(f"ev_{rid}", codegen.exit_source(rid), [nodes.always("finalize")])
+        wf_nodes[f"ev_{rid}"] = nodes.code_node(
+            f"ev_{rid}", codegen.exit_source(rid), [nodes.always("finalize")]
+        )
     for stage in STAGES:
         name = f"ev_cap_{stage}"
-        wf_nodes[name] = nodes.code_node(name, codegen.exit_source(f"cap_{stage}"), [nodes.always("finalize")])
+        wf_nodes[name] = nodes.code_node(
+            name, codegen.exit_source(f"cap_{stage}"), [nodes.always("finalize")]
+        )
 
     finalize_next = [nodes.always("close")]
     if "transfer_to_agent" in by:
@@ -311,12 +335,16 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
                 "description": "The call is transferred",
                 "condition": {
                     "logic": "or",
-                    "conditions": [{"variable": "xfer_queue", "operator": "not_equals", "operand": "none"}],
+                    "conditions": [
+                        {"variable": "xfer_queue", "operator": "not_equals", "operand": "none"}
+                    ],
                 },
             },
         )
         xt = by["transfer_to_agent"]
-        xfer_call = engine_call(xt, _bake_customer(spec, xt) | {spec["transfer_field"]: "{{xfer_queue}}"}, retries=1)
+        xfer_call = engine_call(
+            xt, _bake_customer(spec, xt) | {spec["transfer_field"]: "{{xfer_queue}}"}, retries=1
+        )
         wf_nodes["xfer"] = nodes.api_node("xfer", [xfer_call], [nodes.always("close")])
     wf_nodes["finalize"] = nodes.code_node("finalize", codegen.finalize_source(spec), finalize_next)
 

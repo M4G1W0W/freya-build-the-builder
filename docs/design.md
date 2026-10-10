@@ -435,7 +435,7 @@ Spec: `src/freya_builder/spec.py` (`SPEC_SCHEMA`, `check_spec`), and the fixture
 Slots: `K = spec.meta.max_products`; slot k is 1..K. Row ids come from `spec.rows[].id`.
 
 **Node names.** `setup`, `opening`, `third_party`, `identity`, `load_account`, `account_facts`, `negotiate`,
-`ev_<row_id>`, `ev_done`, `ev_cap_<stage>`, `finalize`, `xfer`, `close`, `hang_up`.
+`ev_<row_id>`, `ev_cap_<stage>` (no `ev_done`: decided 15:20; finalize recomputes the outcome from what was recorded, so the specific endings suffice, and a vague 'done' would pull the model away from them), `finalize`, `xfer`, `close`, `hang_up`.
 The model fires an exit with the tool `transition_to_ev_<row_id>`; the engine names it after the target node.
 
 **Model-called tool names.**

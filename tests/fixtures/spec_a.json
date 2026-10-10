@@ -96,7 +96,7 @@
    "n": 1,
    "bands": [],
    "amount": "full_or_floor",
-   "date_expr": "last_business_day_of_week(today) if last_business_day_of_week(today) != today else last_business_day_of_week(add_days(today, 7))",
+   "date_expr": "last_business_day_of_week(today) if last_business_day_of_week(today) > today else last_business_day_of_week(add_days(today, 7))",
    "note": "Attempt 1 is for the full past-due amount, or for the floor if the customer already said the full amount is too much."
   },
   {
