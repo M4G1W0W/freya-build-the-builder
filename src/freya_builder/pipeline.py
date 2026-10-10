@@ -199,10 +199,16 @@ def render(spec: dict, tools: list[Tool]) -> dict:
     return render_workflow(clean, tools, spec.get("_prompt_brief", ""))
 
 
-def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> None:
+def _example(var: dict) -> str:
+    if var["example"]:
+        return var["example"]
+    return time.strftime("%Y-%m-%dT%H:%M", time.gmtime()) if var["role"] == "now" else "x"
+
+
+def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     """Smoke test on the published workflow: it starts, says the opening line, leaks nothing."""
     freya = platform.kit()
-    variables = {v["name"]: v["example"] or "x" for v in spec["meta"]["call_vars"]}
+    variables = {v["name"]: _example(v) for v in spec["meta"]["call_vars"]}
     body = {"workflowId": saved["workflow_id"], "message": "Hello?", "customerVariables": variables}
     r = None
     for attempt in (1, 2):  # the kit warns a long chat turn can return 504; retry a 5xx once
@@ -216,7 +222,7 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> None:
                 time.sleep(5)
                 continue
             trace.test("chat smoke test: workflow starts", False, str(e)[:200])
-            return
+            return False
     reply = str(r.get("response") or "")
     forbidden = [
         w for w in spec["opening"]["forbidden_before_verified"] if w.lower() in reply.lower()
@@ -228,3 +234,4 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> None:
             freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]})
         except RuntimeError:
             pass
+    return ok

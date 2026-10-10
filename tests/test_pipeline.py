@@ -3,6 +3,7 @@
 import copy
 import io
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -67,6 +68,7 @@ class _FakeFreya:
 
     def api(self, method, path, body=None, **params):
         self.calls.append(path)
+        self.body = body if path.endswith("/chat/message") else getattr(self, "body", None)
         if path.endswith("/chat/message") and self.errors:
             raise RuntimeError(f"POST {path} -> {self.errors.pop(0)}: error")
         return {
@@ -90,7 +92,7 @@ def test_smoke_test_does_not_retry_a_client_error(monkeypatch):
     fake = _FakeFreya([400, 400])
     monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
     out = io.StringIO()
-    pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS)
+    assert pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS) is False
     assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
     assert fake.calls.count("/api/v2/chat/message") == 1
 
@@ -102,3 +104,16 @@ def test_a_brief_read_as_single_product_is_flagged_in_the_trace(monkeypatch):
     out = io.StringIO()
     pipeline.extract(Trace(out), "brief", TOOLS)
     assert "brief read as 1 product(s); rendering 3 product slots" in out.getvalue()
+
+
+def test_smoke_test_sends_a_real_now_and_reports_its_result(monkeypatch):
+    # Review gap 15: `now` used to be "x" when the spec gave no example.
+    fake = _FakeFreya([])
+    monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
+    spec = copy.deepcopy(SPEC_A)
+    for v in spec["meta"]["call_vars"]:
+        if v["role"] == "now":
+            v["example"] = ""
+    assert pipeline.selftest(Trace(io.StringIO()), {"workflow_id": "wf"}, spec, TOOLS) is True
+    now = next(v["name"] for v in spec["meta"]["call_vars"] if v["role"] == "now")
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", fake.body["customerVariables"][now])

@@ -87,6 +87,7 @@ git tag submission-final
 | LLM error or timeout | The fallback chain (gpt-5.5, gpt-5.4) runs automatically. Re-run the same command. |
 | `spec check` still has problems after 2 repair rounds | Read the problem list. If it is a builder bug, make a generic fix and re-run. |
 | Freya 5xx or 429 | Wait a minute and re-run. Do not hammer the platform. |
+| `END ok=False`, exit code 3 | The agent was saved and exported, but its chat smoke test failed (the TEST line says why). Re-run the same command; if it fails again, read the reply in the TEST line. |
 | `python3` is 3.9 | Run `export PATH="$PWD/.venv/bin:$PATH"` (`build.py` exits with a clear message on < 3.10). |
 | A brief seems to depend on another document | The FAQ says each hidden brief is one file and `{brief_path}` is that file. Build from that one file only. If in doubt, ask the organisers by replying to the login mail. |
 

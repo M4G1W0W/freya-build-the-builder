@@ -88,3 +88,14 @@ def test_a_failing_build_exits_1_with_a_redacted_traceback(capsys, monkeypatch):
     err = capsys.readouterr().err
     assert "ERROR" in err and "RuntimeError" in err and "Traceback" in err
     assert "sk-test-SECRET-abcdef" not in err
+
+
+def test_a_failed_smoke_test_ends_not_ok_with_exit_3(capsys, monkeypatch):
+    # Review gap 15: a failed self-test used to end with ok=True.
+    monkeypatch.setattr(cli.platform, "dry_run", lambda trace, slot, wf: None)
+    monkeypatch.setattr(
+        cli.platform, "save", lambda trace, slot, wf: {"workflow_id": "w", "agent_id": "a"}
+    )
+    assert cli.run([BRIEF, API], fake_extract, fake_render, lambda *args: False) == 3
+    err = capsys.readouterr().err
+    assert "ok=False" in err

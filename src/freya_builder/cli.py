@@ -169,13 +169,14 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
             count_tools(workflow),
             saved.get("version"),
         )
+        passed = True
         if selftest and not a.no_selftest:
-            selftest(trace, saved, spec, tools)
+            passed = selftest(trace, saved, spec, tools) is not False
         if a.export:
             platform.export(trace, saved["workflow_id"], a.export)
         print(json.dumps(saved))
-        ok = True
-        return 0
+        ok = passed
+        return 0 if passed else 3  # 3: the agent is saved, but its smoke test failed: re-run
     except Exception as e:  # the trace must record why a run failed, redacted (audit F80)
         trace.line("ERROR", f"{type(e).__name__}: {e}")
         for row in traceback.format_exc().rstrip().splitlines():
