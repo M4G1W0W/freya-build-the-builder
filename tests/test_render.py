@@ -355,7 +355,7 @@ def test_prompts_handle_customer_speech_styles():
     # sympathy repeated, support offered for mere stress.
     wf = render(SPEC_A, TOOLS, BRIEF)
     system = wf["system_prompt"]
-    assert "breaks off mid-sentence" in system and 'reply only "Please go on."' in system
+    assert "breaks off mid-sentence" in system
     # 276302f talkative PUB-07: "Yes, I confirm. I'm just looking" was cut off, so the yes was
     # ignored and the read-back asked 3 more times until the customer hung up. PUB-06/PUB-05: the
     # "repeat your last offer" rule for a second fragment re-offered the floor 3 times and the support
@@ -369,7 +369,17 @@ def test_prompts_handle_customer_speech_styles():
     assert "repeat your last" not in system
     # 676e9df styled PUB-06 rep 2: the simulated customer's chatter was cut at the same point 20+
     # times; "Please go on." only invited more chatter. A second cut-off asks for a short answer.
-    assert "Sorry, your message was cut off. Could you answer in a few words?" in system
+    # 347e01d styled PUB-03 (corrects): "It is the 12th of July" (no year) came cut off twice; the
+    # loop breaker skipped parts, "Please go on." x4, and the customer hung up after 13 s.
+    breaker = "Sorry, your message was cut off. Could you give me the whole answer in a few words?"
+    assert breaker in system and "a whole answer then replaces the parts so far" in system
+    assert "to a part or to a cut-off message without a reply" in system
+    ident = wf["nodes"]["identity"]["task_message"]
+    nego0 = wf["nodes"]["negotiate"]["task_message"]
+    for task in (ident, nego0):
+        assert (
+            'but if your previous reply was already "Please go on.", use the cut-off line' in task
+        )
     assert "only as often as that rule says in the whole call" in system
     ident = wf["nodes"]["identity"]["task_message"]
     assert "join the parts the customer gave since the last verify_identity result" in ident
