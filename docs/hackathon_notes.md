@@ -210,6 +210,15 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   Reason: lightweight and reproducible (`uv.lock`), no framework lock-in before reading the rules.
   The kit's `freya.py` is stdlib-only, so this stays compatible.
 
+- 2026-10-10 14:40 — **Builder LLM: OpenAI `gpt-6.1-sol`, with fallbacks `gpt-5.5` → `gpt-5.4`** (`BUILDER_MODEL`,
+  `BUILDER_MODEL_FALLBACKS`). Evidence: `experiments/exp02_model_bench.py` and `exp03_model_bench_hard.py`. All 8
+  candidates (gpt-6.1-sol, gpt-6-sol, gpt-6-astra, gpt-5.6-sol, gpt-5.5, gpt-5.4, gpt-5.2, o3) scored 11/11 on two
+  runs with identical outputs. That held on Briefs A+B, on raw material with an amending memo (variant-r) and on a
+  fully perturbed spec (variant-c). Each call took 4–10 s. Since extraction is tied, we chose the newest flagship for
+  the generative parts (stage prompts), plus a fallback chain in case the organisers' re-run key lacks the model.
+  **We will re-benchmark on the full spec extraction once its schema is final.** The builder stays stdlib-only, calling
+  OpenAI through urllib.
+
 ## Score log
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
