@@ -7,6 +7,7 @@ only generic instructions (with invented, generic examples).
 import json
 
 from . import platform
+from .datecheck import check_dates
 from .expr import FUNCS, NAMES
 from .llm import chat_json
 from .spec import SPEC_SCHEMA, check_spec, schema_problems
@@ -118,6 +119,17 @@ def consolidate(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     return out
 
 
+def spec_problems(spec: dict, tools: list[Tool]) -> list[str]:
+    """Schema, then API cross-checks, then the date self-test (it needs a spec that renders)."""
+    problems = schema_problems(spec, SPEC_SCHEMA) or check_spec(spec, tools)
+    if problems:
+        return problems
+    try:
+        return check_dates(spec)
+    except Exception as e:  # the self-test must never be the reason a build dies
+        return [f"date check could not run: {type(e).__name__}: {str(e)[:200]}"]
+
+
 def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
     user = f"# TOOL API\n{_tool_api_text(tools)}\n\n# SPECIFICATION\n{rules_text}"
     spec = chat_json(
@@ -125,7 +137,7 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
     )
     best: tuple[int, dict] | None = None  # (problem count, spec) of the best schema-valid spec
     for round_no in range(1, REPAIR_ROUNDS + 1):
-        problems = schema_problems(spec, SPEC_SCHEMA) or check_spec(spec, tools)
+        problems = spec_problems(spec, tools)
         trace.test(f"spec check (round {round_no})", not problems, f"{len(problems)} problem(s)")
         if not problems:
             return spec
@@ -146,7 +158,7 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
             SPEC_SCHEMA,
             "policy_spec",
         )
-    problems = schema_problems(spec, SPEC_SCHEMA) or check_spec(spec, tools)
+    problems = spec_problems(spec, tools)
     trace.test("spec check (final)", not problems, f"{len(problems)} problem(s)")
     if not problems:
         return spec
@@ -157,7 +169,7 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
     # An agent that is wrong in one corner scores more than no agent: deploy the best spec, loudly.
     # render() and validate() still stop the build if the spec cannot produce a workflow.
     count, spec = best
-    for p in (check_spec(spec, tools))[:20]:
+    for p in spec_problems(spec, tools)[:20]:
         trace.warn(f"UNRESOLVED spec problem (deployed anyway): {p}")
     trace.warn(f"deploying the best spec with {count} unresolved problem(s)")
     return spec
