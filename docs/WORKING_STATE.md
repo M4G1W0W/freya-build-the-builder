@@ -3,57 +3,46 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 19:08 Istanbul (16:08 UTC). Last commit: see `git log` (after `7fb6ba0`). Hidden briefs open
-Sun 11 Oct 17:00 UTC (about 25 h from now).
+**Snapshot:** 2026-10-10 20:25 Istanbul (17:25 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+Sun 11 Oct 17:00 UTC (about 23.5 h from now).
 
 ## Phase
 
-The phases come from `docs/design.md` §7:
 - **Phases 1–2 (Briefs A and B):** working.
-- **Phase 3 (robustness):** most of today's work.
-  - A generalisation audit: 6 auditors + critic, 81 findings. The score-relevant ones are fixed.
-  - Customer speech styles: diagnosed and fixed.
-  - Extraction reproducibility: measured.
-- **Phase 4 (submission):**
-  - Done: RUNBOOK, `scripts/check_secrets.py`, the fresh-clone build (110 s, stdlib only), the Python 3.10+ guard.
-  - Open: the freeze and the Sunday run.
+- **Phase 3 (robustness):** today's afternoon: a generalisation audit (fixed), customer speech styles, then a
+  **direction review against the live page** (`docs/reviews/2026-10-10-direction-review.md`, 20 ranked gaps,
+  skeptic-checked). Gaps 1, 2, 3, 5 and 6 are fixed (17:00–17:25 UTC); gap 4, the measurement, is running.
+- **Phase 4 (submission):** RUNBOOK, `scripts/check_secrets.py`, the fresh-clone build, the 3.10+ guard: done. Open:
+  review gaps 12 and 14 (RUNBOOK: one brief file only; `mkdir -p traces submission`, explicit `--slot hidden-N`, a
+  rehearsal), the freeze and the Sunday run.
 
 ## USER (read this first)
 
 - **Team Pistalogic. The repo stays PRIVATE for now**; the user will share it or make it public later.
-- **The user is testing the Brief A agent `dev-a-llm` (frozen at v6, code 52b947c)** through the slot `voice-test`:
-  - workflow `39e29145-bb65-47ec-9f95-24bbd2286502`, agent `cdd31f6c-…`;
-  - it is a copy with `test_variables` for practice customer PUB-01 `c_946ea8ba-608`, still unused at 15:58 UTC.
-  - `scripts/voice_test.py 81c14d7a-c622-49e2-98fb-8cd347ef4ac2 --case PUB-07` gives the copy a fresh customer.
-  - **Do NOT redeploy `dev-a-llm` or `voice-test` until the user's feedback is in.**
-  - When the user says "done", pull the call (`scripts/show_call.py`, the bank ledger) and go through it with them.
-- The user asked about running the builder's LLM on Freya. Our recommendation is no (see the Decision log, 16:55).
-  **Open:** how the organisers get an OpenAI key for their re-run. The user should ask on the support channel.
-- The user wants: keep developing carefully, measure everything, and say when something is ready for their feedback.
+- **The user's voice test is done** (call 577a2cd4 on `voice-test`, an off-script customer). Findings are in the
+  hackathon_notes Observations (16:12) and became fixes 557161d (direct transfers) and the read-back point (gap 18,
+  open, low). `voice-test` and `dev-a-llm` may now be redeployed.
+- **Dashboard tips for the user:** the editor's ⋮ menu → Organize lays out the nodes (the API refuses
+  `nodePositions`). The dashboard has its own test customer for test calls (DOB 14 March 1988, last four 4471; FAQ).
+- **The user should email the organisers (gap 1):** how to supply the builder's model key for the top-10 re-run. A
+  draft was given in the chat. The code side is done (77fb337: default model chain in code, README re-run section).
+- The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
 ## Running right now
 
-- **16:06 UTC, NEW FINDING (read first):** A talkative at `276302f` (dev-a-llm2, with a1499a8's bounded "Please go
-  on.") is **6/10** with **0 platform errors**: real failures.
-  - "Please go on." appears 5–46 times per failed call (PUB-06: 113 turns, the floor offered 4 times, a wrong date).
-  - PUB-02: no callback booked. PUB-05: support offered twice. PUB-07: no close_call.
-  - At 19664c6 (without the bound) the same style was 9/10 (1 rep; variance is high).
-  - **The fragment handling is fragile.** Next session:
-    - read these 4 calls (`runs/dev/style/a2-talkative-r1-276302f.json`, `all_rows`);
-    - compare with 19664c6;
-    - decide, e.g. revert a1499a8, or limit "Please go on." to identity, or reply to the content so far without
-      counting it.
-  - Measure at 3 reps before trusting any 1-rep number.
-
-- **chain3** (`<scratchpad>/chain3.sh`, background job `b6aj25921`, monitor `b1miemwej`). The mock bank recovered at
-  15:54 UTC, then the chain deployed HEAD `276302f`: dev-ab-llm v9 and dev-a-llm2 v2. It then runs, in order:
-  - styles at 1 rep: A talkative (started 15:56 UTC), B talkative, B asks_back, B in_words;
-  - then 3 reps: a2A, abB, extraB.
-
-  Results go to `runs/dev/style/*-276302f.*` and `runs/dev/{a2A,abB,extraB}-r3-276302f.*`. **Log each in the Score
-  log** and read every failure (`all_rows` in the result JSON).
-- `d2195cf` (the smoke-test retry) is build-time only and is not part of chain3; nothing to redeploy for it.
+- **chain4** (`<scratchpad>/chain4.sh`, background job `b9brwzcqx`, started 17:25 UTC at `676e9df`):
+  deploy dev-a-llm2 (spec-a-llm, now with 3 product slots) and dev-ab-llm (spec-ab-llm) from saved specs, then
+  four styled 3-rep runs, one at a time:
+  1. `styledA-a2`: dev-a-llm2 on `tests/fixtures/cases/styled-a.json` (Brief A, each case one of 5 styles);
+  2. `styledB-ab`: dev-ab-llm on `styled-b.json`;
+  3. `styledXB-ab`: dev-ab-llm on `styled-extra-b.json`;
+  4. `styledABA-ab`: dev-ab-llm on `styled-ab-a.json` (Brief A cases with A+B ledgers: PUB-05 and PUB-08 get notes,
+     Brief B rule 8).
+  Results: `runs/dev/r3/<name>-676e9df.{json,log}`, deploy logs `runs/dev/deploy/*-676e9df.log`. **Log each in the
+  Score log** and read every failure (`all_rows`). Classify platform vs real before changing code.
+- chain3 (276302f) died with the previous session after its first run (A talkative 6/10, 0 platform errors). Its
+  four failures were read (`runs/dev/style/calls-276302f/`) and fixed in 557161d.
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
@@ -68,11 +57,29 @@ The phases come from `docs/design.md` §7:
 | dev-a-llm2 | 19664c6 | A pieces, 1 rep | **10/10** (was 8/10) | |
 | style sweep | 52b947c | A asks_back / corrects / in_words | 10/10 each | |
 
+| dev-a-llm2 | 276302f | A talkative, 1 rep | **6/10**, 0 platform errors | fragment rule: a cut-off yes ignored (PUB-07), offers repeated (PUB-05/06), third_party cap hit (PUB-02); PUB-06 also resolved "this Friday" as 17 Oct. Fixed in 557161d except the date slip |
+
 The Score log in `docs/hackathon_notes.md` has every run with its reasons. The extra-B cases
 (`tests/fixtures/cases/extra-b.json`: refuse-all, paid+dispute+refused, all-paid) were checked on Freya at 52b947c:
-the ledger was correct in every clean rep. They still need a clean 3-rep run (it is in chain3).
+the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
 
-## What changed today (all committed; details in the Decision log and git log)
+## What changed this evening (17:00–17:25 UTC, from the direction review)
+
+- 3a55e6d: `kit/` is now the official **kit v3** (only README and examples differ from v1); the live page snapshot is
+  `docs/reference/hackathon_page_live_2026-10-10.md`.
+- 77fb337 (gap 1): `llm.DEFAULT_MODELS` gpt-6.1-sol → gpt-5.5 → gpt-5.4 in code; env models go in front. README
+  "Organiser re-run" section: only FREYA_API_KEY and OPENAI_API_KEY are needed.
+- 773b0dd (gap 2): `spec.product_slots()` = max(3, extracted max_products), from the page's "one to three
+  products". **Every agent now has 3 product slots**, the Brief A agent included; the trace warns when the brief was
+  read as fewer.
+- 557161d (gaps 3, 5, 6): a cut-off message is read first and its yes/no/date/amount/answer/request acted on;
+  never repeat a question, offer, amount or date because of a cut-off; caps opening 25, third_party 40, identity 40,
+  negotiate 120; endings whose rule says transfer or close happen at once, ask first only when the rule says so.
+- 676e9df: `scripts/make_style_cases.py` and `tests/fixtures/cases/styled-*.json`.
+- `make verify`: **725 passed**.
+
+
+## What changed earlier today (all committed; details in the Decision log and git log)
 
 - **Notes path:**
   - The goodbye-with-note stall was fixed structurally. A deterministic notes-done route goes to `ev_notes` /
@@ -127,21 +134,19 @@ Saved specs for `--spec` redeploys (no LLM): `runs/dev/spec-a-llm.json`, `runs/d
 
 ## Next steps (in order)
 
-1. Read chain3's results as they land, log them in the Score log, and read every failure transcript. Classify each
-   failure (sandbox / bank / platform vs real). Real failures get a generic fix and a regression test.
-2. When the user reports on their dashboard/voice test: pull the call and the ledger, discuss, and fix generically.
-   Only after their feedback: refresh dev-a-llm to HEAD (or point voice-test at dev-a-llm2).
-3. If B and extraB are clean at 3 reps: tell the user the multi-product agent (dev-ab-llm) is ready for their test
-   (make a voice-test copy of `f8f9b203…` with `--case PUB-12` or an extra-b case).
-4. Remaining deferred audit items, if time allows:
-   - F16: attempt amounts other than full/floor;
-   - F42: an "override" precedence rule (insolvency-style);
-   - F44/F45: ev_notes loses the event row's say_before_end;
-   - critic "uncovered": get_account returning a single object; create_promise without a product field;
-     time-of-day rules.
-   - Weigh plausibility; each needs a schema change plus fixture updates.
-5. Freeze about Sun 15:30 UTC (tag `freeze-final`). From 17:00 UTC follow `docs/RUNBOOK.md` (which now lists the new
-   trace signals to grep).
+1. Read chain4's four results as they land (`runs/dev/r3/*-676e9df.*`), log them in the Score log, read every failure
+   transcript, classify platform vs real. Real failures get a generic fix and a regression test. Watch especially:
+   the Brief A agent with 3 slots (a change from 1), talkative/pieces cases, PUB-09 transfers directly, PUB-06 dates.
+2. If the styled numbers hold, refresh `dev-a-llm` / `voice-test` to HEAD for the user and tell them it is ready.
+3. Remaining review gaps (`docs/reviews/2026-10-10-direction-review.md`), by value:
+   - 14 + 12 (RUNBOOK mechanics, 20 min): `mkdir -p traces submission`, `set -o pipefail`, explicit
+     `--slot hidden-1/2`, builds one after the other, real TEST strings, exactly one brief file; then a full rehearsal.
+   - 10 (30 min): commit, dirty flag, argv and model chain in the trace START line; re-run both briefs after any fix.
+   - 7 (1–2 h): a generic "ending overrides a recorded promise" close option (variant-c rule 47).
+   - 8 (2–4 h): changed tool APIs (a new required field on close/transfer; verify_identity taking all answers).
+   - 9, 11: other call days/hours (`--now` for scripts/chat.py), time-of-day and non-floor amount rules.
+   - 13, 15, 16, 17, 18, 19, 20: low.
+4. Freeze about Sun 15:30 UTC (tag `freeze-final`). From 17:00 UTC follow `docs/RUNBOOK.md`.
 
 ## Platform facts learned today (details in the hackathon_notes Observations)
 
