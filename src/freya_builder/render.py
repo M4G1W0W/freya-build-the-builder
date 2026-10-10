@@ -188,8 +188,11 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
         "attempts in order. Unless a brief rule says to make no persuasion attempt, each time the "
         "customer refuses or does not answer for a product, make that product's NEXT listed attempt, "
         "with exactly its amount and date: never skip one, never add one. After a product's last "
-        "listed attempt is refused, make no other offer of your own for it (not even the floor). An "
-        "amount or a date the customer proposes is not a refusal: handle it with the brief and FACTS.\n"
+        "listed attempt is refused, make no other offer of your own for it (not even the floor). After "
+        "the opening question, never ask again whether the customer can pay today: every offer of your "
+        "own uses exactly the date listed for that attempt (a floor offer after the customer said the "
+        "full amount is too much is attempt 1 with the floor amount, on attempt 1's date). An amount "
+        "or a date the customer proposes is not a refusal: handle it with the brief and FACTS.\n"
         if spec["attempts"]
         else ""
     )

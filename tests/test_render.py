@@ -258,3 +258,11 @@ def test_dates_resolve_weekday_phrases_before_comparing():
     task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "first turn it into a calendar date with the DATE TABLE" in task
     assert "Compare dates, never weekday names" in task
+
+
+def test_attempts_never_re_ask_today_and_carry_the_listed_date():
+    # PUB-06 (A+B agent, 52b947c rep 3): after "too much" the floor was offered for today, then
+    # again for Friday (judged as two floor offers). X-B2: "today" re-asked for a single product.
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "never ask again whether the customer can pay today" in task
+    assert "uses exactly the date listed for that attempt" in task
