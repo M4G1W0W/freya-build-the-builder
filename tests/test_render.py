@@ -230,3 +230,11 @@ def test_no_wrap_up_without_notes():
     wf = render(SPEC_A, TOOLS, BRIEF)
     assert "wrap_up" not in wf["nodes"]
     assert all(t["target_node"] != "wrap_up" for t in wf["nodes"]["negotiate"]["transitions"])
+
+
+def test_dates_resolve_weekday_phrases_before_comparing():
+    # PUB-11 rep 3 at d46b807: "this Friday" (16 Oct) was answered as if it were after the
+    # deadline, which is also a Friday (23 Oct); p1/p2 were recorded on the deadline.
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "first turn it into a calendar date with the DATE TABLE" in task
+    assert "Compare dates, never weekday names" in task

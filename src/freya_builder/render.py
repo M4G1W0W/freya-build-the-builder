@@ -193,7 +193,7 @@ DATE TABLE:
 {{{{date_table}}}}
 
 Follow the brief from the first ask to the confirmation and recording.
-DATES: when the customer names a date, find it in that product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Never offer the latest date unless those lines say so.
+DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. Never offer the latest date unless those lines say so.
 {attempts_line}RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
