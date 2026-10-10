@@ -2,9 +2,12 @@
 
 tests/fixtures/briefs/variant-{c,r}: synthetic variants of the PUBLIC practice briefs
 (see their changes_vs_public lists). Used to test that the builder generalises.
+tests/fixtures/briefs/raw-a.md: Brief A re-told as raw material (e-mail, policy extract, amending
+memo, CRM code list) with the SAME meaning, so it can be scored on the public Brief A cases.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -35,3 +38,15 @@ def test_answer_key_values_differ_from_public_where_claimed(v):
     key = json.loads((FIX / f"{v}.answer.json").read_text())
     assert key["changes_vs_public"], "a variant must list its deliberate changes"
     assert key["holidays"] != ["2026-10-26", "2026-11-11", "2026-11-26", "2026-12-25", "2027-01-01"]
+
+
+def test_raw_a_code_list_maps_to_kit_enums():
+    text = (FIX / "raw-a.md").read_text()
+    tools = {t.name: t for t in load_tool_api(KIT_API)}
+    outcomes = set(next(f for f in tools["close_call"].request if f.enum).enum)
+    queues = set(next(f for f in tools["transfer_to_agent"].request if f.enum).enum)
+    rows = re.findall(r"^\| [A-Z-]+ \| [^|]+ \| `(\w+)` \| (?:`(\w+)`|\(none\)) \|$", text, re.M)
+    assert {o for o, _ in rows} == outcomes
+    assert len(rows) == 16
+    listed = set(re.findall(r"^\| Q-[A-Z]+ \| [^|]+ \| `(\w+)` \|$", text, re.M))
+    assert listed == queues

@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 15:55 Istanbul (12:55 UTC). Last commit `6393c16`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 16:22 Istanbul (13:22 UTC). Last commit: see `git log`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -13,17 +13,25 @@ The phases come from `docs/design.md` §7:
 - **Phase 3 (robustness):** partly done (sandbox truncation hardening).
 - **Phase 4 (submission hardening):** not started (README run command done).
 
-## UNCOMMITTED changes in the working tree (written, NOT yet tested or committed)
+## Latest work (13:00 UTC)
 
-The user interrupted this step to save context. These are generic fixes from the latest 3-rep runs:
-1. `src/freya_builder/render.py` (`_identity_task`): "Whenever the customer's message contains an answer … CALL
-   verify_identity with that answer FIRST, then reply." It fixes PUB-03: a third wrong answer said together with a
-   complaint was never verified.
-2. `src/freya_builder/sandbox/facts.py` (`_product`): adds the line "after attempt N is refused, make NO further offer for
-   this product". It fixes PUB-12: the floor was offered after the last allowed attempt was refused.
-3. `tests/test_codegen_integration.py`: adds `test_facts_state_when_offers_must_stop`.
-
-**Next step for these:** run `make verify`. If green, commit. Then redeploy and re-measure (see Next steps).
+- `90b737d` commits the PUB-03 fix (identity: verify an answer inside a mixed message first) and the PUB-12 fix (facts:
+  "after attempt N is refused, make NO further offer", only when N > 0). `make verify`: 678 passed.
+- All 3 dev agents were redeployed from saved specs with `90b737d` (now version 3, same ids). Validation, dry run and
+  smoke test PASS.
+- **3-rep results with `90b737d`:** fixA **10/10**, llmA **10/10** (both logged). Still running in the background:
+  abB, then abA, then rawA. Results go to `runs/dev/{abB,abA}-r3-90b737d.*` and `runs/dev/rawA-r3-fe1d7ef.*`.
+- `fe1d7ef`: `build.py` exits with a clear message on Python < 3.10. The kit needs 3.10+, and the system `python3`
+  here is 3.9.
+- Trace redaction check: the actual secret values from `.env` and key patterns appear in none of the builder logs
+  (deploy + dry, LLM runs included). `FREYA_BANK_TEAM_KEY` is used only by `run_cases.py` and never goes into workflows.
+- Phase 3, variants: fresh `--dry` LLM builds of variant-c and variant-r give exp05 "OK" on every check.
+- **NEW raw-material fixture `tests/fixtures/briefs/raw-a.md`:** Brief A told as an e-mail, a policy extract with CRM
+  codes, a memo with 5 amendments (callback window, holidays, early deadline, "next <weekday>", the SMS sentence) and a
+  code list, keeping the same meaning. Consolidation applied all amendments. Against the clean extraction, 8 of 182
+  typed leaves differ, all harmless: prose inside lists, an unused precedence `outcome`, and wrong_number/deceased
+  rows only in third_party (the opening routes them there anyway). It is deployed as slot **dev-raw-a** (workflow
+  `7286c0bd-223f-4185-a61a-a7fedd43279b`, agent `eb321c47-0eb5-4ceb-9624-a3012d3c1957`, build 109 s, 2 model calls).
 
 ## Latest measured scores
 
@@ -32,11 +40,9 @@ Official-style scoring counts a case only at 3/3.
 | Agent | Spec source | Brief | Code version | Result |
 |---|---|---|---|---|
 | baseline (kit minimal_builder) | n/a | A / B | n/a | 6/10 (1 rep) / 1/3 |
-| dev-a-fixture | `tests/fixtures/spec_a.json` | A | before `6393c16` | 3 reps: **9/10** (PUB-01 2/3, sandbox truncation) |
-| dev-a-llm | LLM | A | before `6393c16` | 3 reps: **8/10** (PUB-03 2/3 identity, PUB-09 2/3 sandbox stall) |
-| dev-ab-llm | LLM | B (3 cases) | before `6393c16` | 3 reps: **2/3** (PUB-12 1/3 attempt count) |
-
-Commit `6393c16` (compact calendar, no pre-hooks, sandbox-free early closes, retry rule) is **not yet deployed or measured**.
+| dev-a-fixture | `tests/fixtures/spec_a.json` | A | `90b737d` | 3 reps: **10/10** |
+| dev-a-llm | LLM | A | `90b737d` | 3 reps: **10/10** |
+| dev-ab-llm | LLM | B (3 cases) | before `6393c16` | 3 reps: **2/3** (PUB-12 1/3 attempt count); re-run with `90b737d` in progress |
 
 ## Deployed agents (slot → ids; the slots file is `.freya-agents.json` in the repo root, gitignored)
 
@@ -45,6 +51,7 @@ Commit `6393c16` (compact calendar, no pre-hooks, sandbox-free early closes, ret
 | dev-a-fixture | 349752be-0764-4025-9e5f-4248a6fe6bff | f0354c17-f459-4d7a-bfef-62acea2e5cd7 |
 | dev-a-llm | 81c14d7a-c622-49e2-98fb-8cd347ef4ac2 | c6a57c76-a3ea-42cc-9cfb-7eb8773b9436 |
 | dev-ab-llm | f8f9b203-66ae-43e1-9d37-82e76d26b762 | b867b809-5d2b-4e75-935f-1ed6086432c3 |
+| dev-raw-a | 7286c0bd-223f-4185-a61a-a7fedd43279b | eb321c47-0eb5-4ceb-9624-a3012d3c1957 |
 
 Also present: the organiser base `2f14ba80-…`, the baseline minimal agents (slots brief-a and brief-a+brief-b), and the
 exp01 agent `1ee05139-…`. Saved specs from LLM builds are `runs/dev/spec-a-llm.json` and `runs/dev/spec-ab-llm.json`.
@@ -52,18 +59,17 @@ Redeploy them with `--spec` to skip the LLM.
 
 ## Next steps (in order)
 
-1. `make verify` → commit the uncommitted fixes above.
-2. Redeploy all three dev agents with the current code (the `--spec` builds are quick):
+1. DONE: `make verify` and commit (`90b737d`).
+2. DONE: redeploy the three dev agents. To redeploy again (the `--spec` builds take about 5 s, with 0 model calls):
    - `.venv/bin/python builder/build.py kit/briefs/brief-a.md kit/tools/openapi.json --spec tests/fixtures/spec_a.json --slot dev-a-fixture`
    - `... brief-a.md ... --spec runs/dev/spec-a-llm.json --slot dev-a-llm`
    - `... brief-a.md brief-b.md ... --spec runs/dev/spec-ab-llm.json --slot dev-ab-llm`
-   - Note: specs saved before `6393c16` already contain the `promise_window.non_business_day/after_max` fields.
-3. 3-rep runs: dev-a-fixture `--brief A`, dev-a-llm `--brief A`, dev-ab-llm `--brief B`. Also dev-ab-llm `--brief A` (the
-   A+B agent must not regress on A). Log each in the Score log and read every failure transcript (`scripts/show_run.py --calls`).
+3. IN PROGRESS: 3-rep runs for dev-a-fixture `--brief A`, dev-a-llm `--brief A`, dev-ab-llm `--brief B` and dev-ab-llm
+   `--brief A`. Log each in the Score log and read every failure transcript (`scripts/show_run.py --calls`).
 4. **Phase 3 robustness:**
    - `--style pieces|corrects|talkative|asks_back|in_words` runs on A and B.
-   - Build the synthetic variants with `--dry`: `tests/fixtures/briefs/variant-{c,r}.md` + `.openapi.json`.
-   - Write a raw-material rewrite of Brief A (`tests/fixtures/briefs/raw-a/`) and score it on the PUB-A cases.
+   - DONE: `--dry` builds of variant-c and variant-r (exp05 all OK).
+   - DONE (scoring queued): raw-a fixture, built as dev-raw-a. Score it with `--brief A --reps 3`.
 5. **Phase 4 submission hardening:**
    - Fresh-clone timed build. Trace completeness and redaction check.
    - A runbook for Sun 17:00–20:00 UTC: run the builder on each hidden brief with `| tee traces/hidden-N.log`, then
