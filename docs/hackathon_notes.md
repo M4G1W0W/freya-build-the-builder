@@ -222,6 +222,15 @@ Transcripts were read with `scripts/show_run.py <run.json> --calls`.
 - **The organiser base workflow** (`docs/reference/workflows/organiser_base_2node.json`) closes the call with a
   **workflow-level `close_call` lifecycle tool** (`alwaysRunsAt: ["end_of_call"]`, body from `{{outcome}}`/`{{reason}}`)
   and ends with an `end_call` tool. It routes identity → collection on `verify_identity_response.data.all_verified`.
+- **2026-10-10 ~15:33 UTC: the organisers' mock bank failed** (`POST /v1/practice/sessions` → HTTP 500 `error code: 1101`,
+  a Cloudflare Worker exception). Every run_cases run, and any test call whose tools reach the bank, fails until it
+  recovers. `scratchpad/chain3.sh` probes it every 10 min.
+- **Simulated customer turns arrive cut off mid-sentence** (verified in transcripts: "I've been so busy at work and",
+  with the agent replying in the same second), often under the talkative and in_words styles and also in identity. The
+  agent must treat a fragment as "still talking". Answering "Please go on." to every fragment can loop, because the
+  persona restarts its chatter (19664c6 PUB-04). A second fragment in a row gets the last question again (a1499a8).
+  Agent VAD keys (`vadStopSecs`, `waitSeconds`) exist in the API, but the kit says speech settings matter on voice
+  only: not used.
 
 ## Decision log
 
@@ -324,3 +333,7 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 10-10 17:38 | 52b947c | same | B | 3 | 0 / 3 (rep 3: **3/3**) | f8f9b203 / b867b809 | 4 s | every failed call in reps 1–2 has `Failed to reach snekbox` / `Connection reset by peer` errors (14:33–14:36 UTC). A hook failure makes the tool call an error even though the bank recorded it, so the model retried and the ledger got duplicate notes. Rep 3, with a working sandbox, was 3/3. `runs/dev/abB-r3-52b947c.json` |
 | 10-10 17:49 | 52b947c | LLM spec (dev-a-llm v6) | A | 3 | (3 / 10) reps 1–2: **10/10 and 10/10** | 81c14d7a / c6a57c76 | 4 s | rep 3 (14:47–14:49 UTC): all 7 failures have `Failed to reach snekbox` errors (sandbox burst). With a working sandbox: 20/20 calls. **Handed to the user for dashboard and voice feedback; not redeployed since.** `runs/dev/llmA-r3-52b947c.json` |
 | 10-10 17:57 | 52b947c + 7d075ac deploy | A+B agent (v7) on Brief A | A | 3 | 3 / 10 | f8f9b203 / b867b809 | 4 s | rep 1: PUB-01/04/08/09 sandbox errors. Artefact: PUB-05 hardship note (Brief B rule). Real: PUB-07 rep 1 recorded the deadline 2 Nov for "Monday the 26th" (a holiday, should be 27 Oct); PUB-06 rep 3 floor offered for today, then again for Friday (fixed generically in 54e094a: no "today" re-ask). `runs/dev/abA-r3-52b947c.json` |
+| 10-10 18:29 | 19664c6 | style fixes (fragments, pieces, questions back, sympathy, period dates) | A talkative (dev-a-llm2) | 1 | **9 / 10** (was 6/10 at 52b947c) | 7cfc34a8 / 2485fc27 | 3 s | PUB-04: a "Please go on." loop on repeated fragments (fixed in a1499a8). `runs/dev/style/a2-talkative-r1-19664c6.json` |
+| 10-10 18:30 | 19664c6 | same | B talkative (dev-ab-llm v8) | 1 | **3 / 3** (was 2/3) | f8f9b203 / b867b809 | 5 s | `runs/dev/style/ab-talkative-r1-19664c6.json` |
+| 10-10 18:31 | 19664c6 | same | A pieces | 1 | **10 / 10** (was 8/10) | 7cfc34a8 / 2485fc27 | 3 s | `runs/dev/style/a2-pieces-r1-19664c6.json` |
+| 10-10 18:32 | 19664c6 | same | B pieces | 1 | **3 / 3** (was 2/3) | f8f9b203 / b867b809 | 5 s | after this, the mock bank failed (1101): the asks_back, in_words and 3-rep runs never ran |
