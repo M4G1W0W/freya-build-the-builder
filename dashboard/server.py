@@ -21,11 +21,14 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import analysis as A  # noqa: E402
+import claude_activity as CA  # noqa: E402
 import data as D  # noqa: E402
+import evidence as EV  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPORTS = D.ROOT / "reports"
 REFRESH_S = 12
+ALLOWED_HOSTS: set[str] = set()
 _state: dict = {}
 _lock = threading.Lock()
 
@@ -39,17 +42,38 @@ def compute() -> dict:
     state["panels"] = A.panels(runs)
     state["failures"] = A.failures(runs)
     state["builder"] = A.builder(traces, runs)
+    try:
+        state["claude"] = CA.activity()
+    except Exception as exc:  # the monitor must never break the testing dashboard
+        state["claude"] = {"available": False, "reason": f"monitor error: {type(exc).__name__}"}
     state["snapshot"] = A.snapshot(state)
+    state["snapshot"]["claude_session"] = CA.summary(state["claude"])
+    try:
+        state["conversation"] = CA.conversation(limit=300)
+    except Exception as exc:
+        state["conversation"] = {
+            "available": False,
+            "reason": f"monitor error: {type(exc).__name__}",
+        }
+    state["snapshot"]["claude_conversation"] = (
+        "reports/latest_conversation.md (and .json): your prompts and Claude's replies"
+    )
     state["refreshed"] = D.iso(time.time())
     return state
 
 
-def write_reports(snap: dict) -> None:
+def write_reports(snap: dict, convo: dict | None = None) -> None:
     REPORTS.mkdir(exist_ok=True)
-    for name, text in (
+    files = [
         ("latest_snapshot.json", D.redact(json.dumps(snap, indent=2, default=str))),
         ("latest_snapshot.md", A.snapshot_markdown(snap)),
-    ):
+    ]
+    if convo is not None:
+        files += [
+            ("latest_conversation.json", D.redact(json.dumps(convo, indent=2, default=str))),
+            ("latest_conversation.md", D.redact(CA.conversation_markdown(convo))),
+        ]
+    for name, text in files:
         tmp = REPORTS / (name + ".tmp")
         tmp.write_text(text)
         tmp.replace(REPORTS / name)
@@ -62,7 +86,7 @@ def refresh_loop() -> None:
             with _lock:
                 _state.clear()
                 _state.update(state)
-            write_reports(state["snapshot"])
+            write_reports(state["snapshot"], state.get("conversation"))
         except Exception:  # keep serving the last good state; the error shows in the console
             traceback.print_exc()
         time.sleep(REFRESH_S)
@@ -97,6 +121,9 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         with _lock:
             st = dict(_state)
+        host = (self.headers.get("Host") or "").lower()
+        if host not in ALLOWED_HOSTS:  # DNS-rebinding guard: only the loopback names may read this
+            return self._send(403, b'{"error":"forbidden host"}', "application/json")
         if not st:
             return self._send(503, b'{"error":"warming up"}', "application/json")
         q = parse_qs(url.query)
@@ -122,6 +149,56 @@ class Handler(BaseHTTPRequestHandler):
             )
         if url.path == "/api/builder":
             return self._json({"refreshed": st["refreshed"], **st["builder"]})
+        if url.path == "/api/claude-activity":
+            wanted = q.get("session", [None])[0]
+            if not wanted:
+                return self._json(st["claude"])
+            try:
+                return self._json(CA.activity(wanted))
+            except Exception as exc:
+                return self._json(
+                    {"available": False, "reason": f"monitor error: {type(exc).__name__}"}
+                )
+        if url.path == "/api/claude-conversation":
+            wanted = q.get("session", [None])[0]
+            raw = q.get("limit", ["300"])[0]
+            limit = int(raw) if raw.isdigit() else 300
+            if not wanted and limit == 300:
+                return self._json(st["conversation"])
+            try:
+                return self._json(CA.conversation(wanted, min(limit, 500)))
+            except Exception as exc:
+                return self._json(
+                    {"available": False, "reason": f"monitor error: {type(exc).__name__}"}
+                )
+        if url.path == "/api/failure-details":
+            return self._json(
+                {"refreshed": st["refreshed"], **EV.index(st["runs"], st["incomplete"])}
+            )
+        if url.path == "/api/failure-detail":
+            rep = q.get("rep", [""])[0]
+            if rep and not (rep.isascii() and rep.isdigit() and len(rep) < 4 and int(rep) > 0):
+                return self._send(
+                    400, b'{"error":"rep must be a positive integer"}', "application/json"
+                )
+            try:
+                found = EV.detail(
+                    st["runs"],
+                    q.get("run", [""])[0],
+                    q.get("case", [""])[0],
+                    int(rep) if rep else None,
+                )
+            except EV.EvidenceError as exc:
+                return self._send(
+                    404, json.dumps({"error": f"Not available: {exc}"}).encode(), "application/json"
+                )
+            except Exception as exc:
+                return self._send(
+                    500,
+                    json.dumps({"error": f"evidence error: {type(exc).__name__}"}).encode(),
+                    "application/json",
+                )
+            return self._json(found)
         if url.path == "/api/case":
             detail = D.case_detail(st["runs"], q.get("run", [""])[0], q.get("case", [""])[0])
             return (
@@ -148,10 +225,12 @@ def main() -> None:
     )
     a = ap.parse_args()
     if a.snapshot_only:
-        write_reports(compute()["snapshot"])
+        st = compute()
+        write_reports(st["snapshot"], st.get("conversation"))
         print(f"wrote {REPORTS}/latest_snapshot.json and .md")
         return
     threading.Thread(target=refresh_loop, daemon=True).start()
+    ALLOWED_HOSTS.update({f"127.0.0.1:{a.port}", f"localhost:{a.port}"})
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)  # loopback only
     print(f"dashboard on http://127.0.0.1:{a.port} (read-only; Ctrl-C to stop)")
     server.serve_forever()

@@ -65,3 +65,77 @@ detail quotes.
   out of best and trend, because they are not builder output.
 - **Other files written.** Python writes its usual gitignored `__pycache__/`. `.claude/launch.json` holds the
   desktop-app preview entry (`testing-dashboard`).
+
+## Claude session monitor (`/api/claude-activity`, `/api/claude-conversation`)
+
+A passive, read-only view of the Claude Desktop (Code tab) session working on this repo. The session runs
+**locally**: the desktop app starts a local `claude --output-format stream-json` agent and writes the transcript to
+`~/.claude/projects/<project>/<cliSessionId>.jsonl` (entries tagged `entrypoint: claude-desktop`). Desktop-only
+metadata (title, turns, last activity, which transcript is current) is in
+`~/Library/Application Support/Claude/claude-code-sessions/*/*/local_<id>.json`. Cloud sessions keep no local data
+and are not visible.
+
+- **Which session.** `?session=<desktop or cli id>` or `DASHBOARD_SESSION`, else the non-archived session for this
+  repo with the most completed turns. The choice is sticky until the server restarts.
+- **Activity feed.** Tool names, Claude's own action descriptions (allowlisted fields only), outcomes, error kinds
+  from a fixed vocabulary, live background processes (basenames only), and Claude's latest text. It never contains
+  your prompts, thinking, tool inputs or tool output.
+- **Conversation.** Your prompts (every one is kept), Claude's replies, and one-line background-task events.
+  System reminders, thinking and tool content are left out. Secrets are redacted and e-mails masked. It is written
+  to `reports/latest_conversation.{json,md}` for an external reviewer (`reports/` is gitignored).
+- **Safety.** Files are opened read-only. The only subprocess is `ps`. Requests whose Host is not
+  `127.0.0.1:<port>` or `localhost:<port>` get 403 (DNS-rebinding guard).
+- **Limits.**
+  - Only the session's current transcript is read. Prompts from before a context save are in older transcripts.
+  - "Open tasks" are background launches with no recorded completion. Only the live processes prove that work is
+    running.
+
+## Failure evidence (`/api/failure-details`, `/api/failure-detail`)
+
+A per case-and-rep evidence view for independent review. It uses local artefacts only and makes no Freya calls.
+
+| Endpoint | Content |
+|---|---|
+| `GET /api/failure-details` | Every failed rep, grouped as completed official-style runs vs completed non-official runs (1-rep or subset). Incomplete runs are listed separately. Each rep shows which evidence exists locally (raw call dump, formatted transcript, or the result row only). |
+| `GET /api/failure-detail?run=<run id>&case=<PUB-xx>&rep=<n>` | The full evidence for one rep (passing reps work too); see the sections below. Without `rep`, the first failed rep is shown and `case.rep_note` says so. Status codes: 400 if `rep` is not a positive integer, 404 for an unknown run or case or a rep out of range, 500 for an internal error (never 200 with an error inside). |
+
+Sections returned by `/api/failure-detail`:
+- **`result`:** raw rep pass/fail, all reps, the strict pass of the case in this run, call id, tools, end reason.
+- **`classification`:** the auto category plus its evidence (structural check, ledger diff, the matched keyword
+  with context). **`platform_adjusted_interpretation`** is reported separately.
+- **`judge`:** the result-row text (cut at 400 characters by the kit), plus the full verdict and the messages it
+  cites, taken from the raw call record.
+- **`bank_records`:** ledger differences (actual vs expected), the expected ledger from the case file, and the bank
+  writes seen in the call (arguments and bank responses). The final ledger itself is marked *Not available*,
+  because run_cases does not save it.
+- **`transcript`:** customer and agent messages, numbered from 0 as the judge counts them, with tool calls, routes
+  and errors. The headers of tool requests are never included.
+- **`date_chain`** (date failures): customer wording → runtime date facts (`today_facts`, `date_table`,
+  `account_facts` from the workflow snapshot) → proposed dates → confirmation → recorded promise. It covers the
+  negotiation step only; messages are selected by keyword, not interpretation.
+- **`multi_product`** (multi-product cases): for each product, what the bank loaded, the agent messages that name
+  it, notes and promises recorded, and the expected records. Attempts are *not* counted for you.
+- **`provenance`:**
+  - commit and its source;
+  - the agent version that was deployed and the version that answered the call;
+  - the deploy trace;
+  - fresh extraction vs saved-spec build;
+  - the input sha256 from the trace;
+  - the current spec hash, with a note when the spec was rewritten after the deploy;
+  - the assigned speech style. The actual style is *Not available*: the call record does not carry the persona.
+- **`timestamps`:** simulation id, estimated simulation start, run end, and the call's created, started, ended and
+  updated times. Verdict arrival is *Not available*: Freya does not record it.
+
+Evidence strength depends on what was saved. A raw call dump (`runs/**/<call>.json`, written by
+`freya.get_call`) gives everything above. Without one, only the result row, the case file and the deploy trace are
+used, and every other field says *Not available*.
+
+More detail on the evidence fields:
+- **Bank writes.** Engine-run bank calls appear as `api_call:<endpoint>` (for example `api_call:close_call`).
+- **Transcript sources.** A `.txt`-only transcript is parsed too (labelled as such). It has no runtime variables,
+  and its tool text is cut at 300 characters.
+- **Speech style.** It comes from the styled case file, or from the run's file name, with the source labelled.
+  Otherwise it is *not recorded*: run_cases does not save `--style`.
+- **Judge field.** A missing judge verdict ("analysis never arrived") is classified as a platform error. A failed rep
+  without a judge line means the judge passed and the failure is in the ledger.
+- **Simulation id.** run_cases records only the last rep's simulation id, so earlier reps report *Not available*.

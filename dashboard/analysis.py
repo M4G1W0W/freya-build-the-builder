@@ -318,7 +318,7 @@ def _mark_in_progress(incomplete: list[dict], procs: list[dict]) -> list[dict]:
     out = []
     for i in incomplete:
         stem = i["file"].rsplit("/", 1)[-1].removesuffix(".log")
-        live = any(p["kind"].startswith("simulation") and stem in p["command"] for p in procs)
+        live = any(p["kind"].startswith("simulation") and stem in p["what"] for p in procs)
         out.append({**i, "status": "in progress (live process)"} if live else i)
     return out
 
@@ -444,6 +444,11 @@ def snapshot_markdown(s: dict) -> str:
         f"- **Latest measured commit:** `{s['test_status']['latest_measured_commit']}`",
         f"- **Running now (process-verified):** {', '.join(p['kind'] + ' ' + p['elapsed'] for p in s['test_status']['running']) or 'nothing'}",
     ]
+    cs = s.get("claude_session") or {}
+    if cs.get("available"):
+        L.append(
+            f"- **Claude engineering session (local, read-only monitor):** {cs['title']} — {cs['state']}; last write {cs['last_write']}; {cs['recent_errors']} recent tool error(s)"
+        )
     lc = s["test_status"]["latest_completed"]
     if lc:
         L.append(

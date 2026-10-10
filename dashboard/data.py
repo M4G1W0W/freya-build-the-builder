@@ -40,7 +40,18 @@ from callview import format_messages  # noqa: E402  (existing pure formatter, no
 SECRET_ENV = ("FREYA_API_KEY", "FREYA_BANK_TEAM_KEY", "OPENAI_API_KEY", "FREYA_WORKSPACE_ID")
 # same patterns as scripts/check_secrets.py; the bearer one is split so this file never matches itself
 PATTERNS = [
-    re.compile(p) for p in (r"\bfak_\w{8,}", r"\bsk-[A-Za-z0-9_-]{16,}", "Bear" + r"er \S{8,}")
+    re.compile(p)
+    for p in (
+        r"\bfak_\w{8,}",
+        r"\bsk-[A-Za-z0-9_-]{16,}",
+        "Bear" + r"er \S{8,}",
+        r"\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_\w{20,}",
+        r"\bxox[abprs]-[\w-]{10,}",
+        r"\bAKIA[0-9A-Z]{16}\b",
+        r"\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}",
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+        r"(?i)\b(password|passwd|secret|api[_-]?key|access[_-]?token)\s*[=:]\s*[^\s,;]{6,}",
+    )
 ]
 
 
@@ -224,6 +235,9 @@ def parse_trace(path: Path) -> dict | None:
             s = re.search(r"saved slot '([^']+)'", msg)
             if s:
                 t["slot"] = s.group(1)
+            pv = re.search(r"published version (\d+)", msg)
+            if pv:
+                t["published_version"] = int(pv.group(1))
         elif kind == "CREATED":
             kv = dict(re.findall(r"(\w+)=(\S+)", msg))
             version = kv.get("version")
@@ -306,13 +320,25 @@ def kit_log() -> list[dict]:
     return rows
 
 
+NO_STYLE = "not recorded (run_cases does not save --style; no style in the file name)"
+STYLE_TOKENS = {
+    "talkative": "talkative",
+    "pieces": "pieces",
+    "corrects": "corrects",
+    "asks_back": "asks_back",
+    "asks": "asks_back",
+    "in_words": "in_words",
+    "words": "in_words",
+}
+
+
 def case_file_for(name: str) -> tuple[str | None, str]:
     for prefix, file in STYLED:
         if name.startswith(prefix):
             return file, "styled case file (one style per case)"
     if "extraB" in name or "extra-b" in name:
-        return "extra-b.json", "default (no style)"
-    return None, "default (no style)"
+        return "extra-b.json", NO_STYLE
+    return None, NO_STYLE
 
 
 def load_cases(file: str | None) -> dict[str, dict]:
@@ -418,6 +444,8 @@ def classify(row: dict) -> tuple[str, list[str]]:
         tags.insert(0, structured)
     if not row.get("tools") and (row.get("slowest_turn_s") or 0) == 0:
         tags.insert(0, "Platform errors")
+    if re.search(r"analysis never arrived|no verdict", text):
+        tags.insert(0, "Platform errors")  # the judge verdict never arrived
     tags = list(dict.fromkeys(tags))
     primary = next((t for t in tags if not t.startswith("Possible platform")), None)
     return (primary or (tags[0] if tags else "Unknown")), tags
@@ -564,7 +592,11 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
             f"The matched deploy trace ({deploy['file']}) started before commit {commit} existed: "
             "deploy metadata for this run is missing"
         )
-    if deploy and deploy["created"]["version"] is None:
+    if deploy and deploy["created"]["version"] is None and deploy.get("published_version"):
+        flags.append(
+            f"Agent version {deploy['published_version']} taken from the trace's 'published version' line (CREATED has none)"
+        )
+    elif deploy and deploy["created"]["version"] is None:
         flags.append(
             "Agent version not recorded by the build trace (first create?): version cross-check not possible"
         )
@@ -578,8 +610,14 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
     # case set, style, expected cases
     ids = sorted({r["id"] for rep in data["all_rows"] for r in rep})
     case_file, style = case_file_for(name)
-    if "/style/" in "/" + rel(path) + "/" or path.parent.name == "style":
-        style = next((s for s in STYLES if f"-{s}-" in name), style)
+    style_source = (
+        "case file 'style' field" if case_file and case_file.startswith("styled") else "none"
+    )
+    token = next(
+        (v for k, v in STYLE_TOKENS.items() if re.search(rf"(^|[-_]){k}([-_]|$)", name)), None
+    )
+    if not (case_file and case_file.startswith("styled")) and token:
+        style, style_source = token, "file name (run_cases does not record --style)"
     if case_file == "extra-b.json" or (case_file or "").startswith("styled-extra"):
         case_set, cs_src = "extra-B", "file name"
     else:
@@ -636,16 +674,21 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
             failures.append({"rep": i + 1, "call_id": r.get("call_id"), **failure_detail(r)})
         for r in c["rows"]:
             dump = calls.get((r or {}).get("call_id"))
-            if dump and deploy and deploy["created"]["version"] is not None:
+            deployed_v = (
+                (deploy["created"]["version"] or deploy.get("published_version"))
+                if deploy
+                else None
+            )
+            if dump and deployed_v is not None:
                 v = (load_json(dump) or {}).get("entityVersionNumber")
                 version_seen += 1
-                version_bad += v != deploy["created"]["version"]
+                version_bad += v != deployed_v
         cdef = cases_def.get(cid, {})
         cases.append(
             {
                 "id": cid,
                 "family": c["family"],
-                "style": cdef.get("style") or (style if style in STYLES else "default"),
+                "style": cdef.get("style") or style,
                 "reps": c["reps"],
                 "strict": strict,
                 "category": failures[0]["category"] if failures else None,
@@ -672,7 +715,9 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         "agent_id": agent,
         "slot": slot,
         "workflow_id": (deploy or {}).get("created", {}).get("workflow_id") if deploy else None,
-        "version": deploy["created"]["version"] if deploy else None,
+        "version": (deploy["created"]["version"] or deploy.get("published_version"))
+        if deploy
+        else None,
         "deploy_log": deploy["file"] if deploy else None,
         "deploy_time": deploy["created"]["time"] if deploy else None,
         "build_mode": deploy["mode"] if deploy else "unknown (no deploy trace)",
@@ -694,6 +739,7 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         "case_file": case_file
         or ("kit/public-test-set.json" if case_set != "extra-B" else "extra-b.json"),
         "style": style,
+        "style_source": style_source,
         "agent_kind": kind,
         "panel": panel,
         "reps": reps,
@@ -865,21 +911,26 @@ def running_tests() -> list[dict]:
         return []
     found = []
     executes = re.compile(
-        r"python[0-9.]*\s+(-u\s+)?\S*(run_cases\.py|builder/build\.py)\b|(^|/)(ba|z)?sh\s+\S*chain\d*\.sh\b"
+        r"python[0-9.]*\s+(-u\s+)?\S*(run_cases\w*\.py|builder/build\.py)\b"
+        r"|(^|/)(ba|z)?sh\s+\S*(chain\d*|scratchpad/\S+)\.sh\b"
     )
     for line in out.splitlines()[1:]:
         parts = line.strip().split(None, 2)
         if len(parts) < 3:
             continue
         pid, etime, cmd = parts
-        if re.match(r"\S*(ba|z)?sh\s+-c\b", cmd) or not executes.search(cmd):
+        if re.match(r"\S*(ba|z)?sh\s+-l?c\b", cmd) or not executes.search(cmd):
             continue  # wrapper shells, editors, viewers and linters that merely name the file
-            kind = (
-                "simulation (run_cases.py)"
-                if "run_cases" in cmd
-                else "build"
-                if "build.py" in cmd
-                else "chain script"
-            )
-            found.append({"pid": pid, "elapsed": etime, "kind": kind, "command": redact(cmd)[:300]})
+        if "run_cases" in cmd:
+            out_file = re.search(r"--out\s+(\S+)", cmd)
+            agent = re.search(r"run_cases\w*\.py\s+([0-9a-f]{8})", cmd)
+            kind = "simulation (run_cases.py)"
+            what = f"agent {agent.group(1) if agent else '?'} -> {Path(out_file.group(1)).name if out_file else 'no --out'}"
+        elif "build.py" in cmd:
+            slot = re.search(r"--slot\s+(\S+)", cmd)
+            kind, what = "build", f"slot {slot.group(1) if slot else '(default)'}"
+        else:
+            script = re.search(r"(\S+\.sh)\b", cmd)
+            kind, what = "chain/queue script", Path(script.group(1)).name if script else "script"
+        found.append({"pid": pid, "elapsed": etime, "kind": kind, "what": redact(what)})
     return found

@@ -22,6 +22,8 @@ h2{font-size:14px;margin:18px 0 8px}.row{display:flex;gap:10px;flex-wrap:wrap;al
 details summary{cursor:pointer;color:var(--acc)}.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:12px}@media(max-width:900px){.split{grid-template-columns:1fr}}
 select{font:inherit;padding:4px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;max-width:100%}
 .bar{height:10px;background:var(--acc);border-radius:3px}.r{text-align:right}
+.msg{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--card)}.msg.you{border-left:4px solid var(--acc)}.msg.claude{border-left:4px solid var(--ok)}.msg pre{max-height:none;background:transparent;padding:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.evt{color:var(--mute);font-size:11px;margin:2px 0 2px 10px}
+.cited{outline:2px solid var(--warn);background:var(--warnbg)}.kv td:first-child{color:var(--mute);white-space:nowrap;width:1%}.box{border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin:6px 0}
 .note{color:var(--warn);background:var(--warnbg);border-radius:4px;padding:2px 6px;margin-top:4px;overflow-wrap:anywhere}
 </style>
 </head>
@@ -31,11 +33,11 @@ select{font:inherit;padding:4px;background:var(--card);color:var(--ink);border:1
   <nav id="nav"></nav>
 </header>
 <main>
-<section id="overview"></section><section id="history"></section><section id="cases"></section>
-<section id="failures"></section><section id="builder"></section><section id="system"></section>
+<section id="overview"></section><section id="history"></section><section id="cases"></section><section id="evidence"></section>
+<section id="failures"></section><section id="builder"></section><section id="claude"></section><section id="system"></section>
 </main>
 <script>
-const TABS=[["overview","Overview"],["history","Test History"],["cases","Case Explorer"],["failures","Failure Analysis"],["builder","Builder Generalization"],["system","System Status"]];
+const TABS=[["overview","Overview"],["history","Test History"],["cases","Case Explorer"],["evidence","Failure Evidence"],["failures","Failure Analysis"],["builder","Builder Generalization"],["claude","Claude Session"],["system","System Status"]];
 let S={},tab=location.hash.slice(1)||"overview",selRun=null,selCase=null;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const NA='<span class="mute">Not available</span>';
@@ -48,12 +50,12 @@ function nav(){document.getElementById("nav").innerHTML=TABS.map(([k,l])=>`<butt
 function go(k){tab=k;location.hash=k;nav();render()}
 async function load(){
   try{
-    const [o,r,f,b,s]=await Promise.all(["overview","runs","failures","builder","snapshot"].map(p=>fetch("/api/"+p).then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()})));
-    S={o,r,f,b,s};document.getElementById("fresh").textContent="data refreshed "+o.refreshed+" · page polls every 12 s";
-    render();
+    const [o,r,f,b,s,c,cv]=await Promise.all(["overview","runs","failures","builder","snapshot","claude-activity","claude-conversation"].map(p=>fetch("/api/"+p).then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()})));
+    const first=!S.o;S={o,r,f,b,s,c,cv};document.getElementById("fresh").textContent="data refreshed "+o.refreshed+" · page polls every 12 s";
+    if(first||tab!=="evidence")render();  // the evidence view is static evidence: no re-render while reading
   }catch(e){document.getElementById("fresh").textContent="refresh failed: "+e}
 }
-function render(){for(const [k] of TABS)document.getElementById(k).classList.toggle("on",k===tab);if(!S.o)return;({overview,history,cases,failures,builder,system})[tab]()}
+function render(){for(const [k] of TABS)document.getElementById(k).classList.toggle("on",k===tab);if(!S.o)return;({overview,history,cases,evidence,failures,builder,claude,system})[tab]()}
 
 function scoreBlock(p){
   const l=p.latest;if(!l)return `<div class="big mute">—</div><div>${NA}: no complete 3-rep full-set run</div>`;
@@ -68,7 +70,7 @@ function scoreBlock(p){
 }
 function overview(){
   const o=S.o.overview,ws=o.working_state||{};
-  const run=o.running.length?o.running.map(p=>`${pill("RUNNING","warn")} ${esc(p.kind)} (${esc(p.elapsed)})<div class="sm mute">${esc(p.command)}</div>`).join(""):pill("nothing running","ok")+`<div class="sm mute">${esc(o.running_note)}</div>`;
+  const run=o.running.length?o.running.map(p=>`${pill("RUNNING","warn")} ${esc(p.kind)} (${esc(p.elapsed)})<div class="sm mute">${esc(p.what)}</div>`).join(""):pill("nothing running","ok")+`<div class="sm mute">${esc(o.running_note)}</div>`;
   const lc=o.latest_completed;
   document.getElementById("overview").innerHTML=`
   <div class="grid">
@@ -77,6 +79,7 @@ function overview(){
    <div class="card"><h3>Latest measured commit</h3><div class="big"><code>${short(o.latest_measured_commit)}</code></div><div class="sm">${esc(o.latest_measured_commit_subject||"")}</div><div class="sm">${csrc(o.latest_measured_commit_source)}</div></div>
    <div class="card"><h3>Running now (process-verified)</h3>${run}</div>
    <div class="card"><h3>Latest completed test</h3>${lc?`<div><b>${esc(lc.strict)}</b> ${lc.official_style?"strict":pill("not an official-style 3/3 run","warn")} · ${esc(lc.reps)} reps · <code>${short(lc.commit)}</code></div><div class="sm">${esc(lc.run)}</div><div class="sm">${esc(o.latest_completed_panel)}</div><div class="sm">${ago(o.seconds_since_last_result)} ago (${esc(lc.end)})</div>`:NA}</div>
+   <div class="card"><h3>Claude engineering session</h3>${S.c&&S.c.available?`<div><b>${esc(S.c.current_task.session_title)}</b></div><div class="sm">${esc(S.c.state)}</div><div class="sm mute">last write ${esc(S.c.transcript_last_write)} · ${S.c.errors.length} recent error(s)</div><a class="sm" href="#claude">details</a>`:`<div class="mute">${esc(S.c?.reason||"Not available")}</div>`}</div>
    <div class="card"><h3>Code commits not yet measured</h3><div class="big ${o.untested_code_commits.length?"":"mute"}">${o.untested_code_commits.length}</div><div class="sm mute">src/ or builder/ commits after the latest measured commit</div></div>
   </div>
   <h2>Official-style performance (strict: a case passes only if every rep passes)</h2>
@@ -141,9 +144,72 @@ async function showCase(){
    ${rp.detail?`<div class="sm">category (auto): <b>${esc(rp.detail.category)}</b> · tags: ${esc(rp.detail.tags.join(", "))}</div>
     ${rp.detail.ledger.length?`<table><tr><th>Ledger field</th><th>Actual</th><th>Expected</th></tr>${rp.detail.ledger.map(l=>`<tr><td>${esc(l.field)}</td><td class="bad">${esc(l.actual)}</td><td>${esc(l.expected)}</td></tr>`).join("")}</table>`:'<div class="sm">Ledger: no mismatch reported</div>'}
     ${rp.detail.judge.map(j=>`<div class="sm"><b>Judge</b> <span class="mute">(as stored by run_cases.py, cut at 400 chars by the kit)</span>: ${esc(j)}</div>`).join("")}${rp.detail.other.map(j=>`<div class="sm">${esc(j)}</div>`).join("")}`:""}
+   <div class="sm"><a href="#evidence" data-rep="${rp.rep}" onclick="evSel={run:selRun,case:selCase,rep:+this.dataset.rep};evData=null">open the full evidence for rep ${rp.rep} →</a></div>
    <details><summary>Transcript ${rp.transcript?`(${esc(rp.transcript_source)})`:"— Not available locally"}</summary>${rp.transcript?`<pre>${esc(rp.transcript)}</pre>`:NA}</details>`).join("")}
   <h2>Human notes (Score log rows citing this run)</h2>${x.human_notes.length?x.human_notes.map(n=>`<pre>${esc(n)}</pre>`).join(""):NA}
   <h2>Artifacts</h2>${x.artifacts.filter(Boolean).map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`;
+}
+let evIdx=null,evSel=null,evData=null,evGroup="completed_official";
+const V=x=>x==null?NA:typeof x==="string"?(x.startsWith("Not available")?`<span class="mute">${esc(x)}</span>`:esc(x)):`<pre>${esc(JSON.stringify(x,null,1))}</pre>`;
+const KV=o=>`<table class="kv">${Object.entries(o).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="sm">${V(v)}</td></tr>`).join("")}</table>`;
+async function evidence(){
+  const el=document.getElementById("evidence");
+  if(!evIdx||tab==="evidence"&&!evIdx._fresh){evIdx=await fetch("/api/failure-details").then(r=>r.json());evIdx._fresh=true;setTimeout(()=>{if(evIdx)evIdx._fresh=false},30000)}
+  const rows=evIdx[evGroup]||[],cov=evIdx.coverage;
+  el.innerHTML=`<div class="sm mute">${esc(evIdx.note)} Coverage: ${cov.failed_reps} failed reps; raw call dump for ${cov.with_raw_call_dump}, formatted transcript only for ${cov.with_formatted_transcript_only}; the rest have result-row evidence only. Endpoint: <code>${esc(evIdx.endpoint)}</code></div>
+  <div class="row" style="margin:6px 0"><b>Show</b><select onchange="evGroup=this.value;render()">${["completed_official","completed_not_official"].map(g=>`<option value="${g}" ${g===evGroup?"selected":""}>${g==="completed_official"?"completed official-style runs (strict 3/3 rule)":"completed runs that are NOT official-style (1-rep / subset)"} (${(evIdx[g]||[]).length})</option>`).join("")}</select></div>
+  <div class="split"><div class="wrap" style="max-height:760px"><table><tr><th>Ended</th><th>Case</th><th>Rep</th><th>Style</th><th>Category (auto)</th><th>Commit · v</th><th>Evidence</th></tr>
+  ${rows.map(x=>`<tr class="click ${evSel&&evSel.run===x.run&&evSel.case===x.case&&evSel.rep===x.rep?"sel":""}" data-run="${esc(x.run)}" data-case="${esc(x.case)}" data-rep="${x.rep}" onclick="evSel={run:this.dataset.run,case:this.dataset.case,rep:+this.dataset.rep};evData=null;render()"><td class="sm">${esc((x.end||"").slice(5,16))}</td><td><b>${esc(x.case)}</b><div class="sm mute">${esc(x.panel)}</div></td><td>${x.rep}</td><td class="sm">${esc(x.style)}</td><td class="sm">${esc(x.category)}</td><td class="sm"><code>${short(x.commit)}</code> v${esc(x.version??"?")}</td><td>${x.raw_call?pill("raw call","ok"):x.formatted_transcript?pill("txt only","warn"):pill("row only")}</td></tr>`).join("")}</table></div>
+  <div id="evdetail" class="card">${evSel?"loading…":"Select a failed rep."}</div></div>
+  <h2>Incomplete runs (no per-rep results; kept apart from strict scores)</h2><div class="wrap" style="max-height:220px"><table><tr><th>Time</th><th>Log</th><th>Status</th><th>Last line</th></tr>${(evIdx.incomplete_runs||[]).map(i=>`<tr><td class="sm">${esc(i.time)}</td><td class="sm">${esc(i.file)}</td><td>${pill(i.status,"bad")}</td><td class="sm">${esc(i.reason)}</td></tr>`).join("")}</table></div>`;
+  if(evSel)showEvidence();
+}
+async function showEvidence(){
+  const d=document.getElementById("evdetail");if(!d)return;
+  if(!evData||evData._key!==JSON.stringify(evSel)){
+    const r=await fetch(`/api/failure-detail?run=${encodeURIComponent(evSel.run)}&case=${encodeURIComponent(evSel.case)}&rep=${evSel.rep}`);
+    evData=r.ok?await r.json():{error:"Not available"};evData._key=JSON.stringify(evSel);
+  }
+  const x=evData;if(x.error){d.innerHTML=esc(x.error);return}
+  const rawCited=(typeof x.judge.full==="object"&&x.judge.full.cited_messages)||{},cited={},otherCited=[];
+  for(const [k,v] of Object.entries(rawCited)){const m=String(k).match(/^(?:message\s*)?(\d+)$/i);if(m)cited[+m[1]]=v;else otherCited.push([k,v])}
+  const msgs=x.transcript.messages, tl=x.transcript.timeline||[];
+  const transcript=msgs?tl.map(e=>e.kind==="message"?`<div class="msg ${e.who==="agent"?"claude":"you"} ${cited[e.n]!==undefined?"cited":""}"><div class="sm"><b>#${e.n} ${e.who==="agent"?"Agent":"Customer"}</b> <span class="mute">${(e.t??0).toFixed(1)} s · node ${esc(e.node||"?")}</span>${cited[e.n]!==undefined?` · <b>judge:</b> ${esc(cited[e.n])}`:""}</div><pre>${esc(e.text)}</pre></div>`
+    :e.kind==="tool_call"?(()=>{const tc=(x.transcript.tool_calls||[])[e.i];return `<div class="box sm"><b>⚙ ${esc(e.function)}</b> <span class="mute">${(e.t??0).toFixed(1)} s</span>${tc&&tc.function!=="code_exec"?`<div>args: <code>${esc(typeof tc.args==="string"?tc.args:JSON.stringify(tc.args))}</code></div><div>result: <code>${esc(typeof tc.result==="string"?tc.result:JSON.stringify(tc.result))}</code></div>${tc.error?`<div class="bad">error: ${esc(tc.error)}</div>`:""}`:""}</div>`})()
+    :e.kind==="tool_error"?`<div class="evt bad">!! ${esc(e.function)} error: ${esc(e.error)}</div>`
+    :["max_turns_exceeded","tool_call_routing","call_ended"].includes(e.kind)?`<div class="evt">⏹ ${esc(e.kind)} ${esc(e.detail)}</div>`
+    :e.kind==="route"?`<div class="evt">↳ route ${e.detail?esc(e.detail):esc(e.from)+" → "+esc(e.to)+": "+esc(e.reason)}</div>`:e.kind==="error"?`<div class="evt bad">!! ${esc(e.detail||e.message)}</div>`:e.kind==="node"?`<div class="evt">▸ enter ${esc(e.node)}</div>`:"").join("")
+    :V(x.transcript.kind);
+  const dc=x.date_chain,mp=x.multi_product;
+  const list=a=>Array.isArray(a)?(a.length?a.map(m=>`<div class="sm">#${m.n} ${esc(m.who)}: ${esc(m.text)}</div>`).join(""):'<span class="mute">none</span>'):V(a);
+  d.innerHTML=`<h3>${esc(x.case.case)} · rep ${x.case.rep} of ${x.case.reps_recorded} · ${esc(x.case.family)} · ${esc(x.case.title||"")}</h3>
+  <div class="sm">${x.result.raw_rep_pass?pill("rep PASS","ok"):pill("rep FAIL","bad")} reps: ${x.result.all_reps.map(rep).join(" ")} · strict in this run: ${x.result.strict_case_pass_in_this_run?pill("PASS","ok"):pill("FAIL","bad")} · ${esc(x.case.run_status)}</div>
+  <div class="sm">call <code>${esc(x.result.call_id)}</code> · ended ${esc(x.result.ended)} · slowest turn ${esc(x.result.slowest_turn_s)} s · ledger calls ${esc((x.result.ledger_calls_in_order||[]).join(" > "))}</div>${x.case.rep_note?`<div class="sm mute">${esc(x.case.rep_note)}</div>`:""}
+  <h2>Judge</h2><div class="sm"><b>Result row</b> <span class="mute">(${esc(x.judge.result_row_note)})</span>:</div>${V(x.judge.from_result_row)}<div class="sm"><b>Full verdict</b>${typeof x.judge.full==="object"?` <span class="mute">(${esc(x.judge.full.source)})</span>`:""}:</div>${typeof x.judge.full==="string"?V(x.judge.full):`<pre>${esc(x.judge.full.reason)}</pre>`}${otherCited.length?`<div class="sm"><b>Other judge citations:</b> ${otherCited.map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(" · ")}</div>`:""}
+  <h2>Classification ${pill("auto","warn")}</h2><div class="sm">primary: <b>${esc(x.classification.primary)}</b> · ${esc(x.classification.method)}</div>
+  <table><tr><th>Category</th><th>Source</th><th>Matched</th><th>Context</th></tr>${x.classification.evidence.map(e=>`<tr><td class="sm">${esc(e.category)}</td><td class="sm">${esc(e.source)}</td><td class="sm">${esc(e.matched)}</td><td class="sm">${esc(e.context)}</td></tr>`).join("")}</table>
+  <div class="box sm"><b>Platform-adjusted interpretation (not official):</b> ${x.platform_adjusted_interpretation.ignored_in_platform_adjusted_view?"this rep is ignored there":"this rep still counts there"} · ${esc(x.platform_adjusted_interpretation.rule)}</div>
+  <h2>Bank records</h2><div class="sm">${esc(x.bank_records.final_ledger)}</div>
+  ${Array.isArray(x.bank_records.ledger_differences)?`<table><tr><th>Field</th><th>Actual (bank)</th><th>Expected</th></tr>${x.bank_records.ledger_differences.map(l=>`<tr><td>${esc(l.field)}</td><td class="bad sm">${esc(l.actual)}</td><td class="sm">${esc(l.expected)}</td></tr>`).join("")}</table>`:V(x.bank_records.ledger_differences)}
+  <details><summary>Expected ledger (${esc(x.bank_records.expected_source)})</summary>${V(x.bank_records.expected_ledger)}</details>
+  <div class="sm"><b>Bank writes in the call</b> (tool arguments and bank responses):</div>${Array.isArray(x.bank_records.bank_writes_in_call)?(x.bank_records.bank_writes_in_call.map(c=>`<div class="box sm"><b>${esc(c.function)}</b> args <code>${esc(JSON.stringify(c.args))}</code><br>result <code>${esc(JSON.stringify(c.result))}</code></div>`).join("")||'<span class="mute">none</span>'):V(x.bank_records.bank_writes_in_call)}
+  ${typeof dc==="object"?`<h2>Date chain</h2><div class="sm mute">${esc(dc.note)}${dc.source?" · source: "+esc(dc.source):""}${dc.scope?" · scope: "+esc(dc.scope):""}${dc.selection_rule?" · "+esc(dc.selection_rule):""}</div>
+   <div class="box"><b class="sm">1. Customer wording</b>${list(dc.customer_wording)}</div>
+   <div class="box"><b class="sm">2. Runtime date facts (workflow snapshot)</b>${typeof dc.runtime_date_facts==="object"?Object.entries(dc.runtime_date_facts).map(([k,v])=>`<details><summary class="sm">${esc(k)}</summary><pre>${esc(v)}</pre></details>`).join(""):V(dc.runtime_date_facts)}</div>
+   <div class="box"><b class="sm">3. Proposed dates (agent)</b>${list(dc.proposed_dates)}</div>
+   <div class="box"><b class="sm">4. Confirmation (customer yes after an agent date message)</b>${Array.isArray(dc.confirmation)?dc.confirmation.map(p=>`<div class="sm">after agent #${p.after_agent_message} → #${p.customer.n} customer: ${esc(p.customer.text)}</div>`).join(""):V(dc.confirmation)}</div>
+   <div class="box"><b class="sm">5. Recorded promise</b>${V(dc.recorded_promise)}</div>`:""}
+  ${typeof mp==="object"?`<h2>Per product</h2><div class="sm mute">${esc(mp.note)} · ${esc(mp.attempts||"")}</div>${typeof mp.products==="object"?Object.entries(mp.products).map(([pid,p])=>`<div class="box"><b>${esc(pid)}</b> <code>${esc(JSON.stringify(p.loaded))}</code>
+     <div class="sm"><b>agent messages naming it:</b></div>${list(p.agent_messages_naming_it)}
+     <div class="sm"><b>notes recorded:</b> ${p.notes_recorded.map(c=>`<code>${esc(JSON.stringify(c.args))}</code> → <code>${esc(JSON.stringify(c.result))}</code>`).join(" ")||"none"} · <b>expected notes:</b> <code>${esc(JSON.stringify(p.expected_notes))}</code></div>
+     <div class="sm"><b>promises recorded:</b> ${p.promises_recorded.map(c=>`<code>${esc(JSON.stringify(c.args))}</code> → <code>${esc(JSON.stringify(c.result))}</code>`).join(" ")||"none"} · <b>expected promises:</b> <code>${esc(JSON.stringify(p.expected_promises))}</code></div></div>`).join(""):V(mp.products)}<div class="sm"><b>ledger differences:</b></div>${V(mp.from_ledger_diff)}`:""}
+  <h2>Provenance</h2>${KV(x.provenance)}
+  <h2>Timestamps</h2>${KV(x.timestamps)}
+  <h2>Transcript <span class="sm mute">(${esc(x.transcript.kind)}${x.transcript.source?" · "+esc(x.transcript.source):""}; ${esc(x.transcript.message_numbering)}; judge-cited messages highlighted)</span></h2>
+  <div class="wrap" style="max-height:700px;padding:6px;background:var(--bg)">${transcript}</div>
+  <h2>Runtime variables (last workflow snapshot)</h2>${typeof x.runtime_variables==="object"?Object.entries(x.runtime_variables).map(([k,v])=>`<details><summary class="sm">${esc(k)}</summary><pre>${esc(typeof v==="string"?v:JSON.stringify(v))}</pre></details>`).join(""):V(x.runtime_variables)}
+  <h2>Human notes (Score log rows citing this run; interpretation)</h2>${Array.isArray(x.human_notes)?x.human_notes.map(n=>`<pre>${esc(n)}</pre>`).join(""):V(x.human_notes)}
+  <h2>Artifacts</h2>${x.artifacts.map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`;
 }
 function failures(){
   const f=S.f,max=Math.max(1,...f.categories_official_runs.map(c=>c[1]));
@@ -167,10 +233,42 @@ function builder(){
   ${[...b.traces].reverse().map(t=>`<tr><td>${esc(t.start)}</td><td class="sm">${esc(t.file)}</td><td class="sm">${esc(t.inputs.join(", "))}</td><td>${t.submission_path?pill(t.mode,"ok"):pill(t.mode,t.mode==="saved-spec"?"warn":"")}</td><td><code>${esc(t.git||"not recorded")}</code>${t.dirty?pill("dirty","bad"):""}</td><td>${t.model_calls}</td><td>${esc(t.build_seconds??"")}</td><td>${t.complete?(t.ok?pill("ok","ok"):pill("not ok","bad")):pill("incomplete","bad")}</td>
   <td class="sm">${t.tests.map(x=>`${esc(x.name)}: ${x.result==="PASS"?pill("PASS","ok"):pill("FAIL","bad")}`).join("<br>")}</td><td>${t.unresolved||""}</td><td>${t.not_enforced||""}</td><td class="sm">${t.created?`${esc(t.created.steps)} steps, ${esc(t.created.tools)} tools, v${esc(t.created.version??"?")}`:"no deploy"}</td></tr>`).join("")}</table></div>`;
 }
+function claude(){
+  const c=S.c,el=document.getElementById("claude"),old=document.getElementById("convo");
+  const atBottom=!old||old.scrollTop+old.clientHeight>=old.scrollHeight-30,prevTop=old?old.scrollTop:0;
+  if(!c||!c.available){el.innerHTML=`<div class="card">${esc(c?.reason||"Not available")}</div>`;return}
+  const s=c.session,oc=Object.entries(c.outcome_counts_last_100||{}).map(([k,v])=>pill(k+": "+v,k==="ok"?"ok":k==="error"||k==="declined"?"bad":"")).join(" ");
+  const out=o=>o==="ok"?pill("ok","ok"):o==="error"||o==="declined"?pill(o,"bad"):pill(o,"warn");
+  el.innerHTML=`<div class="card sm">Passive, read-only monitor. ${esc(c.how)}. Shown: ${esc(c.exposed)}. Never shown: ${esc(c.never_exposed)}.</div>
+  <div class="grid" style="margin-top:10px">
+   <div class="card"><h3>Session</h3><div><b>${esc(s.title)}</b></div><div class="sm">${pill(s.runs,"ok")} ${esc(s.model)} · effort ${esc(s.effort)} · ${esc(s.completed_turns)} turns</div><div class="sm mute">desktop ${esc(s.desktop_session_id)}<br>transcript ${esc(s.transcript)}</div></div>
+   <div class="card"><h3>State</h3><div><b>${esc(c.state)}</b></div><div class="sm">transcript last written ${esc(c.transcript_last_write)} (${ago(c.seconds_since_last_write)} ago)</div><div class="sm">agent process: ${c.processes.agent_process?pill("pid "+c.processes.agent_process.pid,"ok"):pill("not identified","warn")} <span class="mute">${esc(c.processes.agent_note)}</span></div></div>
+   <div class="card"><h3>Current task</h3><div>${esc(c.current_task.session_title)}</div>${c.current_task.latest_chapter?`<div class="sm">chapter: <b>${esc(c.current_task.latest_chapter.title)}</b> ${esc(c.current_task.latest_chapter.summary)}</div>`:""}${c.current_task.todos_in_progress.map(t=>`<div class="sm">• ${esc(t.task)}</div>`).join("")}<div class="sm mute">${esc(c.current_task.note)}</div></div>
+   <div class="card"><h3>Background work of this session</h3><div class="sm mute">launched, no completion recorded in the transcript (may have ended silently)</div>${(c.open_tasks||[]).map(o=>`<div class="sm">${esc(o.tool)} · ${esc(o.action||o.id)} · since ${esc((o.since||"").slice(11,19))}</div>`).join("")||'<div class="sm mute">none</div>'}<div class="sm mute" style="margin-top:4px">processes (live, names only)</div>${c.processes.background_scripts.map(b=>`<div class="sm"><code>${esc(b.what)}</code> · pid ${esc(b.pid)} · ${esc(b.elapsed)}</div>`).join("")||'<div class="sm mute">none</div>'}</div>
+  </div>
+  <div class="split"><div>
+   <h2>Recent actions (newest first) · last 100: ${oc}</h2>
+   <div class="wrap"><table><tr><th>Time (UTC)</th><th>Tool</th><th>Action (Claude's description)</th><th>Outcome</th></tr>${c.recent_actions.map(a=>`<tr><td class="sm">${esc((a.at||"").slice(11,19))}</td><td>${esc(a.tool)}</td><td class="sm">${esc(a.action)}</td><td>${out(a.outcome)}${a.error?`<div class="sm bad">${esc(a.error)}</div>`:""}</td></tr>`).join("")}</table></div>
+  </div><div>
+   <h2>Claude's latest conclusions (truncated, redacted)</h2>${c.latest_conclusions.map(x=>`<div class="sm mute">${esc((x.at||"").slice(11,19))} UTC</div><pre>${esc(x.text)}</pre>`).join("")||NA}
+   <h2>Errors and blockers</h2>${c.errors.length?`<table><tr><th>Time</th><th>Tool</th><th>Action</th><th>Error kind</th></tr>${c.errors.map(e=>`<tr><td class="sm">${esc((e.at||"").slice(11,19))}</td><td>${esc(e.tool)}</td><td class="sm">${esc(e.action)}</td><td class="sm bad">${esc(e.outcome)}: ${esc(e.error)}</td></tr>`).join("")}</table>`:'<div class="mute">none</div>'}
+   ${c.hook_errors.length?`<h2>Hook errors</h2>${c.hook_errors.map(h=>`<div class="sm">${esc(h.at)} · ${esc(h.count)} × ${esc(h.error)}</div>`).join("")}`:""}
+   <h2>Desktop sessions for this repo</h2><table><tr><th>Title</th><th>Desktop id</th><th>Turns</th><th>Last activity</th></tr>${c.sessions_for_this_repo.map(x=>`<tr><td class="sm">${esc(x.title)}${x.desktop_session_id===s.desktop_session_id?" "+pill("monitored","ok"):""}</td><td class="sm"><code>${esc(x.desktop_session_id)}</code></td><td>${esc(x.completed_turns)}</td><td class="sm">${esc(x.last_activity)}</td></tr>`).join("")}</table><div class="sm mute">selection: ${esc(c.selection)} · cloud sessions: ${esc(c.cloud_sessions)}</div>
+  </div></div>
+  <h2>Conversation (your prompts and Claude's replies, newest at the bottom) ${pill("also in reports/latest_conversation.md for ChatGPT","warn")}</h2>
+  ${convo()}`;
+  const box=document.getElementById("convo");if(box)box.scrollTop=atBottom?box.scrollHeight:prevTop;
+}
+function convo(){
+  const cv=S.cv;if(!cv||!cv.available)return `<div class="card">${esc(cv?.reason||"Not available")}</div>`;
+  return `<div class="sm mute">${esc(cv.note)} Showing ${cv.items.length} of ${cv.total_items}.</div>
+  <div id="convo" class="wrap" style="max-height:640px;padding:6px 10px;background:var(--bg)">${cv.items.map(i=>i.role==="event"?`<div class="evt">⏵ ${esc((i.at||"").slice(11,19))} ${esc(i.text)}</div>`:
+   `<div class="msg ${i.role}"><div class="sm"><b>${i.role==="you"?"You":"Claude"}</b> <span class="mute">${esc((i.at||"").replace("T"," ").slice(0,19))} UTC${i.queued?" · queued while Claude was busy":""}</span></div>${i.text.length>1500?`<details><summary>${esc(i.text.slice(0,300))}…</summary><pre>${esc(i.text)}</pre></details>`:`<pre>${esc(i.text)}</pre>`}</div>`).join("")}</div>`;
+}
 function system(){
   const o=S.o.overview;
   document.getElementById("system").innerHTML=`<div class="grid">
-  <div class="card"><h3>Processes (live)</h3>${o.running.length?o.running.map(p=>`<div>${esc(p.kind)} · pid ${esc(p.pid)} · ${esc(p.elapsed)}<div class="sm mute">${esc(p.command)}</div></div>`).join(""):"No run_cases.py, build.py or chain script is running."}</div>
+  <div class="card"><h3>Processes (live)</h3>${o.running.length?o.running.map(p=>`<div>${esc(p.kind)} · pid ${esc(p.pid)} · ${esc(p.elapsed)}<div class="sm mute">${esc(p.what)}</div></div>`).join(""):"No run_cases.py, build.py or chain script is running."}</div>
   <div class="card"><h3>Git</h3><div>HEAD <code>${esc(o.head)}</code></div><div class="sm">tracked changes:</div><pre>${esc(o.tracked_changes.join("\n")||"none")}</pre><div class="sm">untracked:</div><pre>${esc(o.untracked.join("\n")||"none")}</pre></div>
   <div class="card"><h3>Portable snapshot for reviewers</h3><div class="sm"><code>reports/latest_snapshot.json</code> and <code>.md</code>, rewritten every 12 s</div><div class="sm">API: <code>/api/snapshot</code> <code>/api/runs</code> <code>/api/failures</code> <code>/api/overview</code> <code>/api/builder</code> <code>/api/case?run=&case=</code></div><div class="sm">snapshot generated ${esc(S.s.generated_at)}</div></div>
   <div class="card"><h3>Data provenance</h3><pre>${esc(JSON.stringify(S.s.provenance,null,1))}</pre></div></div>`;
