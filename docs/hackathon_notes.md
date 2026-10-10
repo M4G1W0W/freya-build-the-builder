@@ -219,6 +219,16 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   **We will re-benchmark on the full spec extraction once its schema is final.** The builder stays stdlib-only, calling
   OpenAI through urllib.
 
+- 2026-10-10 14:50 — **Architecture: `docs/design.md`.** It is a staged graph: setup → opening → third_party / identity →
+  load_account → account_facts → negotiate → exit events → finalize → xfer → close → hang_up. Facts and bookkeeping
+  (dates, floors, attempt plans, the outcome computed from what was actually recorded, the transfer/close order) live in
+  code nodes and engine-run calls. The brief's rules stay in the prompt so unanticipated rules still reach the model.
+  Chosen by a design panel: 3 proposals were scored by 2 independent judges, and both picked this backbone (feasibility
+  7–8/10, generalisation 7–7.5/10) over a code-only dialogue engine (it loses mixed-intent turns, and its vocabulary can't
+  be extended after 17:00 UTC) and over an LLM graph planner (too large for the time, and the rerun drifts). Each of the
+  4 baseline failure classes is removed by construction: get_account is never model-callable, close and transfer are
+  engine-run in order, dates and floors are computed in code, and outcome aggregation is computed.
+
 ## Score log
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
