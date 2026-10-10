@@ -27,6 +27,9 @@ WEEKDAY = (
     " date."
 )
 PERIOD = re.compile(r" If the customer first named a period .*?not a later one\)\.")
+UNUSED_LINE = (
+    "parts.append('P' + str(k) + ': not in use (never call ' + unused + ')')"  # as generated
+)
 OLD_DATES = (
     "DATES: when the customer names a date, find it in that product's \"IF THE CUSTOMER NAMES A"
     " DATE\" lines in FACTS and do exactly what they say (they already apply the brief's date"
@@ -57,9 +60,28 @@ def _edit(task: str, variant: str) -> str:
     return task
 
 
+def _drop_unused_lines(node) -> int:
+    """Replace the unused-slot FACTS line in every generated code string; return the count."""
+    n = 0
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(value, str) and UNUSED_LINE in value:
+                node[key] = value.replace(UNUSED_LINE, "pass")
+                n += 1
+            else:
+                n += _drop_unused_lines(value)
+    elif isinstance(node, list):
+        for value in node:
+            n += _drop_unused_lines(value)
+    return n
+
+
 def main() -> int:
     variant, argv = sys.argv[1], sys.argv[2:]
-    if variant not in ("noweekday", "noperiod", "old", "1slot"):
+    ctl = None
+    if variant.startswith("ctltext:"):
+        ctl = json.loads(Path(variant.split(":", 1)[1]).read_text())["workflow"]
+    elif variant not in ("noweekday", "noperiod", "old", "1slot", "nounused"):
         raise SystemExit(f"unknown variant {variant}")
     if variant == "1slot":
         spec_mod.MIN_SLOTS = 1
@@ -69,6 +91,11 @@ def main() -> int:
         node = wf["nodes"]["negotiate"]
         before = node["task_message"]
         node["task_message"] = _edit(before, variant)
+        if ctl:
+            wf["system_prompt"] = ctl["system_prompt"]
+            node["task_message"] = ctl["nodes"]["negotiate"]["task_message"]
+        if variant == "nounused" and _drop_unused_lines(wf) == 0:
+            raise SystemExit("unused-slot FACTS line not found in the generated code")
         changed = before != node["task_message"]
         print(f"exp07 variant={variant} negotiate changed={changed}", file=sys.stderr)
         print(f"exp07 DATES: {_dates_line(node['task_message'])}", file=sys.stderr)
