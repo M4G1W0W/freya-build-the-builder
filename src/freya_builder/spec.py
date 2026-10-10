@@ -1,0 +1,303 @@
+"""PolicySpec v1: the structured reading of a brief (docs/design.md §3), and its checks.
+
+`SPEC_SCHEMA` is a strict JSON schema (every property required, no extra keys) so the builder LLM
+can be forced to emit it. Optional values use "" or [] instead of null. `check_spec` cross-checks
+a spec against the tool API: every value we will send must be in the API's enums.
+
+Date/amount rules are small Python EXPRESSIONS over a fixed helper vocabulary (see expr.py); they
+are validated with an AST whitelist and inlined into code-node source at build time.
+"""
+
+from typing import Any
+
+from .expr import check_expr
+from .toolapi import Tool
+
+STR: dict = {"type": "string"}
+INT: dict = {"type": "integer"}
+BOOL: dict = {"type": "boolean"}
+
+
+def arr(item: dict) -> dict:
+    return {"type": "array", "items": item}
+
+
+def obj(props: dict) -> dict:
+    return {
+        "type": "object",
+        "properties": props,
+        "required": list(props),
+        "additionalProperties": False,
+    }
+
+
+CALL_VAR = obj(
+    {
+        "name": STR,
+        "role": {"type": "string", "enum": ["customer_id", "now", "addressing", "other"]},
+        "example": STR,
+    }
+)
+PRODUCT_TYPE = obj({"api_value": STR, "label": STR, "floor_field": STR})
+BAND = obj(
+    {
+        "name": STR,
+        "min_days": INT,
+        "max_days": INT,
+        "deadline_expr": STR,
+        "attempts": INT,
+        "transfer_row": STR,
+    }
+)
+ATTEMPT = obj(
+    {
+        "n": INT,
+        "bands": arr(STR),
+        "amount": {"type": "string", "enum": ["full", "floor", "full_or_floor"]},
+        "date_expr": STR,
+        "note": STR,
+    }
+)
+QUESTION = obj({"key": STR, "ask": STR, "format": STR})
+HINT = obj({"value": STR, "instruction": STR, "counts_as_wrong": BOOL})
+ROW = obj(
+    {
+        "id": STR,
+        "outcome": STR,
+        "reason": STR,
+        "phases": arr(
+            {"type": "string", "enum": ["opening", "third_party", "identity", "negotiate"]}
+        ),
+        "trigger": STR,
+        "say_before_end": arr(STR),
+        "queue": STR,
+    }
+)
+PRECEDENCE = obj(
+    {
+        "when": {
+            "type": "string",
+            "enum": ["transferred", "promise_recorded", "all_notes_reason", "any_note", "always"],
+        },
+        "note_reason": STR,
+        "then": {"type": "string", "enum": ["event_row", "row", "first_note_reason_not"]},
+        "row": STR,
+        "outcome": STR,
+    }
+)
+
+SPEC_SCHEMA = obj(
+    {
+        "meta": obj(
+            {
+                "bank_name": STR,
+                "agent_self_description": STR,
+                "call_vars": arr(CALL_VAR),
+                "max_products": INT,
+            }
+        ),
+        "calendar": obj(
+            {
+                "business_weekdays": arr(INT),
+                "holidays": arr(STR),
+                "next_weekday": {"type": "string", "enum": ["following_week", "next_occurrence"]},
+                "numeric_date_order": {"type": "string", "enum": ["dmy", "mdy", "ymd"]},
+            }
+        ),
+        "products": obj(
+            {
+                "list_field": STR,
+                "id_field": STR,
+                "type_field": STR,
+                "past_due_field": STR,
+                "days_late_field": STR,
+                "types": arr(PRODUCT_TYPE),
+            }
+        ),
+        "bands": arr(BAND),
+        "attempts": arr(ATTEMPT),
+        "promise_window": obj({"min_expr": STR, "max_expr": STR, "business_days_only": BOOL}),
+        "callback": obj(
+            {
+                "enabled": BOOL,
+                "day_exprs": arr(STR),
+                "start": STR,
+                "end": STR,
+                "after_now": BOOL,
+                "date_field": STR,
+                "time_field": STR,
+            }
+        ),
+        "opening": obj(
+            {
+                "line": STR,
+                "confirm_criteria": STR,
+                "forbidden_before_verified": arr(STR),
+            }
+        ),
+        "identity": obj(
+            {
+                "questions": arr(QUESTION),
+                "question_field": STR,
+                "answer_field": STR,
+                "gate_field": STR,
+                "answer_ok_field": STR,
+                "remaining_field": STR,
+                "hint_field": STR,
+                "hints": arr(HINT),
+                "failed_line": STR,
+                "decline_explain": STR,
+            }
+        ),
+        "rows": arr(ROW),
+        "close_precedence": arr(PRECEDENCE),
+        "default_rows": obj(
+            {"opening": STR, "third_party": STR, "identity": STR, "negotiate": STR}
+        ),
+        "notes": obj(
+            {"used": BOOL, "product_field": STR, "reason_field": STR, "on_transfer": BOOL}
+        ),
+        "promise_fields": obj({"product_field": STR, "amount_field": STR, "date_field": STR}),
+        "transfer_field": STR,
+        "close_fields": obj({"outcome_field": STR, "reason_field": STR}),
+        "disclosure": obj(
+            {"intro": STR, "product_sentence": STR, "first_ask_single": STR, "first_ask_multi": STR}
+        ),
+        "success_lines": obj({"promise": STR}),
+        "failure_rules": obj({"promise": STR}),
+        "stage_rules": obj({"opening": STR, "third_party": STR, "identity": STR, "negotiate": STR}),
+        "unmodeled": arr(STR),
+    }
+)
+
+
+def schema_problems(value: Any, schema: dict, path: str = "spec") -> list[str]:
+    """Minimal strict-schema check for the subset SPEC_SCHEMA uses (no external library)."""
+    t = schema.get("type")
+    types = {"object": dict, "array": list, "string": str, "integer": int, "boolean": bool}
+    if t in types and not isinstance(value, types[t]):
+        return [f"{path}: expected {t}, got {type(value).__name__}"]
+    if t == "integer" and isinstance(value, bool):
+        return [f"{path}: expected integer, got boolean"]
+    if "enum" in schema and value not in schema["enum"]:
+        return [f"{path}: {value!r} not in {schema['enum']}"]
+    out: list[str] = []
+    if t == "object":
+        props = schema.get("properties", {})
+        out += [f"{path}: missing {k}" for k in schema.get("required", []) if k not in value]
+        if schema.get("additionalProperties") is False:
+            out += [f"{path}: unexpected key {k}" for k in value if k not in props]
+        for k, sub in props.items():
+            if k in value:
+                out += schema_problems(value[k], sub, f"{path}.{k}")
+    if t == "array":
+        for i, item in enumerate(value):
+            out += schema_problems(item, schema.get("items", {}), f"{path}[{i}]")
+    return out
+
+
+def _enum(tools: dict[str, Tool], tool: str, field: str) -> tuple[str, ...]:
+    t = tools.get(tool)
+    f = t.field(field) if t else None
+    return f.enum if f else ()
+
+
+def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
+    """Problems that would make the agent send values the bank does not accept, or crash code."""
+    by = {t.name: t for t in tools}
+    p: list[str] = []
+    need = ["verify_identity", "get_account", "create_promise", "close_call"]
+    p += [f"tool API has no {n}" for n in need if n not in by]
+    if p:
+        return p
+
+    rows = {r["id"]: r for r in spec["rows"]}
+    if len(rows) != len(spec["rows"]):
+        p.append("row ids are not unique")
+    outcomes = _enum(by, "close_call", spec["close_fields"]["outcome_field"])
+    if not outcomes:
+        p.append(f"close_call has no enum field {spec['close_fields']['outcome_field']!r}")
+    queues = (
+        _enum(by, "transfer_to_agent", spec["transfer_field"]) if "transfer_to_agent" in by else ()
+    )
+    reasons = _enum(by, "close_call", spec["close_fields"]["reason_field"])
+    for r in spec["rows"]:
+        if outcomes and r["outcome"] not in outcomes:
+            p.append(f"row {r['id']}: outcome {r['outcome']!r} not in API enum {outcomes}")
+        if reasons and r["reason"] and r["reason"] not in reasons:
+            p.append(f"row {r['id']}: reason {r['reason']!r} not in API enum {reasons}")
+        if r["queue"] and queues and r["queue"] not in queues:
+            p.append(f"row {r['id']}: queue {r['queue']!r} not in API enum {queues}")
+        if not r["phases"]:
+            p.append(f"row {r['id']}: no phases")
+    for stage, rid in spec["default_rows"].items():
+        if rid not in rows:
+            p.append(f"default row for {stage} is unknown: {rid!r}")
+    for i, c in enumerate(spec["close_precedence"]):
+        if c["then"] == "row" and c["row"] not in rows:
+            p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
+        if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
+            p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
+    for b in spec["bands"]:
+        if b["transfer_row"] and b["transfer_row"] not in rows:
+            p.append(f"band {b['name']}: unknown transfer_row {b['transfer_row']!r}")
+
+    ident = spec["identity"]
+    keys = _enum(by, "verify_identity", ident["question_field"])
+    if not by["verify_identity"].field(ident["question_field"]):
+        p.append(f"verify_identity has no field {ident['question_field']!r}")
+    if not by["verify_identity"].field(ident["answer_field"]):
+        p.append(f"verify_identity has no field {ident['answer_field']!r}")
+    for q in ident["questions"]:
+        if keys and q["key"] not in keys:
+            p.append(f"identity question {q['key']!r} not in API enum {keys}")
+    resp = {f.name for f in by["verify_identity"].response}
+    for role in ("gate_field", "answer_ok_field", "remaining_field", "hint_field"):
+        if ident[role] and resp and ident[role] not in resp:
+            p.append(f"identity {role} {ident[role]!r} is not a verify_identity response field")
+
+    for role in ("product_field", "amount_field", "date_field"):
+        if not by["create_promise"].field(spec["promise_fields"][role]):
+            p.append(f"create_promise has no field {spec['promise_fields'][role]!r}")
+    if spec["notes"]["used"]:
+        if "add_note" not in by:
+            p.append("notes are used but the tool API has no add_note")
+        else:
+            for role in ("product_field", "reason_field"):
+                if not by["add_note"].field(spec["notes"][role]):
+                    p.append(f"add_note has no field {spec['notes'][role]!r}")
+    cb = spec["callback"]
+    if cb["enabled"]:
+        st = by.get("schedule_callback")
+        if not st:
+            p.append("callback enabled but the tool API has no schedule_callback")
+        else:
+            for role in ("date_field", "time_field"):
+                if cb[role] and not st.field(cb[role]):
+                    p.append(f"schedule_callback has no field {cb[role]!r}")
+    api_types = _enum(by, "get_account", spec["products"]["type_field"])
+    for t in spec["products"]["types"]:
+        if api_types and t["api_value"] not in api_types:
+            p.append(f"product type {t['api_value']!r} not in API enum {api_types}")
+
+    exprs: list[tuple[str, str]] = [
+        (f"band {b['name']} deadline", b["deadline_expr"]) for b in spec["bands"]
+    ]
+    exprs += [(f"attempt {a['n']} date", a["date_expr"]) for a in spec["attempts"]]
+    exprs += [("promise window min", spec["promise_window"]["min_expr"])]
+    exprs += [("promise window max", spec["promise_window"]["max_expr"])]
+    exprs += [(f"callback day {i}", e) for i, e in enumerate(cb["day_exprs"])]
+    for label, e in exprs:
+        p += [f"{label}: {problem}" for problem in check_expr(e)]
+    return p
+
+
+def call_var(spec: dict, role: str) -> str:
+    return next((v["name"] for v in spec["meta"]["call_vars"] if v["role"] == role), "")
+
+
+def get(spec: dict, path: str) -> Any:
+    node: Any = spec
+    for part in path.split("."):
+        node = node[part]
+    return node

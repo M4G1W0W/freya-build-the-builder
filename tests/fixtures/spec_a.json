@@ -1,0 +1,117 @@
+{
+ "meta": {
+  "bank_name": "Freya Bank",
+  "agent_self_description": "Freya Bank's digital assistant",
+  "call_vars": [
+   {"name": "customer_id", "role": "customer_id", "example": "c_test"},
+   {"name": "first_name", "role": "addressing", "example": "Daniel"},
+   {"name": "last_name", "role": "addressing", "example": "Reyes"},
+   {"name": "title", "role": "addressing", "example": "Mr"},
+   {"name": "now", "role": "now", "example": "2026-10-14T11:00"}
+  ],
+  "max_products": 1
+ },
+ "calendar": {
+  "business_weekdays": [0, 1, 2, 3, 4],
+  "holidays": ["2026-10-26", "2026-11-11", "2026-11-26", "2026-12-25", "2027-01-01"],
+  "next_weekday": "following_week",
+  "numeric_date_order": "dmy"
+ },
+ "products": {
+  "list_field": "products",
+  "id_field": "product_id",
+  "type_field": "type",
+  "past_due_field": "past_due",
+  "days_late_field": "days_late",
+  "types": [
+   {"api_value": "credit_card", "label": "credit card ending {card_last4}", "floor_field": "minimum_payment"},
+   {"api_value": "personal_loan", "label": "personal loan", "floor_field": "instalment_amount"},
+   {"api_value": "car_loan", "label": "car loan", "floor_field": "instalment_amount"}
+  ]
+ },
+ "bands": [
+  {"name": "early", "min_days": 1, "max_days": 7, "deadline_expr": "add_business_days(today, 12)", "attempts": 1, "transfer_row": ""},
+  {"name": "late", "min_days": 8, "max_days": 45, "deadline_expr": "add_business_days(today, 7)", "attempts": 2, "transfer_row": ""}
+ ],
+ "attempts": [
+  {"n": 1, "bands": [], "amount": "full_or_floor", "date_expr": "last_business_day_of_week(today) if last_business_day_of_week(today) != today else last_business_day_of_week(add_days(today, 7))", "note": "Attempt 1 is for the full past-due amount, or for the floor if the customer already said the full amount is too much."},
+  {"n": 2, "bands": ["late"], "amount": "floor", "date_expr": "deadline", "note": "Attempt 2, late band only: the floor amount on the deadline."}
+ ],
+ "promise_window": {"min_expr": "today", "max_expr": "deadline", "business_days_only": true},
+ "callback": {
+  "enabled": true,
+  "day_exprs": ["today", "next_business_day(today)"],
+  "start": "10:00",
+  "end": "19:00",
+  "after_now": true,
+  "date_field": "date",
+  "time_field": "time"
+ },
+ "opening": {
+  "line": "Hello, this is Freya Bank's digital assistant calling, and this call is recorded. Am I speaking with {{title}} {{last_name}}?",
+  "confirm_criteria": "Only \"yes\", \"that's me\", \"speaking\" or the customer's own name counts as confirmation. \"Hello\", \"go ahead\" and \"who is this\" do not; ask once more. If it is still unclear after the second ask, end the call as unclear. Answer a question from the person first; the ask that follows is the second ask.",
+  "forbidden_before_verified": ["collections", "debt", "payment", "credit card", "personal loan", "car loan"]
+ },
+ "identity": {
+  "questions": [
+   {"key": "date_of_birth", "ask": "What is your date of birth?", "format": "date"},
+   {"key": "phone_last4", "ask": "What are the last four digits of the phone number we have on file for you?", "format": "digits:4"}
+  ],
+  "question_field": "field",
+  "answer_field": "answer",
+  "gate_field": "all_verified",
+  "answer_ok_field": "verified",
+  "remaining_field": "wrong_answers_left",
+  "hint_field": "hint",
+  "hints": [
+   {"value": "day_month_swapped", "instruction": "Ask the customer to say the month of their date of birth as a word. This retry does not count as a wrong answer.", "counts_as_wrong": false}
+  ],
+  "failed_line": "I am sorry, I cannot verify your identity. Please use the Freya Bank mobile app or visit a branch.",
+  "decline_explain": "These questions protect your account."
+ },
+ "rows": [
+  {"id": "promise", "outcome": "promise", "reason": "", "phases": ["negotiate"], "trigger": "at least one promise was recorded and everything else is done", "say_before_end": [], "queue": ""},
+  {"id": "paid", "outcome": "paid", "reason": "", "phases": ["negotiate"], "trigger": "the customer says they already paid this past-due amount", "say_before_end": ["Payments can take one business day to appear."], "queue": ""},
+  {"id": "transferred_restructuring", "outcome": "transferred", "reason": "restructuring", "phases": ["negotiate"], "trigger": "the customer asks for a new payment plan or lower instalments", "say_before_end": [], "queue": "restructuring"},
+  {"id": "transferred_human", "outcome": "transferred", "reason": "human", "phases": ["opening", "identity", "negotiate"], "trigger": "the customer still insists on a human after you asked once whether you can help first", "say_before_end": [], "queue": "general"},
+  {"id": "transferred_support", "outcome": "transferred", "reason": "support", "phases": ["negotiate"], "trigger": "illness, a death in the family or job loss, and the customer accepts the offer to connect them with the customer support team", "say_before_end": [], "queue": "support"},
+  {"id": "no_promise_refused", "outcome": "no_promise", "reason": "refused", "phases": ["negotiate"], "trigger": "the persuasion attempts are used up, or the verified customer says twice that they do not want to talk", "say_before_end": [], "queue": ""},
+  {"id": "no_promise_hardship", "outcome": "no_promise", "reason": "hardship", "phases": ["negotiate"], "trigger": "illness, a death in the family or job loss, and the customer declines the customer support team", "say_before_end": [], "queue": ""},
+  {"id": "no_promise_dispute", "outcome": "no_promise", "reason": "dispute", "phases": ["negotiate"], "trigger": "the customer says the debt is not theirs, they never had the product, or it was closed or paid off in the past", "say_before_end": [], "queue": ""},
+  {"id": "no_promise_service_error", "outcome": "no_promise", "reason": "service_error", "phases": ["negotiate"], "trigger": "create_promise failed twice and you told the customer you could not record it", "say_before_end": [], "queue": ""},
+  {"id": "not_verified_failed", "outcome": "not_verified", "reason": "failed", "phases": ["identity"], "trigger": "three wrong security answers in total", "say_before_end": ["Please use the Freya Bank mobile app or visit a branch."], "queue": ""},
+  {"id": "not_verified_declined", "outcome": "not_verified", "reason": "declined", "phases": ["opening", "identity"], "trigger": "before verification the customer still refuses to answer the security questions after you explained once that they protect the account, asks what the call is about a second time instead of answering, or says twice they do not want to talk", "say_before_end": [], "queue": ""},
+  {"id": "not_reached_callback", "outcome": "not_reached", "reason": "callback", "phases": ["third_party"], "trigger": "someone else answered and a callback was booked with schedule_callback", "say_before_end": [], "queue": ""},
+  {"id": "not_reached_no_callback", "outcome": "not_reached", "reason": "no_callback", "phases": ["third_party"], "trigger": "someone else answered and no time inside the callback window was given after asking once for another time", "say_before_end": [], "queue": ""},
+  {"id": "not_reached_wrong_number", "outcome": "not_reached", "reason": "wrong_number", "phases": ["opening", "third_party"], "trigger": "the person says the number does not belong to the customer", "say_before_end": [], "queue": ""},
+  {"id": "not_reached_deceased", "outcome": "not_reached", "reason": "deceased", "phases": ["opening", "third_party"], "trigger": "the person says the customer has died", "say_before_end": ["I am sorry for your loss."], "queue": ""},
+  {"id": "not_reached_unclear", "outcome": "not_reached", "reason": "unclear", "phases": ["opening"], "trigger": "after the second ask it is still unclear whether you are speaking with the customer", "say_before_end": [], "queue": ""}
+ ],
+ "close_precedence": [
+  {"when": "transferred", "note_reason": "", "then": "event_row", "row": "", "outcome": ""},
+  {"when": "promise_recorded", "note_reason": "", "then": "row", "row": "promise", "outcome": ""},
+  {"when": "all_notes_reason", "note_reason": "paid", "then": "row", "row": "paid", "outcome": ""},
+  {"when": "any_note", "note_reason": "paid", "then": "first_note_reason_not", "row": "", "outcome": "no_promise"},
+  {"when": "always", "note_reason": "", "then": "event_row", "row": "", "outcome": ""}
+ ],
+ "default_rows": {"opening": "not_reached_unclear", "third_party": "not_reached_no_callback", "identity": "not_verified_declined", "negotiate": "no_promise_refused"},
+ "notes": {"used": false, "product_field": "product_id", "reason_field": "reason", "on_transfer": false},
+ "promise_fields": {"product_field": "product_id", "amount_field": "amount", "date_field": "date"},
+ "transfer_field": "queue",
+ "close_fields": {"outcome_field": "outcome", "reason_field": "reason"},
+ "disclosure": {
+  "intro": "I am calling from the collections team about a late payment.",
+  "product_sentence": "Your {label} is {past_due} past due, {days_late} days late.",
+  "first_ask_single": "Can you make this payment today?",
+  "first_ask_multi": "Can you pay all of them today?"
+ },
+ "success_lines": {"promise": "You will receive a text message confirming this promise."},
+ "failure_rules": {"promise": "If it fails, try once more. If it fails again, say you could not record it, and end the call as no_promise / service_error."},
+ "stage_rules": {
+  "opening": "Brief rules 1-4, 42, 43 and 45 apply here. Do not say why you are calling before identity is verified.",
+  "third_party": "Brief rules 5-10 apply here. Say nothing about the account, even if the person offers to pay.",
+  "identity": "Brief rules 11-15, 42 and 45 apply here.",
+  "negotiate": "Brief sections 6-12 apply here (rules 16-47)."
+ },
+ "unmodeled": []
+}
