@@ -59,3 +59,37 @@ def test_no_schema_valid_spec_still_aborts(monkeypatch):
     _stub(monkeypatch, [broken])
     with pytest.raises(ValueError, match="no schema-valid spec"):
         pipeline.extract_spec(Trace(io.StringIO()), "brief", TOOLS)
+
+
+class _FakeFreya:
+    def __init__(self, errors):
+        self.errors, self.calls = list(errors), []
+
+    def api(self, method, path, body=None, **params):
+        self.calls.append(path)
+        if path.endswith("/chat/message") and self.errors:
+            raise RuntimeError(f"POST {path} -> {self.errors.pop(0)}: error")
+        return {
+            "response": "I am a digital assistant. Am I speaking with Mr Reyes?",
+            "callId": "c1",
+        }
+
+
+def test_smoke_test_retries_a_transient_5xx_once(monkeypatch):
+    # 10 Oct 15:55 UTC: one 504 from the chat route made the trace show a failed self-test.
+    fake = _FakeFreya([504])
+    monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
+    monkeypatch.setattr(pipeline.time, "sleep", lambda s: None)
+    out = io.StringIO()
+    pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS)
+    log = out.getvalue()
+    assert "retrying once" in log and "chat smoke test: opening reply: PASS" in log
+
+
+def test_smoke_test_does_not_retry_a_client_error(monkeypatch):
+    fake = _FakeFreya([400, 400])
+    monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
+    out = io.StringIO()
+    pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS)
+    assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
+    assert fake.calls.count("/api/v2/chat/message") == 1

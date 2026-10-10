@@ -5,6 +5,7 @@ only generic instructions (with invented, generic examples).
 """
 
 import json
+import time
 
 from . import platform
 from .datecheck import check_dates
@@ -196,19 +197,20 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> None:
     """Smoke test on the published workflow: it starts, says the opening line, leaks nothing."""
     freya = platform.kit()
     variables = {v["name"]: v["example"] or "x" for v in spec["meta"]["call_vars"]}
-    try:
-        r = freya.api(
-            "POST",
-            "/api/v2/chat/message",
-            {
-                "workflowId": saved["workflow_id"],
-                "message": "Hello?",
-                "customerVariables": variables,
-            },
-        )
-    except RuntimeError as e:
-        trace.test("chat smoke test: workflow starts", False, str(e)[:200])
-        return
+    body = {"workflowId": saved["workflow_id"], "message": "Hello?", "customerVariables": variables}
+    r = None
+    for attempt in (1, 2):  # the kit warns a long chat turn can return 504; retry a 5xx once
+        try:
+            r = freya.api("POST", "/api/v2/chat/message", body)
+            break
+        except RuntimeError as e:
+            transient = any(f"-> {c}" in str(e) for c in (500, 502, 503, 504))
+            if attempt == 1 and transient:
+                trace.warn(f"chat smoke test: {str(e)[:120]}; retrying once")
+                time.sleep(5)
+                continue
+            trace.test("chat smoke test: workflow starts", False, str(e)[:200])
+            return
     reply = str(r.get("response") or "")
     forbidden = [
         w for w in spec["opening"]["forbidden_before_verified"] if w.lower() in reply.lower()
