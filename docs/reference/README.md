@@ -10,6 +10,13 @@ spec-drift detection. Re-download and `git diff` to see what changed.
 | `llms.txt` | <https://docs.freyavoice.ai/llms.txt> (page index) | `3f2061aa…cc088` |
 | `llms-full.txt` | <https://docs.freyavoice.ai/llms-full.txt> (all doc pages as text) | `0a523da6…240938` |
 
+Official hackathon page (fetched 2026-10-10 13:38 Istanbul, i.e. after the start):
+
+| File | Source |
+|---|---|
+| `hackathon_page.md` | <https://www.freyavoice.ai/hackathon>: text extracted from the HTML (diagrams omitted) |
+| `hackathon_practice_cases.json` | The 13 practice cases embedded in that page (`<script id="cases-json">`) |
+
 **Not saved on purpose:** <https://docs.freyavoice.ai/api-reference/openapi.json> is a *stale*
 OpenAPI 3.0.0 spec (58 paths, still has `/problems` and `/solutions`, missing Chat, Simulations,
 Personas, Unit Tests, Versions, Branches, Insights…). Use the live spec above instead.

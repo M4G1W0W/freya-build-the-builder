@@ -2,35 +2,44 @@
 
 ## Competition context
 
-- **Event:** Y Combinator — *Build the Builder*, on the Freya Voice AI platform. Fully online.
-- **Window:** 2026-10-10 13:00 → 2026-10-11 23:00 Istanbul time (UTC+3) = 10:00 → 20:00 UTC. ~34 h.
-- **Prize:** interview with Y Combinator.
-- **Challenge (official text):** "A bank wants to phone its customers who are late on a payment.
-  You write a builder: a program that reads the bank's collections brief and creates a phone agent
-  on Freya. We run that agent against simulated customers. Your score is the share of cases the
-  agent handles correctly."
-- **What we build:** the *builder* (brief → configured Freya agent), not a hand-written agent.
-- **Scoring objective:** maximise the share of simulated cases the generated agent handles
-  correctly. That number is the only metric that matters; optimise for it, measured.
-- **Source of truth:** the official instructions + starter kit released at kickoff. They override
-  everything in this repo, including this file. Record what they say in `docs/hackathon_notes.md`.
+Official page: <https://www.freyavoice.ai/hackathon> (snapshot `docs/reference/hackathon_page.md`).
+The **kit** (emailed at the start) overrides it. The full digest is in `docs/hackathon_notes.md`.
 
-Public event page (<https://events.ycombinator.com/AI-FDE-Build-the-Builder26>, read pre-kickoff):
-the builder gets a task description **and the available tools**. It is run on **unseen tasks** with
-**no manual edits**, and it must be submitted with its dependencies and **reproducible run instructions**.
-Details are in `docs/hackathon_notes.md`.
+- **Window.** Sat 10 Oct 10:00 UTC (13:00 Istanbul) → hidden briefs at **Sun 17:00 UTC** (20:00 Istanbul) →
+  submission closes **Sun 20:00 UTC** (23:00 Istanbul).
+- **The builder.** One command: `python3 builder/build.py <brief> <tool_api.json>` → creates a
+  **phone agent = a Freya workflow** (steps, prompts, tools, conditional routes, code nodes), with no
+  manual edits. It must finish in **≤30 min per brief, including self-tests**, and print a **trace**: start
+  and end time, every model call (model + one-line purpose), the workflow and agent ids it created, steps and
+  tools, and self-test results. No API keys in the trace.
+- **Scoring.** Simulated customers talk to the phone agent **in text, in English**. A case passes only if
+  the **ledger is right** (read from the mock bank) **AND** a judge finds the **policy** was followed **AND** the agent was
+  **honest**. 60 hidden cases (2 briefs × 30), **3 reps each, all must pass**. Tie-breaks: total promised
+  amount on passed cases → shorter build time → earlier submission.
+- **Hidden briefs.** Unseen; one is clean, one is raw material (email, policy extract, an amending memo,
+  a code list). Same 7 tool names, but **fields and allowed values can change**. The call's date and time
+  arrive as the variable `now`.
+- **What matters most.** Maximise hidden-case pass rate, which requires run-to-run consistency. Average quality alone is not enough.
 
-## Freya quick reference (details: `docs/freya_api_notes.md`)
+## Hard competition rules (break one and we are disqualified)
 
-- Canonical contract: the **live** spec <https://app.freyavoice.ai/api/openapi.json> (snapshot:
-  `docs/reference/freya_openapi_live.json`). `docs.freyavoice.ai/api-reference/openapi.json` is **stale**.
-- Base `https://app.freyavoice.ai/api/v2`, header `Authorization: Bearer <key>`. Responses are
-  wrapped in `{success, data: {message, result}}`.
-- Agents are created and updated via `POST /agents` and `PUT /agents/{id}`. Workflows are **read-only** in the API.
-- Test surfaces: `POST /chat/message` (text, synchronous), Personas/Simulations (async), Unit Tests, and
-  `GET /call/{id}` for transcripts and assertion results.
-- Undocumented, so verify by experiment before relying on it: tool `handler` values, PUT merge vs replace, which
-  version runs in chat/simulations, and `{{var}}` filling from `customerVariables`.
+- **Nothing from a hidden brief may ever be written into the builder** (no rule, value, name, date or
+  outcome) after Sun 17:00 UTC. Only generic bug fixes are allowed then. Never paste hidden-brief text into
+  code, prompts, tests or fixtures.
+- The phone agent may call **only the kit's tool API**. Any other service fails the case.
+- The phone agent runs on the **Freya model set in the kit's `freya.py`. Do not change it.**
+- **One Freya key per team. Do not probe or load-test the platform.** At most **10 workflows**
+  per workspace (update in place). Only **1 practice simulation** can run at a time.
+- Submit a builder, not a hand-built agent. Never edit a generated phone agent by hand.
+
+## Freya reference (details: `docs/freya_api_notes.md`; the kit's `docs/` and `freya.py` win)
+
+- The kit's `docs/` (workflow format, tools, code nodes, the API calls a builder needs) and `freya.py`
+  are the authority for workflows. The public docs we studied **don't document workflow creation**.
+- Public API: base `https://app.freyavoice.ai/api/v2`, `Authorization: Bearer <key>`, responses are wrapped in
+  `{success, data: {message, result}}`. The live spec is `docs/reference/freya_openapi_live.json`, and
+  `docs.freyavoice.ai/api-reference/openapi.json` is **stale**.
+- Practice scoring: `python3 tools/run_cases.py <agent_id> --brief A [--reps 3]` (3–11 min per 10 cases).
 
 ## Non-negotiable rules
 
@@ -63,9 +72,9 @@ docs/reference/           offline snapshot of public Freya docs + live OpenAPI s
 runs/                     (gitignored) per-run artefacts: generated configs, transcripts, results
 ```
 
-Preliminary pipeline **hypothesis** (not a plan; validate against the official materials first):
-brief → requirements extraction → structured policy → agent config → Freya deploy → simulated
-conversations → evaluation/failure analysis → improved config.
+Preliminary pipeline **hypothesis** (not a plan; validate against the kit first):
+brief + tool API → requirements extraction → structured policy → workflow config → Freya deploy →
+simulated conversations → evaluation/failure analysis → improved config.
 
 ## Python environment
 
@@ -122,7 +131,10 @@ conversations → evaluation/failure analysis → improved config.
   placeholders only (enforced by `tests/test_smoke.py`).
 - Never print, log, commit or paste API keys. Never put secrets in URLs or query strings.
 - Use test/hackathon credentials only; never real customer data.
-- Do not push this repo to any public remote, and do not publish challenge code before the rules allow it.
+- Do not push to any remote without the user's explicit go-ahead. Submission needs a GitHub repo URL
+  and commit that the organisers can clone. Repo visibility (public, or private with access) is the user's
+  decision and must be made before Sun 20:00 UTC.
+- Traces get committed: strip API keys and team keys from them before committing.
 
 ## Git workflow
 

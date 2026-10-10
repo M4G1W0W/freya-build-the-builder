@@ -9,6 +9,17 @@ completeness critic checked the result against our research checklist.
 **Tags.** **[C]** Confirmed: stated in the docs or live spec. **[I]** Inferred: our reasoning, needs
 testing. **[ND]** Not documented anywhere we could find.
 
+> 🔁 **Corrections after reading the official hackathon page** (<https://www.freyavoice.ai/hackathon>,
+> digest in `docs/hackathon_notes.md`):
+> - **The phone agent must be a Freya *workflow*** (steps, prompts, tools, conditional routes, code
+>   nodes), not a single agent. The kit's `freya.py` "creates a workflow once and updates it on later
+>   runs", and the kit's `docs/` describe the workflow format. The public docs below don't document
+>   workflow creation, so **for workflows the kit is the authority** and §7's "read-only" statement applies only to the public spec.
+> - **Scoring conversations are text, not voice.** TTS/STT settings don't affect the score.
+> - **The phone agent's model is fixed** by the kit's `freya.py`. Do not change `llmConfig` provider or model.
+> - **Phone agent tools are the kit's bank tool API** (7 tools, a hosted mock bank). Calls to any other service fail the case.
+> - **Do not probe or load-test the platform** (official rule). §17 is now "read the kit first".
+
 > ⚠️ The official starter kit and rules override everything here. Freya's own intro page warns that
 > the REST API is "still experimental and the definitions may change without immediate notice" [C].
 > At kickoff: re-download the live spec and `git diff docs/reference/` (see `docs/reference/README.md`).
@@ -31,8 +42,9 @@ testing. **[ND]** Not documented anywhere we could find.
    Simulations, Personas, Unit Tests, Versions or Branches) [C].
 2. **Base URL and auth.** `https://app.freyavoice.ai/api/v2` + `Authorization: Bearer <api-key>` [C].
    Every JSON response is wrapped as `{success, data: {message, result}}`, so read `data.result` [C].
-3. **An agent can be created fully via the API.** `POST /agents {name, language?, config}` [C].
-   **Workflows cannot be created via the API**: there are only GET endpoints for workflows [C].
+3. **An agent can be created fully via the public API.** `POST /agents {name, language?, config}` [C].
+   The public spec has only GET endpoints for workflows [C]. **But the hackathon phone agent is a
+   workflow**, and the kit's `freya.py` and `docs/` provide workflow create, update and export. Use those.
 4. **The agent's behaviour is mostly in `config.llmConfig`:** `systemPrompt` (≤200 000 chars),
    `firstMessage`, `firstMessageMode` (default `assistant-waits-for-user`), `temperature`, and `tools[]` [C].
 5. **Text test loop exists.** `POST /chat/message` drives an agent turn by turn synchronously.
@@ -176,8 +188,9 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
 - **Runtime.** The stale spec's workflow schema (`initial_node`, `nodes{role_messages, task_messages, functions,
   context_strategy…}`) matches Pipecat Flows, and `/chat/end` mentions "pipecat" [C]. So the runtime is
   probably Pipecat [I].
-- **Implication.** A single agent (`POST /agents`) is the only entity we can create
-  end to end through the documented API [C]/[I].
+- **Superseded.** We earlier concluded that a single agent is the only entity creatable through the
+  *public* API. The hackathon requires a **workflow**, and the kit's `freya.py` creates and updates one,
+  so the kit documents what the public spec omits. Check the kit's `docs/` before relying on anything here.
 
 ## 8. Tools and function calls (checklist 6)
 
@@ -354,18 +367,17 @@ appear there is [I].
   lists mpeg, wav and ogg [C].
 - **Support email domain.** It is `support@freyavoice.com` in the spec but `support@freyavoice.ai` on the website [C].
 
-## 17. First experiments once we have a key (only if the official rules allow it)
+## 17. Open questions → answer from the kit first
 
-These turn the biggest [ND]s into facts. Run them in a scratch workspace, log every
-request and response under `runs/`, then delete the test agents.
+The official rules say **"Do not probe or load-test the platform"** and allow **one key per team**, so
+we answer these by reading the kit's `docs/`, `freya.py` and `examples/minimal_builder.py` first. Only
+then, if still needed, do we make a few deliberate calls through the kit's own client, logged under `runs/`:
 
-1. `GET /api-keys/check`: get the key's `workspaceId`, expiry, rate limit and validity.
-2. `GET /agents/defaults?workspaceId=`: get known-good provider, model and voice values.
-3. `POST /agents` with the defaults plus a trivial prompt. Inspect the response, `GET /versions/agent/{id}`
-   (is a version created? is it published?) and `GET /agents/{id}`.
-4. `POST /chat/message` without and with `versionId`: does an unpublished edit take effect? Does
-   `{{var}}` get filled from `customerVariables`? Is `firstMessage` visible?
-5. `PUT /agents/{id}` with only `llmConfig`: are the other config sections kept or reset?
-6. A tool with `handler: "__function__:end_call"`: accepted? Does `endedByAgent` become true?
-7. A tiny `mode: "chat"` simulation with one persona: latency, result fields, and whether its calls
-   appear in `GET /call` with `assertionResults`.
+1. The workflow format: steps, per-step prompts and tools, conditional routes, and the code-node language and runtime.
+2. How tools bind to the bank's tool API (the kit's `tools/openapi.json`). This replaces the unknown `handler` question for
+   workflows.
+3. How the `now` variable and per-case customer variables reach the workflow.
+4. Create vs update semantics and which version the simulator runs (published vs draft).
+5. The ids `run_cases.py` expects (`<agent_id>`) vs the workflow id; what `export_workflow` produces.
+6. Whether any Freya-side test tool (chat, unit tests) is permitted and useful for the builder's own
+   self-tests within the 30-minute budget.
