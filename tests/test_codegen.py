@@ -843,3 +843,25 @@ def test_non_finite_numbers_do_not_break_a_product():
     card = dict(CARD, past_due="NaN", days_late="inf")
     p1 = block(call(spec_a(), [card])["account_facts"], "P1")
     assert "past due: not available; days late: None; band: none" in p1
+
+
+def test_offer_plan_sets_the_attempt_counts_side_by_side():
+    # PUB-12 at 90b737d and d46b807: correct per-product facts, yet the model copied the late-band
+    # product's "full, then floor" onto the early-band car loan. The plan lists every product's
+    # offers in one line, and the early band says ONE offer only.
+    products = [
+        dict(CARD, card_last4="6604", past_due=300.0, days_late=4, minimum_payment=90.0),
+        {
+            "product_id": "p2",
+            "type": "personal_loan",
+            "past_due": 900.0,
+            "days_late": 20,
+            "instalment_amount": 300.0,
+        },
+    ]
+    facts = call(spec_multi(), products)["account_facts"]
+    assert "- persuasion attempts in this band: 1 (ONE offer only)" in block(facts, "P1")
+    plan = next(line for line in facts.splitlines() if line.startswith("OFFER PLAN"))
+    assert "not even the floor" in plan
+    assert "P1: 1 offer only: 1) 300.00 on 2026-10-16" in plan
+    assert "P2: 2 offers: 1) 900.00 on 2026-10-16, 2) floor 300.00 on 2026-10-23" in plan

@@ -378,11 +378,15 @@ def _attempt_amount(kind, past_due, floor):
     if kind == "full_or_floor":
         return (
             full
-            + ", or the floor "
+            + ", or instead the floor "
             + _amount(floor)
-            + " if the customer already said the full amount is too much"
+            + " only if the customer said the full amount is too much before this offer"
         )
     return full
+
+
+def _plan_amount(kind, past_due, floor):
+    return "floor " + _amount(floor) if kind == "floor" else _amount(past_due)
 
 
 def _named_date_lines(today, low, high, C):
@@ -465,9 +469,14 @@ def _product(k, raw, today, C, vs):
     )
     lines.append("- deadline: " + _ds(deadline))
     lines.append("- floor (" + (floor_field or "none") + "): " + _amount(floor))
+    plan = []
     if band is not None:
         allowed = int(band.get("attempts") or 0)
-        lines.append("- persuasion attempts in this band: " + str(allowed))
+        lines.append(
+            "- persuasion attempts in this band: "
+            + str(allowed)
+            + (" (ONE offer only)" if allowed == 1 else "")
+        )
         afns = C.get("fn_attempt") or []
         for ai, attempt in enumerate(C.get("attempts") or []):
             n = int(attempt.get("n") or 0)
@@ -475,6 +484,13 @@ def _product(k, raw, today, C, vs):
             if n > allowed or (names and band.get("name") not in names) or ai >= len(afns):
                 continue
             when = _ev(afns[ai], today, deadline, days_late)
+            plan.append(
+                str(n)
+                + ") "
+                + _plan_amount(attempt.get("amount"), past_due, floor)
+                + " on "
+                + (when.isoformat() if when is not None else "?")
+            )
             line = "- attempt " + str(n) + ", on " + _ds(when)
             if when is not None and when < today:
                 line += " (already past: not a valid promise date)"
@@ -524,7 +540,14 @@ def _product(k, raw, today, C, vs):
     values["floor"] = _spoken_amount(floor)
     values["deadline"] = spoken(deadline) if deadline is not None else ""
     sentence = _fill((C.get("disclosure") or {}).get("product_sentence"), values, vs)
-    return "\n".join(lines), sentence, deadline
+    if band is None or not C.get("attempts"):
+        summary = ""
+    elif not plan:
+        summary = slot + ": no persuasion attempt"
+    else:
+        count = str(len(plan)) + (" offer only" if len(plan) == 1 else " offers")
+        summary = slot + ": " + count + ": " + ", ".join(plan)
+    return "\n".join(lines), sentence, deadline, summary
 
 
 def account_main(vs, C):
@@ -542,17 +565,19 @@ def account_main(vs, C):
             return
         K = max(1, int(C.get("K") or 1))
         used = items[:K]
-        blocks, sentences, deadlines = [], [], []
+        blocks, sentences, deadlines, plans = [], [], [], []
         for i, item in enumerate(used):
             k = i + 1
             raw = _raw_fields(vs, prefix, i, item)
             vs["p" + str(k) + "_id"] = str(raw.get(C.get("id_field")) or "") or "none"
             try:
-                block, sentence, deadline = _product(k, raw, today, C, vs)
+                block, sentence, deadline, summary = _product(k, raw, today, C, vs)
             except Exception as e:
                 block = "P" + str(k) + ": the facts could not be computed (" + str(e)[:80] + ")"
-                sentence, deadline = "", None
+                sentence, deadline, summary = "", None, ""
             blocks.append(block)
+            if summary:
+                plans.append(summary)
             if sentence:
                 sentences.append(sentence)
             deadlines.append("P" + str(k) + " " + _ds(deadline))
@@ -561,6 +586,11 @@ def account_main(vs, C):
         parts = [head] + blocks
         if len(used) > 1:
             parts.append("Deadline per product: " + "; ".join(deadlines) + ".")
+        if plans:
+            parts.append(
+                "OFFER PLAN (one offer per refusal, in this order; after a product's last offer is "
+                "refused, no other offer for it, not even the floor): " + "; ".join(plans) + "."
+            )
         if len(items) > K:
             parts.append(
                 "The bank returned "
