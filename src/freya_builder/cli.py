@@ -31,6 +31,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ap.add_argument("--no-selftest", action="store_true")
     ap.add_argument("--dry", action="store_true", help="render + validate only; no Freya writes")
     ap.add_argument("--save-spec", help="also write the extracted spec JSON here (debugging)")
+    ap.add_argument(
+        "--spec", help="DEV ONLY: use this spec JSON instead of reading the brief with the LLM"
+    )
     a = ap.parse_args(argv)
     if len(a.inputs) < 2:
         ap.error("need at least one brief file and the tool API file")
@@ -80,7 +83,12 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
             f"read {len(a.briefs)} brief file(s), {len(brief_text)} chars; {len(tools)} tools"
         )
 
-        spec = extract(trace, brief_text, tools)
+        if a.spec:
+            spec = json.loads(Path(a.spec).read_text())
+            trace.warn(f"DEV: using provided spec {a.spec}; the brief was not read by the LLM")
+        else:
+            spec = extract(trace, brief_text, tools)
+        spec.setdefault("_prompt_brief", brief_text)
         if a.save_spec:
             Path(a.save_spec).write_text(json.dumps(spec, indent=1))
         workflow = render(spec, tools)
