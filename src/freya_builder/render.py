@@ -4,6 +4,7 @@ Generic: every brief value comes from the spec, every tool shape from the tool A
 templates filled with spec values; facts that need arithmetic come from code nodes (codegen.py).
 """
 
+import itertools
 import json
 import re
 
@@ -42,6 +43,50 @@ def _endings_text(spec: dict, stage: str) -> str:
         say = f" First say {say}." if say else ""
         lines.append(f"- {exit_tool_name(r['id'])}: {r['trigger']}.{say}")
     return "\n".join(lines)
+
+
+WRAP_TASK = """STEP: the call is ending. Every product is settled and the notes are saved. No tool is available.
+In ONE short message: say any sentence the brief requires at the end of the call that you have not said yet in this call (for example the sentence required after a recorded promise; never say a sentence twice), thank the customer and say goodbye. Never mention notes, tools or what the bank records internally."""
+
+
+def _notes_done_transition(k: int, note_tool: str, target: str) -> dict:
+    """negotiate -> wrap_up once every product has a recorded promise, a saved note or does not
+    exist, and at least one note was saved. A model that says goodbye together with its last
+    add_note call then returns empty replies and the call never closes (PUB-05/PUB-12 at d46b807);
+    routing on the result fires before any further model turn (kit tools-and-code.md).
+
+    Only platform-set result keys and the sticky recorded flag are read, so parallel add_note calls
+    cannot race. Conditions nest one AND level under the top OR (kit workflow-format.md), so the
+    AND over products of (recorded OR noted OR absent) is expanded into AND groups.
+    """
+
+    def options(n: int) -> list[tuple[str, dict]]:
+        out = [
+            ("rec", {"variable": hooks.recorded_flag(n), "operator": "equals", "operand": "yes"}),
+            (
+                "note",
+                {
+                    "variable": f"{note_tool}_p{n}_response.data.ok",
+                    "operator": "contains",
+                    "operand": "true",
+                },
+            ),
+        ]
+        if n > 1:  # get_account returns at least one product
+            absent = f"load_account_response.data.products.{n - 1}.product_id"
+            out.append(("absent", {"variable": absent, "operator": "is_not_set"}))
+        return out
+
+    groups = [
+        {"logic": "and", "conditions": [c for _, c in combo]}
+        for combo in itertools.product(*(options(n) for n in range(1, k + 1)))
+        if any(kind == "note" for kind, _ in combo)
+    ]
+    return {
+        "target_node": target,
+        "description": "Every product is settled and the notes are saved",
+        "condition": {"logic": "or", "conditions": groups},
+    }
 
 
 def _exit_transitions(spec: dict, stage: str) -> list[dict]:
@@ -123,10 +168,10 @@ Never mention the debt, the product, an amount or why you are calling in this st
 def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     slots = ", ".join(f"create_promise_p{n}" for n in range(1, k + 1))
     note_line = (
-        "NOTES: after every product is settled and BEFORE you say goodbye, and only where the brief "
-        "requires a note: call add_note_pN for that product with the reason. Then say goodbye and, "
-        "in the same message, call the transition tool of the matching ENDING. Never add notes "
-        "when the call is transferred."
+        "NOTES: after every product is settled and BEFORE any goodbye, and only where the brief "
+        "requires a note: call add_note_pN for that product with the reason, one per message, "
+        "with no other words. When every product is settled the call moves on to its closing by "
+        "itself. Never add notes when the call is transferred."
         if notes
         else "Notes are not used."
     )
@@ -326,16 +371,27 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
             )
             for n in range(1, k + 1)
         ]
+    neg_default = f"ev_{spec['default_rows']['negotiate']}"
+    wrap = [_notes_done_transition(k, by["add_note"].name, "wrap_up")] if notes else []
     wf_nodes["negotiate"] = nodes.conversation(
         "negotiate",
         _negotiate_task(spec, k, notes),
-        _exit_transitions(spec, "negotiate"),
+        wrap + _exit_transitions(spec, "negotiate"),
         tools=neg_tools,
         on_enter={"type": "tts", "text": "{{disclosure_text}}"},
         first_entry_only=True,
         max_turns=CAPS["negotiate"],
-        max_turn_target=f"ev_{spec['default_rows']['negotiate']}",
+        max_turn_target=neg_default,
     )
+    if notes:
+        # The model writes the closing from the history, then the call ends without another
+        # model turn; finalize computes the outcome from what was recorded.
+        wf_nodes["wrap_up"] = nodes.conversation(
+            "wrap_up",
+            WRAP_TASK,
+            [nodes.always(neg_default)],
+            on_enter={"type": "llm", "prompt": WRAP_TASK},
+        ) | {"passthrough": True, "passthrough_default_transition": neg_default}
 
     cf = spec["close_fields"]
     ct = by["close_call"]

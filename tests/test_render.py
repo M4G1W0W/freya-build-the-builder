@@ -158,5 +158,75 @@ def test_notes_come_before_the_goodbye():
     s = copy.deepcopy(SPEC_A)
     s["notes"]["used"] = True
     task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
-    assert "NOTES: after every product is settled and BEFORE you say goodbye" in task
+    assert "NOTES: after every product is settled and BEFORE any goodbye" in task
     assert "very last step" not in task
+
+
+def _holds(cond: dict, vs: dict) -> bool:
+    """Evaluate a rendered condition the way kit workflow-format.md describes the operators."""
+    if "logic" in cond:
+        parts = [_holds(c, vs) for c in cond["conditions"]]
+        return any(parts) if cond["logic"] == "or" else all(parts)
+    value = vs.get(cond["variable"])
+    op = cond["operator"]
+    if op == "equals":
+        return value is not None and str(value) == str(cond["operand"])
+    if op == "contains":
+        return value is not None and cond["operand"].lower() in str(value).lower()
+    if op == "is_not_set":
+        return value is None
+    raise AssertionError(op)
+
+
+def _notes_spec(k: int) -> dict:
+    s = copy.deepcopy(SPEC_A)
+    s["notes"]["used"] = True
+    s["meta"]["max_products"] = k
+    return s
+
+
+def _products(n: int) -> dict:
+    return {f"load_account_response.data.products.{i}.product_id": f"p{i + 1}" for i in range(n)}
+
+
+def test_notes_done_route_fires_only_when_every_product_is_settled_and_noted():
+    # PUB-05 / PUB-12 at d46b807: goodbye said with the last add_note, then empty replies, no
+    # close_call. negotiate now leaves to wrap_up on the note results themselves.
+    wf = render(_notes_spec(3), TOOLS, BRIEF)
+    route = wf["nodes"]["negotiate"]["transitions"][0]
+    assert route["target_node"] == "wrap_up"
+    assert len(route["condition"]["conditions"]) == 14  # 2*3*3 combos minus the 4 without a note
+    cond = route["condition"]
+    ok = {f"add_note_p{n}_response.data.ok": "true" for n in (1, 2, 3)}
+    three = _products(3)
+    assert _holds(cond, three | {"p1_recorded": "yes"} | {k: ok[k] for k in list(ok)[1:]})
+    assert _holds(cond, three | ok)
+    assert _holds(cond, _products(1) | {"add_note_p1_response.data.ok": "True"})
+    assert _holds(
+        cond, _products(2) | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"}
+    )
+    # still open: p3 has neither a promise nor a note
+    assert not _holds(cond, three | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"})
+    # promises only: the model's own goodbye and ENDING close the call as before
+    assert not _holds(cond, three | {f"p{n}_recorded": "yes" for n in (1, 2, 3)})
+    # a failed note does not count
+    assert not _holds(cond, _products(1) | {"add_note_p1_response.data.ok": "false"})
+
+
+def test_wrap_up_speaks_then_ends_through_the_default_negotiate_ending():
+    wf = render(_notes_spec(3), TOOLS, BRIEF)
+    wrap = wf["nodes"]["wrap_up"]
+    end = f"ev_{SPEC_A['default_rows']['negotiate']}"
+    assert wrap["passthrough"] is True and wrap["passthrough_default_transition"] == end
+    assert wrap["on_enter"]["type"] == "llm" and "goodbye" in wrap["on_enter"]["prompt"]
+    assert wrap["transitions"] == [
+        {"target_node": end, "description": "always", "condition": {"operator": "always"}}
+    ]
+    assert end in wf["nodes"] and "tools" not in wrap
+    assert validate(wf) == []
+
+
+def test_no_wrap_up_without_notes():
+    wf = render(SPEC_A, TOOLS, BRIEF)
+    assert "wrap_up" not in wf["nodes"]
+    assert all(t["target_node"] != "wrap_up" for t in wf["nodes"]["negotiate"]["transitions"])

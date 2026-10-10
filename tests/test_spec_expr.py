@@ -43,6 +43,12 @@ def test_schema_is_strict_everywhere():
         (lambda s: s["identity"].update(gate_field="verified_all"), "gate_field"),
         (lambda s: s["promise_fields"].update(date_field="when"), "create_promise has no field"),
         (lambda s: s["default_rows"].update(opening="nope"), "default row"),
+        (
+            lambda s: s["default_rows"].update(
+                negotiate=next(r["id"] for r in s["rows"] if r["queue"])
+            ),
+            "must not transfer",
+        ),
         (lambda s: s["bands"][0].update(deadline_expr="__import__('os')"), "deadline"),
         (lambda s: s["close_precedence"][1].update(row="ghost"), "unknown row"),
         (lambda s: s["products"].update(id_field="pid"), "is not a field of"),
