@@ -29,18 +29,17 @@ open Sun 11 Oct 17:00 UTC (about 20 h from now). Tag `good-pre-f1` = the builder
 - The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
-## Running right now (updated 21:20 UTC)
+## Running right now (updated 22:20 UTC)
 
-Two file-driven queue runners in `<scratchpad>` (one simulation at a time, all through `scripts/run_cases_retry.py`):
-- `qrun.sh` (queue `queue.txt`, output `qrun.out`, names `-c45758f`): running **styledXB-ab** on dev-ab-llm v13
-  (c45758f build; measures the 92d91ea paid sentence in a call). Its queue is otherwise empty.
-- `qrun2.sh` (queue `queue2.txt`, output `qrun2.out`, names `-15bcbad`, started by `takeover2.sh` when qrun empties):
-  **F1 checks on dev-a-llm2 v7 (15bcbad)**: PUB-07 asks_back, PUB-07 pieces, then the full styled-a set.
-- **Not yet done:** redeploy dev-ab-llm at F1 (`--spec runs/dev/spec-ab-llm-c45758f.json`, only after styledXB-ab ends;
-  never while a run uses it), then styled-ab-a, styled-extra-b, styled-b on it. Append lines to `queue2.txt`
-  ("name agent brief args...") to queue runs.
+- `qrun2` (names `-15bcbad`): **styledA-a2 at F1** on dev-a-llm2 v7 (the PUB-06 check after removing the too-much line).
+- `takeover3.sh` then deploys **F2 (bd4da7c)** to dev-a-llm2 and starts `qrun3` (queue `queue3.txt`, names
+  `-bd4da7c`): styled-a (dev-a-llm2), styled-ab-a, styled-b, styled-extra-b (dev-ab-llm **v14 = F2**, deployed 22:18).
+- All runs use `scripts/run_cases_retry.py` (GET 5xx retries + **report-only STUCK detection**, fed67b1). A monitor
+  forwards STUCK lines. A stuck simulation was paused once with the user's OK (21:55, see freya_api_notes); ask again
+  before any further PUT.
 
-**PUB-07 root cause (exp07, `experiments/exp07_p07_dates_ablation.py`, Score log 10-10 22:28 to 11-10 00:10):** the
+**PUB-07: F2 (bd4da7c) = F1 + "start the answer to a named date with that date as written in FACTS": 6/6 calls
+(echodate). F1 alone: 4/6.** Root cause (exp07, `experiments/exp07_p07_dates_ablation.py`, Score log 10-10 22:28 to 11-10 00:10):** the
 runtime FACTS, not the prompt text. The passing 52b947c agent's exact prompts on HEAD FACTS failed 0/3. The failure
 needs both the DATE TABLE period rows (19664c6/aa94ccb) and the FACTS "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO
 MUCH" line (35c030a). Over 6 calls: HEAD 1, isokey 2, noperiodrows 4, notoomuch 5, both removed 5. **F1 (15bcbad)**
