@@ -377,6 +377,11 @@ appear there is [I].
   lists mpeg, wav and ogg [C].
 - **Support email domain.** It is `support@freyavoice.com` in the spec but `support@freyavoice.ai` on the website [C].
 
+- **`nodePositions`.** kit/docs/workflow-format.md lists it as an optional top-level key ("Layout for the visual
+  editor"). A dry-run POST with it in the definition returns 400 `Unrecognized key: "nodePositions"` (2026-10-10). GET
+  returns `nodePositions` and `canvasViewport` on the workflow record, outside the definition. No documented write
+  path; the dashboard's ⋮ → Organize lays the nodes out [C].
+
 ## 17. Open questions → answer from the kit first
 
 The official rules say **"Do not probe or load-test the platform"** and allow **one key per team**, so

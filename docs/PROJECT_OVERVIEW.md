@@ -125,7 +125,8 @@ json_schema). The whole builder is **stdlib-only**, so `python3 builder/build.py
 
 ## 7. Evidence so far (details in the `docs/hackathon_notes.md` Score log and Observations)
 
-- **Baseline.** The kit's minimal builder scored 6/10 on A and 1/3 on B.
+- **Baseline.** The kit v1 minimal builder scored 6/10 on A and 1/3 on B. (Kit v3 replaced it with an example agent,
+  2 of 13, and a Claude Agent SDK builder that the README says reached 10/10 on A in one run.)
 - **Our design.** 10/10 on A in a single run. At 3 reps it has scored 8–9/10 on A. Remaining failures were sandbox
   truncation and two behaviour gaps that are being fixed.
 - **Extraction generalises.** On the synthetic unseen briefs `tests/fixtures/briefs/variant-r` (raw material plus memo)

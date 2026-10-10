@@ -236,6 +236,37 @@ Transcripts were read with `scripts/show_run.py <run.json> --calls`.
   Every difference is prose inside a list (attempt `note`, a hint instruction, the forbidden-words list). Amounts,
   bands and date expressions are identical in all builds, and attempt 1 is always the correct `>` form.
 
+- **2026-10-10 16:30 UTC, the official page re-read (all 7 tabs) and kit v3.** Snapshot:
+  `docs/reference/hackathon_page_live_2026-10-10.md`.
+  - The Data tab now serves **kit version 3** (`build-the-builder-v3.zip`, 59,892 bytes, sha256 655cbe58…, last
+    modified 13:57 UTC). The old URL serves the same file. Compared with our v1 copy, the briefs, the tool API,
+    `freya.py` (same phone-agent model), `run_cases.py`, `score.py`, the practice cases and all three docs are
+    **byte-identical**. Only README.md changed (a version history), plus the examples: `minimal_builder.py` became
+    `base-agent.json` (the two-step organiser agent, which "passed 2 of the 13") and `agent_builder.py`, a Claude
+    Agent SDK builder with one skill. Per the README, it built an agent that passed 10 of 10 on Brief A in one run.
+  - The practice cases on the Data tab ("Download JSON") match `kit/public-test-set.json`: scripts, expected ledgers,
+    judge checks and faults.
+  - New FAQ facts: the workspace has **one practice customer for dashboard test calls** (DOB 14 March 1988, last
+    four 4471), and it "starts fresh once it has been idle for 5 minutes" after a call. Each hidden brief is one
+    Markdown file. Hidden briefs come with no practice cases. Score comes from the exported agents; the top entries
+    are rebuilt and judged on "structure and score", not identity.
+  - Evaluation tab: 30 customers per brief, "with one to three products, on several calendar days"; customers talk
+    with split numbers, corrections, side talk, questions back, amounts and dates in words.
+  - Submit tab: "Models the builder may use: Any. You pay for your builder's own model calls."
+- **2026-10-10 16:35 UTC, node layout on the dashboard.** Generated agents look like a pile in the editor because
+  they carry no positions. `POST /api/v2/workflow?dryRun=true` with a top-level `nodePositions` in the definition
+  returns 400 `Unrecognized key: "nodePositions"`, although kit/docs/workflow-format.md lists the key. The live spec
+  documents only GET for workflows, so there is no documented way to send positions; we did not try undocumented
+  body fields. The editor's own **⋮ menu → Organize** lays the nodes out in rows (verified on `voice-test`).
+- **2026-10-10 16:12 UTC, manual voice test of `voice-test` (dev-a-llm v6), call 577a2cd4.** The user played an
+  off-script customer: a wrong last-4, an instalment request, 200 now and 220 later, a withdrawn promise, then
+  5 November. The close was correct (`no_promise` / `refused`, deadline 2 Nov = 12th business day skipping 26 Oct).
+  Gaps: (1) "instalments" (heard as "instrument") got "would you like me to connect you to restructuring?"
+  instead of the transfer of rule 41; (2) the read-back omitted the product ("200.00 today. Do you confirm?"). A
+  scan of 25 recent simulation calls found 19 of 20 read-backs naming the product and 1 without (7ca19968);
+  (3) "200 now" was accepted together with a pitch for the full amount on Friday, which was repeated after the
+  customer withdrew. Raw call: `runs/dev/voice/call-577a2cd4.json`.
+
 ## Decision log
 
 _One entry per major decision: time, decision, alternatives, reason, evidence._
@@ -310,6 +341,15 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
       fixtures.
     - F57: extra required fields on engine-run tools; low plausibility.
     - The sandbox-hook reduction: weighed and recorded in the Observations.
+
+- 2026-10-10 16:40 — **`kit/` updated to the official kit v3.** Only README.md and examples/ differ from v1 (see
+  the Observations, 16:30), so behaviour and every test fixture are unchanged. `kit/` keeps mirroring the official zip
+  byte for byte. `test_kit_example_agent_passes` now checks `examples/base-agent.json`, and `make baseline` deploys
+  that example agent.
+- 2026-10-10 16:40 — **No node layout from the builder.** The API rejects `nodePositions` in the definition and
+  documents no other way to send it. A layout module was written and tested, then removed (dead code). On the
+  dashboard, ⋮ → Organize gives the readable view. The organisers load our exported JSON, so they get their own
+  editor's layout either way.
 
 ## Score log
 

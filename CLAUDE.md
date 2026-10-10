@@ -51,7 +51,7 @@ The **kit** (downloaded from the page's Data tab into `kit/`) overrides it. The 
 ## Non-negotiable rules
 
 1. Never invent Freya API functionality. Check the **kit first** (`docs/`, `freya.py`,
-   `examples/minimal_builder.py`, the brief's tool API file), then `docs/freya_api_notes.md` and the live spec.
+   `examples/base-agent.json`, the brief's tool API file), then `docs/freya_api_notes.md` and the live spec.
    If something isn't documented, say so.
 2. Always consult the documentation or starter kit; cite the source when adding API code.
 3. Never invent bank policies. Every rule the agent follows must trace back to the bank's brief
@@ -91,7 +91,8 @@ submission/               (COMMITTED) exported phone agents: hidden-N.workflow.j
 traces/                   (COMMITTED) builder traces: hidden-N.log (keys stripped)
 ```
 **Kit: `kit/`**, unmodified, from <https://www.freyavoice.ai/hackathon/build-the-builder.zip> (Data tab,
-downloaded 2026-10-10; sha256 0d7e816a…). Read `kit/README.md` and `kit/docs/*.md` before touching workflows.
+v1 downloaded 2026-10-10, sha256 0d7e816a…; now **v3**, `build-the-builder-v3.zip`, sha256 655cbe58…: only README and
+examples changed). Read `kit/README.md` and `kit/docs/*.md` before touching workflows.
 Don't edit files in `kit/`. Wrap or copy them instead, so it stays diffable against the official zip.
 
 ## Kit facts (verified 2026-10-10)
@@ -151,7 +152,7 @@ simulated conversations → evaluation/failure analysis → improved config.
 ## Verification-first engineering
 
 - "Correct" is defined officially: ledger right **and** policy followed **and** honest, 3/3 reps.
-- Get the smallest end-to-end path working first (kit's minimal builder → `run_cases.py`), then iterate.
+- Get the smallest end-to-end path working first (kit v1's minimal builder → `run_cases.py`; done), then iterate.
 - Measure with `python3 tools/run_cases.py <agent_id> --brief A --reps 3` (and `--brief B`). Scores
   vary between runs, so trust only rep-3 numbers. Record each run in `docs/hackathon_notes.md` (Score log).
 - Only 1 simulation can run per workspace, at 3–11 min per 10 cases, so use cheap local checks first (workflow validation,

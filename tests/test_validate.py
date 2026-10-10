@@ -1,6 +1,5 @@
 import copy
 import json
-import sys
 from pathlib import Path
 
 from freya_builder.validate import validate
@@ -69,13 +68,11 @@ def test_good_workflow_passes():
     assert validate(good()) == []
 
 
-def test_kit_minimal_builder_output_passes():
-    # What the kit's working example SENDS (stored copies carry platform-filled nulls).
-    sys.path.insert(0, str(KIT))
-    import examples.minimal_builder as mb
-
-    wf = mb.build((KIT / "briefs" / "brief-a.md").read_text())
-    problems = [p for p in validate(wf) if "max_node_turns" not in p]
+def test_kit_example_agent_passes():
+    # The kit's example agent (v3) is a stored copy of the organiser base: it carries the
+    # platform-filled nulls too, so only the graph rules must hold.
+    wf = json.loads((KIT / "examples" / "base-agent.json").read_text())
+    problems = [p for p in validate(wf) if "null value" not in p and "max_node_turns" not in p]
     assert problems == []
 
 

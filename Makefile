@@ -48,6 +48,6 @@ call:  ## one transcript: make call ID=<call_id>
 chat:  ## quick text chat: make chat WF=<workflow_id> [CASE=PUB-01]
 	$(PY) scripts/chat.py $(WF) --case $(CASE)
 
-baseline:  ## kit's minimal builder on brief A, then one practice run
-	$(ENV) $(PY) kit/examples/minimal_builder.py kit/briefs/brief-a.md
+baseline:  ## kit's example agent (kit v3) on Freya, then one practice run
+	$(ENV) cd kit && ../$(PY) -c "import freya,json; print(freya.save_workflow('base', json.load(open('examples/base-agent.json')), state_file='../.freya-agents.json'))"
 	@echo "now: make cases AGENT=<agent_id printed above>"
