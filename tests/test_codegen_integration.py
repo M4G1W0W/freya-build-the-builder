@@ -118,9 +118,13 @@ def test_facts_state_when_offers_must_stop():
     )
 
 
-def test_facts_say_exactly_when_and_what_the_floor_offer_is():
-    # 676e9df styled PUB-06 (2 of 3 reps): after "the full amount is too much" the floor was
-    # offered "today", then again on attempt 1's date, and the judge counted two floor offers.
+def test_attempt_1_line_names_the_floor_and_its_date_without_a_separate_too_much_line():
+    # 676e9df styled PUB-06: the floor was offered "today", then again on attempt 1's date. The
+    # attempt-1 line says the floor and the date, and the negotiate ATTEMPTS line says a floor offer
+    # after "too much" is attempt 1 on attempt 1's date. The separate "IF THE CUSTOMER SAYS THE FULL
+    # AMOUNT IS TOO MUCH" line (35c030a) is gone: with it the model answered PUB-07's holiday with the
+    # after-deadline line (exp07: 5 of 6 calls) and offered the floor on a cut-off "can't afford"
+    # (styled-ab-a PUB-09 r1, c45758f).
     card = {
         "product_id": "p1",
         "type": "credit_card",
@@ -130,17 +134,8 @@ def test_facts_say_exactly_when_and_what_the_floor_offer_is():
         "minimum_payment": "637.5",
     }
     facts = _account(SPEC_A, "2026-10-14T11:00", card)
-    line = next(x for x in facts.splitlines() if "SAYS THE FULL AMOUNT IS TOO MUCH" in x)
-    assert "637.50 on 2026-10-16 (Friday 16 October 2026)" in line
-    assert "this IS attempt 1" in line and "no other date" in line
-
-
-def test_no_floor_line_without_a_floor():
-    # Diff review 16: "offer exactly the floor not available on ..." for a product with no floor.
-    spec = copy.deepcopy(SPEC_A)
-    for t in spec["products"]["types"]:
-        t["floor_field"], t["floor_percent"] = "", 0
-    facts = _account(spec, "2026-10-14T11:00", LOAN_5)
+    line = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
+    assert "2026-10-16 (Friday 16 October 2026)" in line and "the floor 637.50" in line
     assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts
 
 

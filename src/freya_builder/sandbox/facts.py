@@ -263,11 +263,8 @@ def date_table(today, end, C):
         nxt = [next_occurrence(today, wd, False) for wd in range(7)]
         rule = "next <weekday> (the first such weekday after today): "
     lines.append(rule + ", ".join(_wd(x) for x in nxt))
-    for label, k in (("next week", 1), ("the week after next", 2)):
-        # every day listed: "Monday" said after "the week after next" became the deadline Monday
-        # a week later when the row gave only the range (a8b70ea styled PUB-07)
-        days = [weekday_in_week(today, wd, k) for wd in range(7)]
-        lines.append(label + " (Monday-to-Sunday): " + ", ".join(_wd(x) for x in days))
+    # No "next week" / "the week after next" rows: with them (and the old too-much FACTS line) the
+    # model answered a holiday inside the window with the after-deadline line (exp07, c45758f).
     last_bd = last_business_day_of_month(today)
     line = "end of this month = " + _wd(end_of_month(today))
     if last_bd is not None:
@@ -490,15 +487,12 @@ def _product(k, raw, today, C, vs):
             + (" (ONE offer only)" if allowed == 1 else "")
         )
         afns = C.get("fn_attempt") or []
-        first = None
         for ai, attempt in enumerate(C.get("attempts") or []):
             n = int(attempt.get("n") or 0)
             names = attempt.get("bands") or []
             if n > allowed or (names and band.get("name") not in names) or ai >= len(afns):
                 continue
             when = _ev(afns[ai], today, deadline, days_late)
-            if first is None:
-                first = (attempt.get("amount"), when)
             plan.append(
                 str(n)
                 + ") "
@@ -512,20 +506,6 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
-        if (
-            first is not None
-            and first[0] == "full_or_floor"
-            and first[1] is not None
-            and floor is not None
-        ):
-            lines.append(
-                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
-                + " exactly the floor "
-                + _amount(floor)
-                + " on "
-                + _ds(first[1])
-                + "; this IS attempt 1 (no other date: not today unless that is this date)"
-            )
         if allowed > 0:
             lines.append(
                 "- after attempt "

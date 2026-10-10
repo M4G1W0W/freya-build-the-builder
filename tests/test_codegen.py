@@ -909,15 +909,11 @@ def test_date_table_stays_small(mode):
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_period_rows_list_their_days(mode):
-    # a8b70ea styled PUB-07: after "the week after next", "Monday" became Monday 2 November (the
-    # deadline) in every failed call; the row gave only "Mon 2026-10-26 to Sun 2026-11-01".
+def test_date_table_has_no_period_rows(mode):
+    # exp07 (c45758f, PUB-07 "the week after next", then "Monday the 26th", a holiday): with the
+    # "next week" / "the week after next" rows AND the FACTS too-much line the model answered "the
+    # latest date I can record is Monday 2 November" in 5 of 6 calls; without both, 1 of 6. The rows
+    # never fixed the case they were added for (aa94ccb: 1 of 6).
     table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
-    row = next(x for x in table.splitlines() if x.startswith("the week after next"))
-    assert row.endswith(
-        ": Mon 2026-10-26, Tue 2026-10-27, Wed 2026-10-28, Thu 2026-10-29, Fri 2026-10-30, "
-        "Sat 2026-10-31, Sun 2026-11-01"
-    )
-    assert next(x for x in table.splitlines() if x.startswith("next week")).endswith(
-        "Sun 2026-10-25"
-    )
+    assert not any(x.startswith(("next week", "the week after next")) for x in table.splitlines())
+    assert "Monday-to-Sunday): " not in table.replace("this <weekday> (this Monday-to-Sunday", "")
