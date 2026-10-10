@@ -30,7 +30,7 @@ def changed_api() -> list:
 
 
 FILLED = [
-    {"tool": "close_call", "field": "summary", "value": "{{close_outcome}} {{close_reason}}"},
+    {"tool": "close_call", "field": "summary", "value": "Outcome: {{close_outcome}}"},
     {"tool": "transfer_to_agent", "field": "priority", "value": "normal"},
 ]
 
@@ -87,8 +87,17 @@ def test_every_engine_call_sends_the_filled_fields():
     assert len(closes) > 3 and all("summary" in b for b in closes)
     # the computed close keeps the runtime placeholders; endings before negotiation close with
     # literal values, so their placeholders are filled from the row at build time
-    assert any(b["summary"] == "{{close_outcome}} {{close_reason}}" for b in closes)
+    assert any(b["summary"] == "Outcome: {{close_outcome}}" for b in closes)
     literal = [b for b in closes if "{{" not in b["outcome"]]
     assert literal and all("{{" not in b["summary"] for b in literal)
-    assert all(b["summary"].startswith(b["outcome"]) for b in literal)
+    assert all(b["summary"] == "Outcome: " + b["outcome"] for b in literal)
     assert all(b["priority"] == "normal" for b in engine_bodies(wf, "transfer_to_agent"))
+
+
+def test_late_placeholders_that_may_be_unset_must_stand_alone():
+    # Diff review 10: close_reason is unset for reasonless rows; inside text it is sent literally.
+    tools = changed_api()
+    mixed = [{**FILLED[0], "value": "{{close_outcome}} {{close_reason}}"}, FILLED[1]]
+    assert any("only as the whole value" in p for p in check_spec(with_fields(mixed), tools))
+    alone = [{**FILLED[0], "value": "{{close_outcome}}"}, FILLED[1]]
+    assert check_spec(with_fields(alone), tools) == []

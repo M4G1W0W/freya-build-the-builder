@@ -133,3 +133,12 @@ def test_facts_say_exactly_when_and_what_the_floor_offer_is():
     line = next(x for x in facts.splitlines() if "SAYS THE FULL AMOUNT IS TOO MUCH" in x)
     assert "637.50 on 2026-10-16 (Friday 16 October 2026)" in line
     assert "this IS attempt 1" in line and "no other date" in line
+
+
+def test_no_floor_line_without_a_floor():
+    # Diff review 16: "offer exactly the floor not available on ..." for a product with no floor.
+    spec = copy.deepcopy(SPEC_A)
+    for t in spec["products"]["types"]:
+        t["floor_field"], t["floor_percent"] = "", 0
+    facts = _account(spec, "2026-10-14T11:00", LOAN_5)
+    assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts

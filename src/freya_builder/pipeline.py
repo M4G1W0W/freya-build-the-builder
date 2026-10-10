@@ -10,7 +10,7 @@ import time
 from . import platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
-from .llm import budget_left, chat_json
+from .llm import LLMError, budget_left, chat_json
 from .spec import MIN_SLOTS, SPEC_SCHEMA, check_spec, schema_problems
 from .toolapi import Tool
 from .trace import Trace
@@ -160,14 +160,18 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
             + "\n".join(f"- {p}" for p in problems)
             + "\n\nReturn the full corrected spec."
         )
-        spec = chat_json(
-            trace,
-            f"repair policy spec (round {round_no})",
-            SPEC_SYSTEM,
-            fix_user,
-            SPEC_SCHEMA,
-            "policy_spec",
-        )
+        try:
+            spec = chat_json(
+                trace,
+                f"repair policy spec (round {round_no})",
+                SPEC_SYSTEM,
+                fix_user,
+                SPEC_SCHEMA,
+                "policy_spec",
+            )
+        except LLMError as e:  # keep the best spec so far rather than no agent (diff review 8)
+            trace.warn(f"repair round {round_no} failed ({str(e)[:160]}); keeping the best spec")
+            break
     problems = spec_problems(spec, tools)
     trace.test("spec check (final)", not problems, f"{len(problems)} problem(s)")
     if not problems:

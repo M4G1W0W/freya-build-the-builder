@@ -42,7 +42,7 @@ def test_start_line_ties_the_trace_to_the_code_and_inputs(capsys, monkeypatch):
     start = next(line for line in err.splitlines() if " START " in line)
     for needle in ("git=abc1234", "dirty=True", "python=", "models=gpt-6.1-sol", "sha256="):
         assert needle in start
-    assert "uncommitted changes" in err
+    assert "uncommitted changes in the builder code" in err
 
 
 def test_code_version_reads_this_checkout():

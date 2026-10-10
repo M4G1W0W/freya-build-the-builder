@@ -84,6 +84,9 @@ def load_dotenv(path: Path = platform.ROOT / ".env") -> None:
                 os.environ.setdefault(key.strip(), value.strip())
 
 
+CODE_PATHS = ("src", "builder", "pyproject.toml")
+
+
 def code_version() -> tuple[str, bool]:
     """(short commit, uncommitted changes in tracked files), or ("unknown", False) outside git."""
     try:
@@ -94,7 +97,8 @@ def code_version() -> tuple[str, bool]:
             text=True,
         )
         status = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            # the builder's own code only: a re-run's tee rewrites a tracked trace (diff review 19)
+            ["git", "status", "--porcelain", "--untracked-files=no", "--", *CODE_PATHS],
             cwd=platform.ROOT,
             capture_output=True,
             text=True,
@@ -127,7 +131,9 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         f"models={','.join(llm.model_chain())}",
     )
     if dirty:
-        trace.warn(f"uncommitted changes in tracked files: this run is not exactly commit {commit}")
+        trace.warn(
+            f"uncommitted changes in the builder code: this run is not exactly commit {commit}"
+        )
     ok = False
     try:
         brief_text = read_briefs(a.briefs)

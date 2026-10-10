@@ -41,7 +41,7 @@ python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --slot hidden-2 --e
 
 ```bash
 grep -E "END +ok=True" traces/hidden-N.log
-grep -E "TEST +spec check \(round [0-9]+\): PASS" traces/hidden-N.log
+grep -E "TEST +spec check \((round [0-9]+|final)\): PASS" traces/hidden-N.log
 grep -E "TEST +local workflow validation: PASS|TEST +platform dry-run validation: PASS" traces/hidden-N.log
 grep -E "TEST +chat smoke test: opening reply: PASS" traces/hidden-N.log
 grep -E "CREATED +workflow_id=" traces/hidden-N.log   # steps= and tools= are on this line
@@ -61,8 +61,11 @@ grep -E "CREATED +workflow_id=" traces/hidden-N.log   # steps= and tools= are on
 4. If a build fails or looks wrong, **re-run the same command.** That updates the same slot in place and the new
    trace replaces the old one. Never edit the agent by hand. If it fails again, read the error. A **generic** fix to
    the builder is allowed: commit it, then **re-run both briefs**, so both agents come from the same commit.
-   Every trace's START line has `git=<commit> dirty=<flag>`: before submitting, both traces must show
-   `dirty=False` and the same commit as the form's `commit` field (`grep -o "git=[0-9a-f]* dirty=[A-Za-z]*" traces/hidden-*.log`).
+   Every trace's START line has `git=<commit> dirty=<flag>` (the flag covers `src`, `builder` and
+   `pyproject.toml` only). Before submitting, both traces must show `dirty=False`, and the builder code of the
+   form's commit must equal theirs. The submission commit only adds traces and exports, so for each trace's commit
+   C this prints nothing: `git diff --stat C HEAD -- src builder pyproject.toml`
+   (`grep -o "git=[0-9a-f]* dirty=[A-Za-z]*" traces/hidden-*.log` lists them).
 5. Secret check, then commit:
 
 ```bash

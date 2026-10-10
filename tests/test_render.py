@@ -444,23 +444,58 @@ NOTE_ROWS = (
 )
 
 
-def test_with_notes_the_endings_the_notes_route_produces_leave_negotiate():
+def test_with_notes_note_endings_stay_but_point_to_the_notes_route():
     # Styled extra-B at 676e9df: "I paid both" took the paid ending with no notes (Brief B rule 8
-    # wants a note per product); paid + disputed + refused were noted all at once, without the paid
-    # sentence and without the car loan's persuasion attempt.
+    # wants a note per product). Removing those endings (e233cb8) left refusals to talk, a missing
+    # account and a second promise failure without an exit (diff review 3, 9, 11): they stay, and
+    # their ENDINGS line points to the notes instead.
     n = render(spec_ab(), TOOLS, BRIEF)["nodes"]
     targets = {t["target_node"] for t in n["negotiate"]["transitions"] if t.get("is_tool_call")}
     nego = n["negotiate"]["task_message"]
+    assert {f"ev_{rid}" for rid in NOTE_ROWS} <= targets
     for rid in NOTE_ROWS:
-        assert f"ev_{rid}" not in targets and exit_tool_name(rid) not in nego
-        assert f"ev_{rid}" in n  # still the target of the turn cap and of other stages
-    assert {"ev_promise", "ev_transferred_restructuring"} <= targets
+        line = next(x for x in nego.splitlines() if x.startswith(f"- {exit_tool_name(rid)}:"))
+        assert "note them instead of using this ending" in line
+    assert "note them instead" not in next(
+        x for x in nego.splitlines() if x.startswith(f"- {exit_tool_name('promise')}:")
+    )
+    # Notes come last and only where the brief requires them; the duties of a situation first.
     assert "do for that product what the brief says for that ending" in nego
-    assert "only after that product's last listed attempt was refused" in nego
-    assert 'paid: say "Payments can take one business day to appear."' in nego
+    assert "unless a brief rule ends the call as a refusal" in nego
+    assert "go on with the next product" in nego
+    assert "a product without a promise gets a note" not in nego  # diff review 4: Brief B's rule
+    assert "Never add notes when the call is or must be transferred" in nego
 
 
 def test_without_notes_every_negotiate_ending_stays():
     n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
     targets = {t["target_node"] for t in n["negotiate"]["transitions"] if t.get("is_tool_call")}
     assert {f"ev_{rid}" for rid in NOTE_ROWS} <= targets
+
+
+def test_review_fixes_in_the_prompts():
+    # Diff review at a3e6c77, after e233cb8 / 96c37ad / 557161d.
+    wf = render(SPEC_A, TOOLS, BRIEF)
+    system, nego = wf["system_prompt"], wf["nodes"]["negotiate"]["task_message"]
+    # 6/15: one definition of a complete reply; a value that may go on is a part
+    assert "A value that may still go on" in system and "is only a part" in system
+    # 7: the brief's precedence before "transfer at once"
+    assert "If a brief rule says another situation the customer also described comes first" in nego
+    # 14: no practice-case value as the PARTS example
+    assert "Monday the" not in nego and "26th" not in nego
+    # 1: a spec whose rows all end with a goodbye line puts no goodbye into NOTES
+    fx = ROOT / "tests" / "fixtures"
+    vr = json.loads((fx / "spec_variant_r.json").read_text())
+    vtools = load_tool_api(fx / "briefs" / "variant-r.openapi.json")
+    vnego = render(vr, vtools, "")["nodes"]["negotiate"]["task_message"]
+    notes = next(x for x in vnego.splitlines() if x.startswith("NOTES:"))
+    assert "goodbye." not in notes.lower().replace("before any goodbye", "")
+
+
+def test_engine_owns_its_fields_over_engine_fields():
+    # Diff review 12: engine_fields were merged last and could replace the computed outcome.
+    s = copy.deepcopy(SPEC_A)
+    s["engine_fields"] = [{"tool": "close_call", "field": "outcome", "value": "no_promise"}]
+    wf = render(s, TOOLS, BRIEF)
+    close = wf["nodes"]["close"]["pre_actions"][0]["function"]["parameters"]["properties"]
+    assert close["body"]["properties"]["outcome"]["default"] == "{{close_outcome}}"

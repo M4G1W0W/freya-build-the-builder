@@ -558,11 +558,13 @@ NOTE_POST = POST["note_post"]
 
 def test_note_success_and_failure(split):
     ok = what(post(NOTE_POST, envelope({"ok": "true"}), split))
-    assert ok.startswith("Note saved.") and "ENDING" in ok
+    assert ok.startswith("Note saved.")
     assert "transition_to_ev_" not in ok  # render.py builds no ev_done exit; name none
-    # PUB-05 on the A+B agent (3/3 reps at 90b737d): goodbye was said before add_note, then the
-    # model returned empty messages and the call never closed. Re-say goodbye; never be empty.
-    assert "even if you already said goodbye" in ok and "Never reply with an empty message" in ok
+    # The notes-done route (92b83b5) closes the call on the last note's result. Diff review 2:
+    # "say goodbye and call the matching ENDING" after an early note ended multi-product calls
+    # with products still open. Now: go on with an open product; never be empty (90b737d stall).
+    assert "do not say goodbye" in ok and "closes by itself" in ok
+    assert "Never reply with an empty message" in ok
     bad = what(post(NOTE_POST, envelope({"ok": False, "error": "unknown product"}), split))
     assert bad == "The note was NOT saved (bank error: unknown product). Do not say it was saved."
     down = what(post(NOTE_POST, copy.deepcopy(SERVER_ERROR), split))

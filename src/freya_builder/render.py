@@ -38,18 +38,16 @@ def _rows_for(spec: dict, stage: str) -> list[dict]:
             for r in spec["rows"]
             if "third_party" in r["phases"] or (r["phases"] and set(r["phases"]) <= before)
         ]
-    rows = [r for r in spec["rows"] if stage in r["phases"]]
-    if stage == "negotiate":  # with notes, the notes route ends these calls (see _note_rows)
-        rows = [r for r in rows if r["id"] not in spec.get("_note_rows", {})]
-    return rows
+    return [r for r in spec["rows"] if stage in r["phases"]]
 
 
 def _note_rows(spec: dict, note_reasons: tuple[str, ...]) -> dict[str, str]:
     """Rows the brief's close rules derive from notes, with the note reason each stands for.
 
-    With notes, a product's paid/dispute/refusal situation is noted and the call goes on; the
-    notes-done route closes it and finalize picks these rows (styled extra-B at 676e9df: "I paid
-    both" took the paid ending with no notes). So they are no ending of negotiate.
+    With notes, the notes-done route closes such a call and finalize picks these rows, so their
+    ENDINGS line says to note the products instead (styled extra-B at 676e9df: "I paid both" took
+    the paid ending with no notes). They stay endings: refusals to talk, a missing account and a
+    second promise failure still close through them (diff review 3, 9, 11).
     """
     out: dict[str, str] = {}
     for c in spec["close_precedence"]:
@@ -78,6 +76,11 @@ def _endings_text(spec: dict, stage: str) -> str:
     for r in _rows_for(spec, stage):
         say = " ".join(_quote(s) for s in r["say_before_end"])
         say = f" First say {say}." if say else ""
+        if stage == "negotiate" and r["id"] in spec.get("_note_rows", {}):
+            say += (
+                " Where the brief requires a note for each product without a promise, note them"
+                " instead of using this ending: the call then closes by itself."
+            )
         lines.append(f"- {exit_tool_name(r['id'])}: {r['trigger']}.{say}")
     return "\n".join(lines)
 
@@ -157,7 +160,7 @@ def system_prompt(spec: dict, brief_text: str, engine_tools: list[str]) -> str:
 HOW TO WORK
 - Follow the BANK BRIEF below exactly. When a rule says to use a tool, call the tool: saying that you did something is not enough.
 - After every tool result, obey its what_to_do_next, then speak to the customer or call the next tool. Never end a turn with nothing.
-- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking. First read what it already says: if it already holds a reply to your last question or offer (a yes, a no, a date, an amount, a security answer) or a request, act on that part as you would on a complete message. Otherwise reply only "Please go on."; but if your previous reply was already "Please go on.", say instead "Sorry, your message was cut off. Could you answer in a few words?". A cut-off message without such a part is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Never repeat a question, an offer, an amount or a date because a message was cut off: each repeat counts as asking or offering again.
+- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking. First read what it already says: if it already holds a complete reply to your last question or offer (a clear yes or no, or a date, amount or security answer that cannot go on) or a request, act on that part as you would on a complete message. A value that may still go on (it ends on "the", "and", a number word or a month) is only a part: reply "Please go on." and join it with what follows (your step's rules for answers in parts apply). Otherwise reply only "Please go on."; but if your previous reply was already "Please go on.", say instead "Sorry, your message was cut off. Could you answer in a few words?". A cut-off message without such a part is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Never repeat a question, an offer, an amount or a date because a message was cut off: each repeat counts as asking or offering again.
 - Say a sentence of sympathy only where a brief rule asks for one, and only as often as that rule says in the whole call. Small talk needs no sympathy.
 - Something happened only if its tool result says so. Never say something was recorded or booked unless the result says it was.
 - Call at most one tool per message.
@@ -229,26 +232,16 @@ Never mention the debt, the product, an amount or why you are calling in this st
 
 def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     slots = ", ".join(f"create_promise_p{n}" for n in range(1, k + 1))
-    rows = {r["id"]: r for r in spec["rows"]}
-    says = [
-        f"{reason}: say " + " ".join(_quote(x) for x in rows[rid]["say_before_end"])
-        for rid, reason in spec.get("_note_rows", {}).items()
-        if rid in rows and rows[rid]["say_before_end"]
-    ]
     note_line = (
-        "NOTES: a product without a promise gets a note, and the call closes by itself once every "
-        "product has a recorded promise or a note. When a product's situation matches one of the "
-        "brief's endings (for example already paid, a dispute, hardship or a refusal), do for that "
-        "product what the brief says for that ending (its required sentence, no promise; a refusal "
-        "only after that product's last listed attempt was refused), then note it with that reason. "
-        + (
-            "Sentences for a note reason, said before that note: " + "; ".join(says) + ". "
-            if says
-            else ""
-        )
-        + "After every product is settled and BEFORE any goodbye, and only where the brief requires a "
-        "note: call add_note_pN for that product with the reason, one per message, with no other "
-        "words. Never add notes when the call is transferred."
+        "NOTES: when a product's situation matches one of the brief's endings (for example already "
+        "paid, a dispute, hardship or a refusal), do for that product what the brief says for that "
+        "ending (its required sentence and no promise; a refusal only after that product's last "
+        "listed attempt was refused, unless a brief rule ends the call as a refusal), remember the "
+        "reason, and go on with the next product. After every product is settled and BEFORE any "
+        "goodbye, and only where the brief requires a note: call add_note_pN for each such product "
+        "with its reason, one per message, with no other words; once every product has a recorded "
+        "promise or a note, the call closes by itself. Never add notes when the call is or must be "
+        "transferred."
         if notes
         else "Notes are not used."
     )
@@ -277,9 +270,9 @@ DATE TABLE:
 {{{{date_table}}}}
 
 Follow the brief from the first ask to the confirmation and recording.
-PARTS: A date or an amount may come in parts over several messages ("Monday the", then "26th"; "four hundred", then "and twenty"): join the parts the customer gave since your last question and use the joined value; while a part is clearly missing, reply only "Please go on.".
+PARTS: A date or an amount may come in parts over several messages ("the", then "fifth"; "four hundred", then "and twenty"): join the parts the customer gave since your last question and use the joined value; while a part is clearly missing, reply only "Please go on.".
 DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. This year's calendar differs from other years: never pair a weekday with a date from memory; take both from the DATE TABLE (its EVERY DAY weeks) or FACTS and say them as written there. If the customer first named a period (like "next week" or "the week after next") and then gives only a weekday or a day number, that day lies INSIDE that period (DATE TABLE week rows). Never offer the latest date unless those lines say so.
-{attempts_line}Use an ending the brief ties to a situation (a transfer, the support team or another option, see ENDINGS) only after the customer has described that situation. Then do what its rule says: when the rule says to transfer or close, do it at once without asking whether they want it; ask first only when the rule itself says to offer it or to ask.
+{attempts_line}Use an ending the brief ties to a situation (a transfer, the support team or another option, see ENDINGS) only after the customer has described that situation. Then do what its rule says: when the rule says to transfer or close, do it at once without asking whether they want it; ask first only when the rule itself says to offer it or to ask. If a brief rule says another situation the customer also described comes first, follow that rule first.
 RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
@@ -428,7 +421,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
 
     account_call = engine_call(
         by["get_account"],
-        _bake_customer(spec, by["get_account"]) | _engine_extra(spec, "get_account"),
+        _engine_extra(spec, "get_account") | _bake_customer(spec, by["get_account"]),
         retries=2,
     )
     wf_nodes["load_account"] = nodes.api_node(
@@ -519,15 +512,15 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         }
         close_lit = engine_call(
             ct,
-            _bake_customer(spec, ct) | literal | _engine_extra(spec, "close_call", known),
+            _engine_extra(spec, "close_call", known) | _bake_customer(spec, ct) | literal,
             retries=1,
         )
         if row["queue"] and xt:
             xfer_lit = engine_call(
                 xt,
-                _bake_customer(spec, xt)
-                | {spec["transfer_field"]: row["queue"]}
-                | _engine_extra(spec, "transfer_to_agent", known),
+                _engine_extra(spec, "transfer_to_agent", known)
+                | _bake_customer(spec, xt)
+                | {spec["transfer_field"]: row["queue"]},
                 retries=1,
             )
             wf_nodes[f"ev_{rid}"] = nodes.api_node(
@@ -559,9 +552,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         xt = by["transfer_to_agent"]
         xfer_call = engine_call(
             xt,
-            _bake_customer(spec, xt)
-            | {spec["transfer_field"]: "{{xfer_queue}}"}
-            | _engine_extra(spec, "transfer_to_agent"),
+            _engine_extra(spec, "transfer_to_agent")
+            | _bake_customer(spec, xt)
+            | {spec["transfer_field"]: "{{xfer_queue}}"},
             retries=1,
         )
         wf_nodes["xfer"] = nodes.api_node("xfer", [xfer_call], [nodes.always("close")])
@@ -569,9 +562,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
 
     close_call = engine_call(
         ct,
-        _bake_customer(spec, ct)
-        | {cf["outcome_field"]: "{{close_outcome}}", cf["reason_field"]: "{{close_reason}}"}
-        | _engine_extra(spec, "close_call"),
+        _engine_extra(spec, "close_call")
+        | _bake_customer(spec, ct)
+        | {cf["outcome_field"]: "{{close_outcome}}", cf["reason_field"]: "{{close_reason}}"},
         retries=1,
     )
     wf_nodes["close"] = nodes.api_node("close", [close_call], [nodes.always("hang_up")])

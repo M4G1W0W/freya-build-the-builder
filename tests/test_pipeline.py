@@ -129,3 +129,22 @@ def test_repair_rounds_are_skipped_when_the_build_budget_runs_low(monkeypatch):
     spec = pipeline.extract_spec(Trace(out), "brief", TOOLS)
     assert len(calls) == 1 and spec["default_rows"]["opening"] == "nope"
     assert "skipping repair round 1" in out.getvalue()
+
+
+def test_a_failed_repair_call_keeps_the_best_spec(monkeypatch):
+    # Diff review 8: a repair call out of budget or models crashed the build with a valid spec.
+    bad = copy.deepcopy(SPEC_A)
+    bad["default_rows"]["opening"] = "nope"
+    calls = []
+
+    def chat(trace, purpose, system, user, schema, name):
+        calls.append(purpose)
+        if purpose.startswith("repair"):
+            raise pipeline.LLMError("repair policy spec (round 1): build time budget used up")
+        return copy.deepcopy(bad)
+
+    monkeypatch.setattr(pipeline, "chat_json", chat)
+    out = io.StringIO()
+    spec = pipeline.extract_spec(Trace(out), "brief", TOOLS)
+    assert spec["default_rows"]["opening"] == "nope"
+    assert "keeping the best spec" in out.getvalue()

@@ -262,6 +262,11 @@ def _engine_field_problems(spec: dict, tools: list[Tool]) -> list[str]:
             if name not in call_vars | late:
                 allowed = ", ".join(sorted(call_vars | late))
                 p.append(f"{where}: unknown placeholder {{{{{name}}}}} (allowed here: {allowed})")
+        unset = {"close_reason", "xfer_queue"} & set(names)
+        if unset and not PLACEHOLDER.fullmatch(e["value"].strip()):
+            # close_reason is unset for reasonless rows and xfer_queue is 'none' without a transfer:
+            # alone they drop the field, inside other text they would be sent literally
+            p.append(f"{where}: use {sorted(unset)} only as the whole value, not inside text")
         if not names and field.enum and e["value"] not in field.enum:
             p.append(f"{where}: {e['value']!r} not in API enum {field.enum}")
         filled.setdefault(e["tool"], set()).add(e["field"])

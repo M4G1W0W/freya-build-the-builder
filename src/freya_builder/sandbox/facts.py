@@ -533,7 +533,12 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
-        if first is not None and first[0] == "full_or_floor" and first[1] is not None:
+        if (
+            first is not None
+            and first[0] == "full_or_floor"
+            and first[1] is not None
+            and floor is not None
+        ):
             lines.append(
                 "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
                 + " exactly the floor "
