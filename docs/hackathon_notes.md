@@ -5,7 +5,7 @@
 `docs/reference/hackathon_practice_cases.json`. The kit (emailed at the start) supersedes both.
 Event listing: <https://events.ycombinator.com/AI-FDE-Build-the-Builder26>.
 
-> **Update 2026-10-10 ~14:30 Istanbul.** The page changed at kickoff. The kit is now a download
+> **Update 2026-10-10 ~14:00 Istanbul.** The page changed at kickoff. The kit is now a download
 > (`build-the-builder.zip`, Data tab), saved unmodified in `kit/`. The workflow limit is **200** (was 10). The API key and
 > support channel come by email. The platform is **staging-app.freyavoice.ai**, the phone-agent model is `experimental-5`,
 > and there is **no MCP**: everything goes through `kit/freya.py`. The workspace contains an organiser base workflow
@@ -214,5 +214,5 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
 |---|---|---|---|---|---|---|---|---|
-| 10-10 14:55 | fc120f9 | kit minimal_builder (baseline) | A | 1 | 6 / 10 | e2f7b97e / 23c6c141 | <1 min | fails PUB-02, 03, 07, 09 (see Observations). `runs/baseline-minimal-A.json` |
-| 10-10 15:05 | 05eb2db | kit minimal_builder (baseline), briefs A+B | B | 1 | 1 / 3 | aab4bc00 / 6afab2aa | <1 min | PUB-12: persuasion attempts per product; PUB-13: loan recorded 21 Oct instead of its 23 Oct deadline (date arithmetic again). `runs/baseline-minimal-B.json` |
+| 10-10 14:07 | fc120f9 | kit minimal_builder (baseline) | A | 1 | 6 / 10 | e2f7b97e / 23c6c141 | <1 min | fails PUB-02, 03, 07, 09 (see Observations). `runs/baseline-minimal-A.json` |
+| 10-10 14:08 | 05eb2db | kit minimal_builder (baseline), briefs A+B | B | 1 | 1 / 3 | aab4bc00 / 6afab2aa | <1 min | PUB-12: persuasion attempts per product; PUB-13: loan recorded 21 Oct instead of its 23 Oct deadline (date arithmetic again). `runs/baseline-minimal-B.json` |
