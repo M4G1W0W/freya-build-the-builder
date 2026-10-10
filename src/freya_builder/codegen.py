@@ -169,7 +169,11 @@ def account_config(spec: dict) -> dict:
         "past_due_field": prod["past_due_field"],
         "days_late_field": prod["days_late_field"],
         "types": {
-            t["api_value"]: {"label": t["label"], "floor_field": t["floor_field"]}
+            t["api_value"]: {
+                "label": t["label"],
+                "floor_field": t["floor_field"],
+                "floor_percent": t.get("floor_percent") or 0,
+            }
             for t in prod["types"]
         },
         "bands": [

@@ -449,7 +449,14 @@ def _product(k, raw, today, C, vs):
     past_due = _num(raw.get(C.get("past_due_field")))
     days_late = _int(raw.get(C.get("days_late_field")))
     floor_field = kind.get("floor_field") or ""
-    floor = _num(raw.get(floor_field)) if floor_field else None
+    floor_pct = _num(kind.get("floor_percent")) or 0
+    if floor_pct > 0 and past_due is not None:  # a share of the past-due amount (audit F15)
+        floor = round(past_due * floor_pct / 100.0, 2)
+        floor_field = (
+            str(int(floor_pct) if floor_pct == int(floor_pct) else floor_pct) + "% of past due"
+        )
+    else:
+        floor = _num(raw.get(floor_field)) if floor_field else None
     bi, band = _band(days_late, C)
     fns = C.get("fn_deadline") or []
     deadline = _ev(fns[bi], today, None, days_late) if band is not None and bi < len(fns) else None

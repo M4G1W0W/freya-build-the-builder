@@ -59,17 +59,20 @@
    {
     "api_value": "credit_card",
     "label": "credit card ending {card_last4}",
-    "floor_field": "minimum_payment"
+    "floor_field": "minimum_payment",
+    "floor_percent": 0
    },
    {
     "api_value": "personal_loan",
     "label": "personal loan",
-    "floor_field": "instalment_amount"
+    "floor_field": "instalment_amount",
+    "floor_percent": 0
    },
    {
     "api_value": "car_loan",
     "label": "car loan",
-    "floor_field": "instalment_amount"
+    "floor_field": "instalment_amount",
+    "floor_percent": 0
    }
   ]
  },

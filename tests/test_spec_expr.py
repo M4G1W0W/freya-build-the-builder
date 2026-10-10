@@ -114,3 +114,15 @@ def test_every_note_reason_finalize_can_close_with_has_a_row():
     assert not [p for p in check_spec(spec, TOOLS) if "no row" in p]
     spec["rows"] = [r for r in spec["rows"] if r["id"] != "no_promise_dispute"]
     assert any("no row ('no_promise', 'dispute')" in p for p in check_spec(spec, TOOLS))
+
+
+def test_floor_percent_is_checked():
+    spec = copy.deepcopy(SPEC_A)
+    for t in spec["products"]["types"]:
+        t["floor_field"], t["floor_percent"] = "", 30
+    assert check_spec(spec, TOOLS) == []
+    spec["products"]["types"][0]["floor_percent"] = 150
+    assert any("floor_percent 150 not in 0..100" in p for p in check_spec(spec, TOOLS))
+    spec = copy.deepcopy(SPEC_A)
+    spec["products"]["types"][0]["floor_field"] = ""
+    assert any("floor field ''" in p for p in check_spec(spec, TOOLS))

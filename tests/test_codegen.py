@@ -897,3 +897,13 @@ def test_date_table_names_the_next_two_weeks():
         "the week after next (Monday-to-Sunday week): Mon 2026-10-26 to Sun 2026-11-01"
         in vs["date_table"]
     )
+
+
+def test_floor_as_a_percentage_of_past_due():
+    # audit F15: "the lowest acceptable amount is 30% of the past-due amount" had no representation.
+    spec = spec_a()
+    for t in spec["products"]["types"]:
+        t["floor_field"], t["floor_percent"] = "", 30
+    p1 = block(call(spec, [CARD])["account_facts"], "P1")
+    assert "- floor (30% of past due): 126.00" in p1  # CARD: 420.00 past due
+    assert "floor 126.00" in p1

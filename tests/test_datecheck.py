@@ -40,3 +40,10 @@ def test_a_business_week_closed_for_holidays_is_reported():
         | {"2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"}
     )
     assert any("has no date" in p for p in check_dates(spec))
+
+
+def test_percentage_floor_spec_has_no_date_problems():
+    spec = copy.deepcopy(SPEC_A)
+    for t in spec["products"]["types"]:
+        t["floor_field"], t["floor_percent"] = "", 25
+    assert check_dates(spec) == []

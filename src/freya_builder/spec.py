@@ -38,7 +38,9 @@ CALL_VAR = obj(
         "example": STR,
     }
 )
-PRODUCT_TYPE = obj({"api_value": STR, "label": STR, "floor_field": STR})
+PRODUCT_TYPE = obj(
+    {"api_value": STR, "label": STR, "floor_field": STR, "floor_percent": {"type": "number"}}
+)
 BAND = obj(
     {
         "name": STR,
@@ -340,7 +342,12 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         for t in pr["types"]:
             if api_types and t["api_value"] not in api_types:
                 p.append(f"product type {t['api_value']!r} not in API enum {api_types}")
-            if item and t["floor_field"] not in item:
+            pct = t.get("floor_percent") or 0
+            if not 0 <= pct <= 100:
+                p.append(f"product type {t['api_value']!r}: floor_percent {pct} not in 0..100")
+            elif pct and not t["floor_field"]:
+                pass  # the floor is that share of the past-due amount (audit F15)
+            elif item and t["floor_field"] not in item:
                 p.append(
                     f"floor field {t['floor_field']!r} is not a field of {pr['list_field']} items"
                 )
