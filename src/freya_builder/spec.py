@@ -271,10 +271,23 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     for q in ident["questions"]:
         if keys and q["key"] not in keys:
             p.append(f"identity question {q['key']!r} not in API enum {keys}")
-    resp = {f.name for f in by["verify_identity"].response}
+    resp_types = {f.name: f.type for f in by["verify_identity"].response}
     for role in ("gate_field", "answer_ok_field", "remaining_field", "hint_field"):
-        if ident[role] and resp and ident[role] not in resp:
+        if ident[role] and resp_types and ident[role] not in resp_types:
             p.append(f"identity {role} {ident[role]!r} is not a verify_identity response field")
+    # The identity gate and the post-hook compare these with 'true': an empty or non-boolean field
+    # would never open the gate (audit F01/F02/F62), silently, for every call.
+    for role, meaning in (
+        ("gate_field", "is true once EVERY security question has passed"),
+        ("answer_ok_field", "is true when the answer just checked was correct"),
+    ):
+        if not ident[role]:
+            p.append(f"identity {role} is empty: name the verify_identity boolean that {meaning}")
+        elif resp_types.get(ident[role]) not in (None, "", "boolean"):
+            p.append(
+                f"identity {role} {ident[role]!r} is {resp_types[ident[role]]}: name the "
+                f"verify_identity boolean that {meaning}"
+            )
 
     for role in ("product_field", "amount_field", "date_field"):
         if not by["create_promise"].field(spec["promise_fields"][role]):

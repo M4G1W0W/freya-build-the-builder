@@ -324,7 +324,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         [
             nodes.when_true(
                 "load_account",
-                "Both security answers are verified",
+                "All security answers are verified",
                 f"verify_identity_response.data.{gate}",
             ),
             *_exit_transitions(spec, "identity"),

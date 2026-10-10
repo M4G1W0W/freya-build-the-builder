@@ -41,6 +41,9 @@ def test_schema_is_strict_everywhere():
         (lambda s: s["rows"][2].update(queue="plans"), "queue 'plans'"),
         (lambda s: s["identity"]["questions"][0].update(key="postcode"), "identity question"),
         (lambda s: s["identity"].update(gate_field="verified_all"), "gate_field"),
+        (lambda s: s["identity"].update(gate_field=""), "identity gate_field is empty"),
+        (lambda s: s["identity"].update(answer_ok_field=""), "identity answer_ok_field is empty"),
+        (lambda s: s["identity"].update(gate_field="wrong_answers_left"), "is integer"),
         (lambda s: s["promise_fields"].update(date_field="when"), "create_promise has no field"),
         (lambda s: s["default_rows"].update(opening="nope"), "default row"),
         (
