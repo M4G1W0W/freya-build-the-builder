@@ -10,12 +10,15 @@ import time
 from . import platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
-from .llm import chat_json
+from .llm import budget_left, chat_json
 from .spec import MIN_SLOTS, SPEC_SCHEMA, check_spec, schema_problems
 from .toolapi import Tool
 from .trace import Trace
 
 REPAIR_ROUNDS = 2
+REPAIR_MIN_S = (
+    300  # a repair call takes about a minute; below this the best spec so far is deployed
+)
 
 CONSOLIDATE_SCHEMA = {
     "type": "object",
@@ -147,6 +150,11 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
             best = (len(problems), spec)
         for p in problems[:20]:
             trace.warn(f"spec: {p}")
+        if budget_left() < REPAIR_MIN_S:
+            trace.warn(
+                f"build time budget: {budget_left():.0f} s left, skipping repair round {round_no}"
+            )
+            break
         fix_user = (
             f"{user}\n\n# YOUR PREVIOUS SPEC\n{json.dumps(spec)}\n\n# PROBLEMS FOUND BY THE CHECKER\n"
             + "\n".join(f"- {p}" for p in problems)

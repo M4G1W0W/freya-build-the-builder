@@ -151,3 +151,48 @@ def test_rate_limit_after_retries_falls_back_to_the_next_model(monkeypatch):
 def test_strict_json_unsupported_counts_as_unavailable():
     assert llm._unavailable(400, '{"error": "response_format json_schema is not supported"}')
     assert not llm._unavailable(400, '{"error": "bad request: messages missing"}')
+
+
+def test_a_timeout_moves_straight_to_the_next_model(monkeypatch):
+    # Review gap 13: a stalled call used to be retried on the same model (3 x 600 s).
+    trace, buf = make_trace(monkeypatch)
+    monkeypatch.setenv("BUILDER_MODEL", "slow-model")
+    monkeypatch.setenv("BUILDER_MODEL_FALLBACKS", "quick-model")
+    tried = []
+
+    def post(path, body, timeout):
+        tried.append((body["model"], timeout))
+        if body["model"] == "slow-model":
+            raise TimeoutError("timed out")
+        return fake_response('{"x": 4}')
+
+    monkeypatch.setattr(llm, "_post", post)
+    assert llm.chat_json(trace, "p", "s", "u", SCHEMA) == {"x": 4}
+    assert [m for m, _ in tried] == ["slow-model", "quick-model"]
+    assert all(t <= llm.CALL_TIMEOUT_S for _, t in tried)
+    assert "timed out" in buf.getvalue()
+
+
+def test_calls_stop_when_the_build_budget_is_used_up(monkeypatch):
+    trace, _ = make_trace(monkeypatch)
+    monkeypatch.setattr(llm, "_post", lambda *a: pytest.fail("no call after the budget"))
+    llm.start_budget(5)
+    try:
+        with pytest.raises(llm.LLMError, match="build time budget"):
+            llm.chat_json(trace, "p", "s", "u", SCHEMA, model="m")
+    finally:
+        llm.start_budget(None)
+
+
+def test_a_call_timeout_never_exceeds_the_budget_left(monkeypatch):
+    trace, _ = make_trace(monkeypatch)
+    seen = []
+    monkeypatch.setattr(
+        llm, "_post", lambda path, body, timeout: seen.append(timeout) or fake_response('{"x": 1}')
+    )
+    llm.start_budget(100)
+    try:
+        llm.chat_json(trace, "p", "s", "u", SCHEMA, model="m")
+    finally:
+        llm.start_budget(None)
+    assert 0 < seen[0] <= 100

@@ -116,6 +116,7 @@ def _sha(path: str) -> str:
 def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int:
     a = parse_args(argv)
     load_dotenv()
+    llm.start_budget()
     trace = Trace()
     commit, dirty = code_version()
     inputs = ",".join(_sha(p) for p in [*a.briefs, a.tool_api])

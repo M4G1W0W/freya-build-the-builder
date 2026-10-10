@@ -17,6 +17,21 @@ from .trace import Trace
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 # Benchmarked in exp02/exp03 (Decision log 2026-10-10 14:40). In code, so a fresh-clone re-run needs only the key.
 DEFAULT_MODELS = ("gpt-6.1-sol", "gpt-5.5", "gpt-5.4")
+# The page allows 30 min per brief including self-tests; deploy and the smoke test take ~10 s. A call
+# normally takes ~55 s; one that stalls moves on to the next model (review gap 13).
+BUILD_BUDGET_S = 25 * 60
+CALL_TIMEOUT_S = 240
+_deadline: float | None = None
+
+
+def start_budget(seconds: float | None = BUILD_BUDGET_S) -> None:
+    """Start the model-call budget of one build (None switches it off)."""
+    global _deadline
+    _deadline = None if seconds is None else time.monotonic() + seconds
+
+
+def budget_left() -> float:
+    return float("inf") if _deadline is None else _deadline - time.monotonic()
 
 
 class LLMError(RuntimeError):
@@ -80,7 +95,7 @@ def chat_json(
     schema_name: str = "result",
     model: str | None = None,
     retries: int = 2,
-    timeout: float = 600,
+    timeout: float = CALL_TIMEOUT_S,
 ) -> dict:
     """One structured call. Returns the parsed JSON object. Logs one trace line per success.
 
@@ -112,9 +127,13 @@ def _chat_once(trace, purpose, system, user, schema, schema_name, model, retries
     }
     last = ""
     for attempt in range(retries + 1):
+        left = budget_left()
+        if left < 20:
+            raise LLMError(f"{purpose}: build time budget used up")
+        call_timeout = min(timeout, left)
         t0 = time.monotonic()
         try:
-            resp = _post("/chat/completions", body, timeout)
+            resp = _post("/chat/completions", body, call_timeout)
         except urllib.error.HTTPError as e:
             text = e.read().decode(errors="replace")[:500]
             last = f"HTTP {e.code}: {text}"
@@ -130,6 +149,9 @@ def _chat_once(trace, purpose, system, user, schema, schema_name, model, retries
             raise LLMError(f"{purpose}: {last}") from None
         except (urllib.error.URLError, TimeoutError) as e:
             last = str(e)
+            if isinstance(e, TimeoutError) or isinstance(getattr(e, "reason", None), TimeoutError):
+                trace.warn(f"model call '{purpose}' to {model} timed out after {call_timeout:.0f}s")
+                raise ModelUnavailable(f"{purpose}: timed out") from None
             if attempt < retries:
                 trace.warn(
                     f"model call '{purpose}' to {model} network error ({last[:120]}), retrying"

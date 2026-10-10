@@ -117,3 +117,15 @@ def test_smoke_test_sends_a_real_now_and_reports_its_result(monkeypatch):
     assert pipeline.selftest(Trace(io.StringIO()), {"workflow_id": "wf"}, spec, TOOLS) is True
     now = next(v["name"] for v in spec["meta"]["call_vars"] if v["role"] == "now")
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", fake.body["customerVariables"][now])
+
+
+def test_repair_rounds_are_skipped_when_the_build_budget_runs_low(monkeypatch):
+    # Review gap 13: the page allows 30 min per brief including self-tests.
+    bad = copy.deepcopy(SPEC_A)
+    bad["default_rows"]["opening"] = "nope"
+    calls = _stub(monkeypatch, [bad])
+    monkeypatch.setattr(pipeline, "budget_left", lambda: 60.0)
+    out = io.StringIO()
+    spec = pipeline.extract_spec(Trace(out), "brief", TOOLS)
+    assert len(calls) == 1 and spec["default_rows"]["opening"] == "nope"
+    assert "skipping repair round 1" in out.getvalue()
