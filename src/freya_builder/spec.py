@@ -8,6 +8,7 @@ Date/amount rules are small Python EXPRESSIONS over a fixed helper vocabulary (s
 are validated with an AST whitelist and inlined into code-node source at build time.
 """
 
+import re
 from typing import Any
 
 from .expr import check_expr
@@ -175,6 +176,7 @@ SPEC_SCHEMA = obj(
         "promise_fields": obj({"product_field": STR, "amount_field": STR, "date_field": STR}),
         "transfer_field": STR,
         "close_fields": obj({"outcome_field": STR, "reason_field": STR}),
+        "engine_fields": arr(obj({"tool": STR, "field": STR, "value": STR})),
         "disclosure": obj(
             {"intro": STR, "product_sentence": STR, "first_ask_single": STR, "first_ask_multi": STR}
         ),
@@ -215,6 +217,65 @@ def _enum(tools: dict[str, Tool], tool: str, field: str) -> tuple[str, ...]:
     t = tools.get(tool)
     f = t.field(field) if t else None
     return f.enum if f else ()
+
+
+# Tools the workflow engine calls itself (no model fills their fields), and the variables finalize
+# sets before close_call and transfer_to_agent run.
+ENGINE_TOOLS = ("get_account", "close_call", "transfer_to_agent")
+LATE_VARS = ("close_outcome", "close_reason", "xfer_queue")
+PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+
+
+def engine_sent(spec: dict, tools: list[Tool]) -> dict[str, set[str]]:
+    """The fields render bakes into each engine-run call, before engine_fields."""
+    cid = customer_field(spec, tools)
+    cf = spec["close_fields"]
+    return {
+        "get_account": {cid},
+        "close_call": {cid, cf["outcome_field"], cf["reason_field"]},
+        "transfer_to_agent": {cid, spec["transfer_field"]},
+    }
+
+
+def _engine_field_problems(spec: dict, tools: list[Tool]) -> list[str]:
+    """Review gap 8a: hidden tool APIs may add required fields to the engine-run tools."""
+    by = {t.name: t for t in tools}
+    base = engine_sent(spec, tools)
+    call_vars = {v["name"] for v in spec["meta"]["call_vars"]}
+    p: list[str] = []
+    filled: dict[str, set[str]] = {}
+    for e in spec["engine_fields"]:
+        where = f"engine_fields {e['tool']}.{e['field']}"
+        tool = by.get(e["tool"]) if e["tool"] in ENGINE_TOOLS else None
+        if not tool:
+            p.append(f"{where}: not a tool the engine calls ({', '.join(ENGINE_TOOLS)})")
+            continue
+        field = tool.field(e["field"])
+        if not field:
+            p.append(f"{where}: {e['tool']} has no request field {e['field']!r}")
+            continue
+        if e["field"] in base[e["tool"]]:
+            p.append(f"{where}: the engine already sends this field")
+        late = set(LATE_VARS) if e["tool"] != "get_account" else set()
+        names = PLACEHOLDER.findall(e["value"])
+        for name in names:
+            if name not in call_vars | late:
+                allowed = ", ".join(sorted(call_vars | late))
+                p.append(f"{where}: unknown placeholder {{{{{name}}}}} (allowed here: {allowed})")
+        if not names and field.enum and e["value"] not in field.enum:
+            p.append(f"{where}: {e['value']!r} not in API enum {field.enum}")
+        filled.setdefault(e["tool"], set()).add(e["field"])
+    for name in ENGINE_TOOLS:
+        if name not in by:
+            continue
+        sent = base[name] | filled.get(name, set())
+        for f in by[name].request:
+            if f.required and f.name not in sent:
+                p.append(
+                    f"{name} requires {f.name!r} but the engine does not send it: add an "
+                    f"engine_fields entry with its value"
+                )
+    return p
 
 
 def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
@@ -361,6 +422,7 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     exprs += [(f"callback day {i}", e) for i, e in enumerate(cb["day_exprs"])]
     for label, e in exprs:
         p += [f"{label}: {problem}" for problem in check_expr(e)]
+    p += _engine_field_problems(spec, tools)
     return p
 
 

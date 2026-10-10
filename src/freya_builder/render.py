@@ -10,7 +10,7 @@ import re
 
 from . import codegen, hooks, nodes
 from .codegen import OK_FIELD
-from .spec import call_var, customer_field
+from .spec import PLACEHOLDER, call_var, customer_field
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
@@ -104,6 +104,17 @@ def _exit_transitions(spec: dict, stage: str) -> list[dict]:
         nodes.tool_transition(f"ev_{r['id']}", f"End the call: {r['trigger']}")
         for r in _rows_for(spec, stage)
     ]
+
+
+def _engine_extra(spec: dict, tool: str, known: dict[str, str] | None = None) -> dict[str, str]:
+    """engine_fields for one engine-run tool; placeholders in `known` are filled at build time
+    (the endings before negotiation close with literal values and never run finalize)."""
+    fill = known or {}
+    return {
+        e["field"]: PLACEHOLDER.sub(lambda m: fill.get(m.group(1), m.group(0)), e["value"])
+        for e in spec["engine_fields"]
+        if e["tool"] == tool
+    }
 
 
 def _bake_customer(spec: dict, tool: Tool) -> dict[str, str]:
@@ -374,7 +385,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     )
 
     account_call = engine_call(
-        by["get_account"], _bake_customer(spec, by["get_account"]), retries=2
+        by["get_account"],
+        _bake_customer(spec, by["get_account"]) | _engine_extra(spec, "get_account"),
+        retries=2,
     )
     wf_nodes["load_account"] = nodes.api_node(
         "load_account", [account_call], [nodes.always("account_facts")]
@@ -457,10 +470,23 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         literal = {cf["outcome_field"]: row["outcome"]}
         if row["reason"]:
             literal[cf["reason_field"]] = row["reason"]
-        close_lit = engine_call(ct, _bake_customer(spec, ct) | literal, retries=1)
+        known = {
+            "close_outcome": row["outcome"],
+            "close_reason": row["reason"],
+            "xfer_queue": row["queue"] or "none",
+        }
+        close_lit = engine_call(
+            ct,
+            _bake_customer(spec, ct) | literal | _engine_extra(spec, "close_call", known),
+            retries=1,
+        )
         if row["queue"] and xt:
             xfer_lit = engine_call(
-                xt, _bake_customer(spec, xt) | {spec["transfer_field"]: row["queue"]}, retries=1
+                xt,
+                _bake_customer(spec, xt)
+                | {spec["transfer_field"]: row["queue"]}
+                | _engine_extra(spec, "transfer_to_agent", known),
+                retries=1,
             )
             wf_nodes[f"ev_{rid}"] = nodes.api_node(
                 f"ev_{rid}", [xfer_lit], [nodes.always(f"cl_{rid}")]
@@ -490,7 +516,11 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         )
         xt = by["transfer_to_agent"]
         xfer_call = engine_call(
-            xt, _bake_customer(spec, xt) | {spec["transfer_field"]: "{{xfer_queue}}"}, retries=1
+            xt,
+            _bake_customer(spec, xt)
+            | {spec["transfer_field"]: "{{xfer_queue}}"}
+            | _engine_extra(spec, "transfer_to_agent"),
+            retries=1,
         )
         wf_nodes["xfer"] = nodes.api_node("xfer", [xfer_call], [nodes.always("close")])
     wf_nodes["finalize"] = nodes.code_node("finalize", codegen.finalize_source(spec), finalize_next)
@@ -498,7 +528,8 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     close_call = engine_call(
         ct,
         _bake_customer(spec, ct)
-        | {cf["outcome_field"]: "{{close_outcome}}", cf["reason_field"]: "{{close_reason}}"},
+        | {cf["outcome_field"]: "{{close_outcome}}", cf["reason_field"]: "{{close_reason}}"}
+        | _engine_extra(spec, "close_call"),
         retries=1,
     )
     wf_nodes["close"] = nodes.api_node("close", [close_call], [nodes.always("hang_up")])

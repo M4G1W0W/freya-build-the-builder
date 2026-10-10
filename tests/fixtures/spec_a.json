@@ -422,6 +422,7 @@
   "outcome_field": "outcome",
   "reason_field": "reason"
  },
+ "engine_fields": [],
  "disclosure": {
   "intro": "I am calling from the collections team about a late payment.",
   "product_sentence": "Your {label} is {past_due} past due, {days_late} days late.",

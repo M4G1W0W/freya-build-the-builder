@@ -78,6 +78,7 @@ FIELDS
 - default_rows: the row to use per step if the call ends there without an explicit ending (the most conservative row of that step).
 - notes: used = the specification uses add_note; product_field/reason_field = add_note request field names; on_transfer = notes are allowed when the call is transferred.
 - promise_fields / transfer_field / close_fields: request field names in the tool API.
+- engine_fields: the program itself sends get_account (with the customer id), close_call (customer id, outcome, reason) and transfer_to_agent (customer id, queue). For every OTHER field the tool API marks required on one of these three tools, add {{"tool", "field", "value"}}. value = the exact value the specification or the tool API gives for it (an enum value where the field has an enum), or a placeholder in double braces: a meta.call_vars name, and for close_call and transfer_to_agent also {{{{close_outcome}}}}, {{{{close_reason}}}} or {{{{xfer_queue}}}}. [] when these tools need nothing more.
 - disclosure: intro = what the agent says right after verification before the amounts; product_sentence = a template for one product using {{label}}, {{past_due}}, {{days_late}}; first_ask_single / first_ask_multi = the exact first request for payment.
 - success_lines.promise = the exact sentence after a promise is recorded. failure_rules.promise = the specification's rule when recording fails.
 - stage_rules: for each step, the specification's rules that apply there (short; cite rule numbers or titles).
