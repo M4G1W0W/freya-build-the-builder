@@ -570,3 +570,8 @@ def test_without_notes_endings_go_straight_to_finalize():
     n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
     assert n["ev_paid"]["transitions"] == [nodes_always("finalize")]
     assert not [k for k in n if k.startswith("an_")]
+
+
+def test_a_weekday_after_a_period_is_taken_from_that_period_row():
+    nego = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "take it from that period's row in the DATE TABLE" in nego

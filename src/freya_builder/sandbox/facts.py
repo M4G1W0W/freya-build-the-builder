@@ -264,13 +264,10 @@ def date_table(today, end, C):
         rule = "next <weekday> (the first such weekday after today): "
     lines.append(rule + ", ".join(_wd(x) for x in nxt))
     for label, k in (("next week", 1), ("the week after next", 2)):
-        lines.append(
-            label
-            + " (Monday-to-Sunday week): "
-            + _wd(weekday_in_week(today, 0, k))
-            + " to "
-            + _wd(weekday_in_week(today, 6, k))
-        )
+        # every day listed: "Monday" said after "the week after next" became the deadline Monday
+        # a week later when the row gave only the range (a8b70ea styled PUB-07)
+        days = [weekday_in_week(today, wd, k) for wd in range(7)]
+        lines.append(label + " (Monday-to-Sunday): " + ", ".join(_wd(x) for x in days))
     last_bd = last_business_day_of_month(today)
     line = "end of this month = " + _wd(end_of_month(today))
     if last_bd is not None:

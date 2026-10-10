@@ -889,16 +889,6 @@ def test_account_marks_unused_slots_even_without_setup():
     assert vs["p1_id"] == "p1" and vs["p2_id"] == "none" and vs["p3_id"] == "none"
 
 
-def test_date_table_names_the_next_two_weeks():
-    # PUB-07 (pieces) / PUB-04 (talkative): "the week after next" then "Monday the 26th".
-    vs = run(codegen.setup_source(spec_a()), {"now": "2026-10-14T11:00"})
-    assert "next week (Monday-to-Sunday week): Mon 2026-10-19 to Sun 2026-10-25" in vs["date_table"]
-    assert (
-        "the week after next (Monday-to-Sunday week): Mon 2026-10-26 to Sun 2026-11-01"
-        in vs["date_table"]
-    )
-
-
 def test_floor_as_a_percentage_of_past_due():
     # audit F15: "the lowest acceptable amount is 30% of the past-due amount" had no representation.
     spec = spec_a()
@@ -915,4 +905,19 @@ def test_date_table_stays_small(mode):
     # verify_identity post-hook then failed 40 times with "Sandbox did not return a parseable
     # result" (every sandbox run returns all variables; 6393c16 saw the same at 4.8 KB). Reverted.
     table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
-    assert len(table) < 1400 and "EVERY DAY" not in table
+    assert len(table) < 1450 and "EVERY DAY" not in table
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_period_rows_list_their_days(mode):
+    # a8b70ea styled PUB-07: after "the week after next", "Monday" became Monday 2 November (the
+    # deadline) in every failed call; the row gave only "Mon 2026-10-26 to Sun 2026-11-01".
+    table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
+    row = next(x for x in table.splitlines() if x.startswith("the week after next"))
+    assert row.endswith(
+        ": Mon 2026-10-26, Tue 2026-10-27, Wed 2026-10-28, Thu 2026-10-29, Fri 2026-10-30, "
+        "Sat 2026-10-31, Sun 2026-11-01"
+    )
+    assert next(x for x in table.splitlines() if x.startswith("next week")).endswith(
+        "Sun 2026-10-25"
+    )
