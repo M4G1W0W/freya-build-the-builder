@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 16:25 Istanbul (13:25 UTC). Last commit `031344c`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 16:56 Istanbul (13:56 UTC). Last commit `03ee6b0`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -15,34 +15,34 @@ The phases come from `docs/design.md` §7:
 - **Phase 4 (submission hardening):** `docs/RUNBOOK.md` written; `scripts/check_secrets.py`; Python version guard;
   fresh-clone timed build not done yet.
 
-## Latest work (13:00 UTC)
+## Latest work (13:56 UTC)
 
-- `90b737d` commits the PUB-03 fix (identity: verify an answer inside a mixed message first) and the PUB-12 fix (facts:
-  "after attempt N is refused, make NO further offer", only when N > 0). `make verify`: 678 passed.
-- All 3 dev agents were redeployed from saved specs with `90b737d` (now version 3, same ids). Validation, dry run and
-  smoke test PASS.
-- **3-rep results with `90b737d`:** fixA **10/10**, llmA **10/10**, abB **2/3** (PUB-12 0/3), abA **8/10** (PUB-05 0/3
-  no close_call after the note, PUB-06 2/3). All are logged in the Score log.
-- `e186247` adds an explicit per-product ATTEMPTS procedure and read-back honesty (PUB-12). `d46b807` puts notes before
-  the goodbye and makes the reply after a note re-say goodbye with the ending, never empty (PUB-05). `make verify`: 682
-  passed. dev-ab-llm and dev-a-llm were redeployed with `d46b807` (version 4).
-- **Running (background):** rawA (dev-raw-a, built at `fe1d7ef`), then abB, abA and llmA at `d46b807`. Results go to
-  `runs/dev/rawA-r3-fe1d7ef.*` and `runs/dev/{abB,abA,llmA}-r3-d46b807.*`.
-- **Correction:** the subject of commit `9646cdf` says raw-a scored 10/10 before it was scored. The real result, measured
-  afterwards, is 10/10 at 3 reps.
-- **Fresh-clone timed build (Phase 4):** `git clone` to scratch, then the RUNBOOK command: 110 s, 2 model calls, all
-  self-tests PASS, trace CLEAN (`check_secrets.py`). All 14 modules import with `python -S` (stdlib only).
-- `fe1d7ef`: `build.py` exits with a clear message on Python < 3.10. The kit needs 3.10+, and the system `python3`
-  here is 3.9.
-- Trace redaction check: the actual secret values from `.env` and key patterns appear in none of the builder logs
-  (deploy + dry, LLM runs included). `FREYA_BANK_TEAM_KEY` is used only by `run_cases.py` and never goes into workflows.
-- Phase 3, variants: fresh `--dry` LLM builds of variant-c and variant-r give exp05 "OK" on every check.
-- **NEW raw-material fixture `tests/fixtures/briefs/raw-a.md`:** Brief A told as an e-mail, a policy extract with CRM
-  codes, a memo with 5 amendments (callback window, holidays, early deadline, "next <weekday>", the SMS sentence) and a
-  code list, keeping the same meaning. Consolidation applied all amendments. Against the clean extraction, 8 of 182
-  typed leaves differ, all harmless: prose inside lists, an unused precedence `outcome`, and wrong_number/deceased
-  rows only in third_party (the opening routes them there anyway). It is deployed as slot **dev-raw-a** (workflow
-  `7286c0bd-223f-4185-a61a-a7fedd43279b`, agent `eb321c47-0eb5-4ceb-9624-a3012d3c1957`, build 109 s, 2 model calls).
+- **USER DECISIONS (10 Oct):** team **Pistalogic**; the repo stays **private** for now (the user will share it or make
+  it public later). The user asked about running the builder LLM on Freya. We recommended staying on OpenAI (no
+  completion endpoint, maxTokens 4000 < our 4.2–4.6k outputs, undocumented model strings); see the Decision log. Still
+  open: how the organisers get an OpenAI key for their re-run (ask them on the support channel).
+- **PLATFORM OUTAGE since about 13:41 UTC:** `/chat/message` returns 503 for every workflow, and simulation agents go
+  silent after the first customer turn. Runs llmA@d46b807 rep 3 and extraB@d46b807 are invalid. A background probe
+  checks again around 14:04 UTC. When Freya is back, run `bash <scratchpad>/chain.sh` (redeploy at HEAD, then PUB-05 on
+  the A+B agent, abB, extraB, llmA, abA, and a 1-rep style sweep). The script is reproduced in the next-steps section.
+- Commits this session:
+  - `90b737d`: PUB-03 identity + PUB-12 stop line.
+  - `fe1d7ef`: Python guard.
+  - `9646cdf`: raw-a fixture.
+  - `e186247`: ATTEMPTS procedure + read-back honesty.
+  - `d46b807`: notes wording (did NOT fix the stall).
+  - `031344c`: RUNBOOK + check_secrets.
+  - `d33d8a7`: extra-b cases.
+  - **`92b83b5`: notes-done route into a speaking passthrough `wrap_up`** (structural fix for the goodbye-with-note
+    stall; not yet measured).
+  - `03ee6b0`: DATES resolve weekday phrases first.
+  - `make verify`: 688 passed.
+- Measured (3 reps):
+  - fixA@90b737d 10/10, llmA@90b737d 10/10, rawA@fe1d7ef 10/10 (raw-material brief).
+  - abB@d46b807 1/3, abA@d46b807 9/10 (the stall, plus attempt variance).
+  - The Score log has every run with its reason.
+- `9646cdf`'s subject claimed raw-a 10/10 before it was scored; it was later measured at 10/10.
+- Phase 4 done: fresh-clone build 110 s, trace clean, stdlib only (`python -S`), RUNBOOK, `scripts/check_secrets.py`.
 
 ## Latest measured scores
 
@@ -53,8 +53,8 @@ Official-style scoring counts a case only at 3/3.
 | baseline (kit minimal_builder) | n/a | A / B | n/a | 6/10 (1 rep) / 1/3 |
 | dev-a-fixture | `tests/fixtures/spec_a.json` | A | `90b737d` | 3 reps: **10/10** |
 | dev-a-llm | LLM | A | `90b737d` | 3 reps: **10/10** |
-| dev-ab-llm | LLM | B (3 cases) | `90b737d` | 3 reps: **2/3** (PUB-12 0/3); re-run at `d46b807` queued |
-| dev-ab-llm | LLM | A (10 cases) | `90b737d` | 3 reps: **8/10** (PUB-05 0/3, PUB-06 2/3); re-run at `d46b807` queued |
+| dev-ab-llm | LLM | B (3 cases) | `d46b807` | 3 reps: **1/3** (PUB-12 stall + attempts, PUB-11 date mix-up) |
+| dev-ab-llm | LLM | A (10 cases) | `d46b807` | 3 reps: **9/10** (PUB-05 0/3 stall) |
 | dev-raw-a | LLM from raw-a.md | A | `fe1d7ef` | 3 reps: **10/10** |
 
 ## Deployed agents (slot → ids; the slots file is `.freya-agents.json` in the repo root, gitignored)
@@ -72,18 +72,16 @@ Redeploy them with `--spec` to skip the LLM.
 
 ## Next steps (in order)
 
-1. Read the rawA, abB, abA and llmA results as they land. Log each in the Score log and read every failure transcript.
-   Per-rep calls are in the result JSON `all_rows` (show_run shows only one call per case). To redeploy (`--spec`,
-   about 5 s, 0 model calls):
-   - `.venv/bin/python builder/build.py kit/briefs/brief-a.md kit/tools/openapi.json --spec tests/fixtures/spec_a.json --slot dev-a-fixture`
-   - `... brief-a.md ... --spec runs/dev/spec-a-llm.json --slot dev-a-llm`
-   - `... brief-a.md brief-b.md ... --spec runs/dev/spec-ab-llm.json --slot dev-ab-llm`
-   - Note: dev-a-fixture is still at `90b737d` (version 3).
-2. **Phase 3 robustness:** `--style pieces|corrects|talkative|asks_back|in_words` runs on A and B.
-3. DONE: Phase 4 fresh-clone timed build (110 s, trace clean).
-4. **Ask the user** (RUNBOOK → Open questions): repo visibility, team name, and the OpenAI key for the organisers' re-run.
-5. Freeze target about Sun 15:30 UTC (tag `freeze-final`). After 17:00 UTC: generic bug fixes only, no hidden-brief
-   content. Follow `docs/RUNBOOK.md`.
+1. When Freya answers again, run the chain (it uses bash; zsh does not word-split `$var`, which broke one sweep):
+   `bash /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/b5ac8f2d-13b1-4c15-8c93-74b9dca1b3cf/scratchpad/chain.sh`.
+   If the scratchpad is gone, rebuild it from this list:
+   - redeploy dev-ab-llm, dev-a-llm and dev-a-fixture with `--spec` at HEAD;
+   - then `run_cases` for: A+B agent `--brief A --only PUB-05 --reps 3`; `--brief B --reps 3`;
+     `--cases tests/fixtures/cases/extra-b.json --reps 3`; dev-a-llm `--brief A --reps 3`; A+B agent `--brief A --reps 3`;
+   - then `--style` in {asks_back, pieces, corrects, talkative, in_words} at 1 rep on dev-a-llm A and the A+B agent B.
+   - Watch `wrap_up`: does the passthrough conversation node speak its llm line and then end? Read `route_evaluated`.
+2. Log every result in the Score log. Per-rep calls are in the result JSON `all_rows`.
+3. Freeze about Sun 15:30 UTC (tag `freeze-final`). From 17:00 UTC follow `docs/RUNBOOK.md`.
 
 ## Open questions / risks being tracked
 
