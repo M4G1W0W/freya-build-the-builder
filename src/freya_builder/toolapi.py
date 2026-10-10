@@ -115,7 +115,13 @@ JSON_TYPES = {"string", "number", "integer", "boolean", "array", "object"}
 
 def _leaf(f: Field, default: str, description: str = "") -> dict:
     leaf: dict[str, Any] = {"type": f.type if f.type in JSON_TYPES else "string"}
-    desc = description or f.description
+    # Our wording first, then the API's own (its formats are the authority: audit F05).
+    api = f.description.strip()
+    desc = (
+        f"{description} API: {api}"
+        if description and api and api not in description
+        else (description or api)
+    )
     if f.enum:
         desc = (desc + " " if desc else "") + "One of: " + ", ".join(f.enum) + "."
         leaf["enum"] = list(f.enum)

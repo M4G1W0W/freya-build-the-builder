@@ -315,3 +315,11 @@ def test_opening_only_endings_are_reachable_from_third_party():
     assert {"ev_not_reached_wrong_number", "ev_not_reached_deceased"} <= targets
     assert exit_tool_name("not_reached_deceased") in n["third_party"]["task_message"]
     assert "ev_not_verified_declined" not in targets  # about the customer, not a third party
+
+
+def test_model_tool_fields_keep_the_api_description():
+    # audit F05: our generic wording replaced the API's (its formats are the authority).
+    wf = render(SPEC_A, TOOLS, BRIEF)
+    body = wf["nodes"]["identity"]["tools"][0]["function"]["parameters"]["properties"]["body"]
+    desc = body["properties"][SPEC_A["identity"]["answer_field"]]["description"]
+    assert desc.startswith("The customer's answer") and " API: For date_of_birth:" in desc
