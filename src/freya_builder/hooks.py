@@ -651,8 +651,14 @@ def promise_post(spec: dict, k: int) -> str:
         "FAIL_HEAD": lit(f"NOT recorded (P{k})"),
         "FAIL_TAIL": lit(tail),
         "FLAG": lit(recorded_flag(k)),
+        "CLOSING_VAR": lit(CLOSING_VAR),
+        "CLOSING": lit((line + " " + GOODBYE) if line else GOODBYE),
     }
     return _post("", _PROMISE_POST, values)
+
+
+GOODBYE = "Thank you for your time. Goodbye."
+CLOSING_VAR = "closing_text"  # spoken by render's ev_notes; setup writes GOODBYE as the default
 
 
 def recorded_flag(k: int) -> str:
@@ -666,6 +672,7 @@ if _done:
     _d['what_to_do_next'] = $SUCCESS
     try:
         vars[$FLAG] = 'yes'
+        vars[$CLOSING_VAR] = $CLOSING
     except Exception:
         pass
 else:

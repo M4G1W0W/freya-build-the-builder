@@ -877,3 +877,9 @@ def test_finalize_wrap_up_default_ending_takes_the_note_reason():
     extra = {"end_event": spec["default_rows"]["negotiate"], **note(1, "hardship")}
     vs = finalize(spec, extra, 1)
     assert (vs["close_outcome"], vs["close_reason"]) == ("no_promise", "hardship")
+
+
+def test_setup_defaults_the_closing_line():
+    # ev_notes speaks {{closing_text}}; an unset variable would be spoken as literal braces.
+    vs = run(codegen.setup_source(spec_a()), {"now": "2026-10-14T11:00"})
+    assert vs["closing_text"] == "Thank you for your time. Goodbye."

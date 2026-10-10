@@ -9,7 +9,7 @@ No brief knowledge: every value comes from the spec. Node and tool names are the
 """
 
 from .expr import check_expr, normalise
-from .hooks import ARG_PREFIX
+from .hooks import ARG_PREFIX, CLOSING_VAR, GOODBYE
 from .sandbox import assemble
 from .spec import call_var
 
@@ -131,6 +131,7 @@ def setup_config(spec: dict) -> dict:
         **_empty_slots(spec),
         "finalize_debug": "",
         "setup_debug": "",
+        CLOSING_VAR: GOODBYE,
     }
     return {
         **_calendar(spec),

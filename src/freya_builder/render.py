@@ -45,12 +45,8 @@ def _endings_text(spec: dict, stage: str) -> str:
     return "\n".join(lines)
 
 
-WRAP_TASK = """STEP: the call is ending. Every product is settled and the notes are saved. No tool is available.
-In ONE short message: say any sentence the brief requires at the end of the call that you have not said yet in this call (for example the sentence required after a recorded promise; never say a sentence twice), thank the customer and say goodbye. Never mention notes, tools or what the bank records internally."""
-
-
 def _notes_done_transition(k: int, note_tool: str, target: str) -> dict:
-    """negotiate -> wrap_up once every product has a recorded promise, a saved note or does not
+    """negotiate -> ev_notes once every product has a recorded promise, a saved note or does not
     exist, and at least one note was saved. A model that says goodbye together with its last
     add_note call then returns empty replies and the call never closes (PUB-05/PUB-12 at d46b807);
     routing on the result fires before any further model turn (kit tools-and-code.md).
@@ -372,7 +368,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
             for n in range(1, k + 1)
         ]
     neg_default = f"ev_{spec['default_rows']['negotiate']}"
-    wrap = [_notes_done_transition(k, by["add_note"].name, "wrap_up")] if notes else []
+    wrap = [_notes_done_transition(k, by["add_note"].name, "ev_notes")] if notes else []
     wf_nodes["negotiate"] = nodes.conversation(
         "negotiate",
         _negotiate_task(spec, k, notes),
@@ -384,14 +380,16 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         max_turn_target=neg_default,
     )
     if notes:
-        # The model writes the closing from the history, then the call ends without another
-        # model turn; finalize computes the outcome from what was recorded.
-        wf_nodes["wrap_up"] = nodes.conversation(
-            "wrap_up",
-            WRAP_TASK,
-            [nodes.always(neg_default)],
-            on_enter={"type": "llm", "prompt": WRAP_TASK},
-        ) | {"passthrough": True, "passthrough_default_transition": neg_default}
+        # Speaks the closing (the brief's promise sentence when one was recorded, then goodbye) as a
+        # fixed line: no model turn, so nothing to block and no empty reply. Then the default
+        # negotiate event; finalize computes the outcome from what was recorded.
+        ev_notes = nodes.code_node(
+            "ev_notes",
+            codegen.exit_source(spec["default_rows"]["negotiate"]),
+            [nodes.always("finalize")],
+        )
+        ev_notes["on_enter"] = {"type": "tts", "text": "{{" + hooks.CLOSING_VAR + "}}"}
+        wf_nodes["ev_notes"] = ev_notes
 
     cf = spec["close_fields"]
     ct = by["close_call"]

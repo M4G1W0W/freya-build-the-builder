@@ -191,10 +191,10 @@ def _products(n: int) -> dict:
 
 def test_notes_done_route_fires_only_when_every_product_is_settled_and_noted():
     # PUB-05 / PUB-12 at d46b807: goodbye said with the last add_note, then empty replies, no
-    # close_call. negotiate now leaves to wrap_up on the note results themselves.
+    # close_call. negotiate now leaves to ev_notes on the note results themselves.
     wf = render(_notes_spec(3), TOOLS, BRIEF)
     route = wf["nodes"]["negotiate"]["transitions"][0]
-    assert route["target_node"] == "wrap_up"
+    assert route["target_node"] == "ev_notes"
     assert len(route["condition"]["conditions"]) == 14  # 2*3*3 combos minus the 4 without a note
     cond = route["condition"]
     ok = {f"add_note_p{n}_response.data.ok": "true" for n in (1, 2, 3)}
@@ -213,23 +213,26 @@ def test_notes_done_route_fires_only_when_every_product_is_settled_and_noted():
     assert not _holds(cond, _products(1) | {"add_note_p1_response.data.ok": "false"})
 
 
-def test_wrap_up_speaks_then_ends_through_the_default_negotiate_ending():
+def test_ev_notes_speaks_a_fixed_closing_then_ends_through_the_default_negotiate_event():
+    # 1bc0c1d rep 3: an llm entry line in a tool-less node was blocked (the model wrote a pseudo
+    # close_call as text) and the platform spoke a Turkish filler instead. ev_notes uses no model.
     wf = render(_notes_spec(3), TOOLS, BRIEF)
-    wrap = wf["nodes"]["wrap_up"]
-    end = f"ev_{SPEC_A['default_rows']['negotiate']}"
-    assert wrap["passthrough"] is True and wrap["passthrough_default_transition"] == end
-    assert wrap["on_enter"]["type"] == "llm" and "goodbye" in wrap["on_enter"]["prompt"]
-    assert wrap["transitions"] == [
-        {"target_node": end, "description": "always", "condition": {"operator": "always"}}
+    ev = wf["nodes"]["ev_notes"]
+    assert ev["node_type"] == "code" and ev["passthrough"] is True
+    assert ev["on_enter"] == {"type": "tts", "text": "{{closing_text}}"}
+    assert ev["transitions"] == [
+        {"target_node": "finalize", "description": "always", "condition": {"operator": "always"}}
     ]
-    assert end in wf["nodes"] and "tools" not in wrap
+    default = wf["nodes"][f"ev_{SPEC_A['default_rows']['negotiate']}"]
+    assert ev["pre_actions"] == default["pre_actions"]  # same event as the default ending
+    assert "wrap_up" not in wf["nodes"]
     assert validate(wf) == []
 
 
-def test_no_wrap_up_without_notes():
+def test_no_notes_route_without_notes():
     wf = render(SPEC_A, TOOLS, BRIEF)
-    assert "wrap_up" not in wf["nodes"]
-    assert all(t["target_node"] != "wrap_up" for t in wf["nodes"]["negotiate"]["transitions"])
+    assert "ev_notes" not in wf["nodes"]
+    assert all(t["target_node"] != "ev_notes" for t in wf["nodes"]["negotiate"]["transitions"])
 
 
 def test_dates_resolve_weekday_phrases_before_comparing():

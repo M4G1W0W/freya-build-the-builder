@@ -247,7 +247,7 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         if rid not in rows:
             p.append(f"default row for {stage} is unknown: {rid!r}")
         elif stage == "negotiate" and rows[rid]["queue"]:
-            # turn caps and render.wrap_up end through it; finalize would transfer every such call
+            # turn caps and render's ev_notes end through it; finalize would transfer every such call
             p.append(f"default row for negotiate must not transfer: {rid!r}")
     for i, c in enumerate(spec["close_precedence"]):
         if c["then"] == "row" and c["row"] not in rows:
