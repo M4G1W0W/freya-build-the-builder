@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 17:08 Istanbul (14:08 UTC). Last commit `cd6970c`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 17:28 Istanbul (14:28 UTC). Last commit `6b4e08a`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -21,9 +21,9 @@ The phases come from `docs/design.md` §7:
   it public later). The user asked about running the builder LLM on Freya. We recommended staying on OpenAI (no
   completion endpoint, maxTokens 4000 < our 4.2–4.6k outputs, undocumented model strings); see the Decision log. Still
   open: how the organisers get an OpenAI key for their re-run (ask them on the support channel).
-- **PLATFORM OUTAGE since about 13:41 UTC:** `/chat/message` returns 503 for every workflow, and simulation agents go
-  silent after the first customer turn. Runs llmA@d46b807 rep 3 and extraB@d46b807 are invalid. Background job `bu0m04miu`
-  probes every 10 min and starts `chain.sh` by itself once Freya answers (the 14:03 probe was still 503). When Freya is back, run `bash <scratchpad>/chain.sh` (redeploy at HEAD, then PUB-05 on
+- **PLATFORM OUTAGE 13:41–14:14 UTC (over):** `/chat/message` returns 503 for every workflow, and simulation agents go
+  silent after the first customer turn. Runs llmA@d46b807 rep 3 and extraB@d46b807 are invalid. The chain is running again at `78936ae`
+  (background job `bmk88qp3i`, started about 14:31 UTC). When Freya is back, run `bash <scratchpad>/chain.sh` (redeploy at HEAD, then PUB-05 on
   the A+B agent, abB, extraB, llmA, abA, and a 1-rep style sweep). The script is reproduced in the next-steps section.
 - Commits this session:
   - `90b737d`: PUB-03 identity + PUB-12 stop line.
@@ -37,6 +37,10 @@ The phases come from `docs/design.md` §7:
     stall; not yet measured).
   - `03ee6b0`: DATES resolve weekday phrases first.
   - `cd6970c`: facts OFFER PLAN line (attempt counts side by side, early band "ONE offer only").
+  - `8ccd652`: **finalize reads note reasons from `<tool>_args.arg_<field>`** (the key the platform actually
+    writes). Before this, no note-derived outcome ever worked.
+  - `78936ae`: **ev_notes replaces wrap_up**. The notes-done route goes to a code node that speaks `{{closing_text}}`
+    (setup default: goodbye; after a promise: the brief's promise sentence + goodbye). No model turn.
   - `make verify`: 688 passed.
 - Measured (3 reps):
   - fixA@90b737d 10/10, llmA@90b737d 10/10, rawA@fe1d7ef 10/10 (raw-material brief).
