@@ -123,11 +123,14 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
     spec = chat_json(
         trace, "extract policy spec from brief", SPEC_SYSTEM, user, SPEC_SCHEMA, "policy_spec"
     )
+    best: tuple[int, dict] | None = None  # (problem count, spec) of the best schema-valid spec
     for round_no in range(1, REPAIR_ROUNDS + 1):
         problems = schema_problems(spec, SPEC_SCHEMA) or check_spec(spec, tools)
         trace.test(f"spec check (round {round_no})", not problems, f"{len(problems)} problem(s)")
         if not problems:
             return spec
+        if not schema_problems(spec, SPEC_SCHEMA) and (best is None or len(problems) < best[0]):
+            best = (len(problems), spec)
         for p in problems[:20]:
             trace.warn(f"spec: {p}")
         fix_user = (
@@ -145,8 +148,18 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
         )
     problems = schema_problems(spec, SPEC_SCHEMA) or check_spec(spec, tools)
     trace.test("spec check (final)", not problems, f"{len(problems)} problem(s)")
-    if problems:
-        raise ValueError("spec still invalid after repair: " + "; ".join(problems[:5]))
+    if not problems:
+        return spec
+    if not schema_problems(spec, SPEC_SCHEMA) and (best is None or len(problems) <= best[0]):
+        best = (len(problems), spec)
+    if best is None:
+        raise ValueError("no schema-valid spec after repair: " + "; ".join(problems[:5]))
+    # An agent that is wrong in one corner scores more than no agent: deploy the best spec, loudly.
+    # render() and validate() still stop the build if the spec cannot produce a workflow.
+    count, spec = best
+    for p in (check_spec(spec, tools))[:20]:
+        trace.warn(f"UNRESOLVED spec problem (deployed anyway): {p}")
+    trace.warn(f"deploying the best spec with {count} unresolved problem(s)")
     return spec
 
 
