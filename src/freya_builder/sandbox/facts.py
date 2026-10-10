@@ -276,6 +276,24 @@ def date_table(today, end, C):
     if last_bd is not None:
         line += "; last business day of this month = " + _wd(last_bd)
     lines.append(line)
+    # Every day with its weekday: the model otherwise pairs weekdays and dates from another year's
+    # calendar ("this Friday" = 17 Oct, "Monday the 26th" read as after the deadline).
+    lines.append("EVERY DAY (take weekdays from here, never from memory):")
+    start = weekday_in_week(today, 0, 0)
+    for _ in range(8):
+        if start > end:
+            break
+        days = [start + datetime.timedelta(days=i) for i in range(7)]
+        lines.append(
+            "week "
+            + start.isoformat()
+            + ": "
+            + ", ".join(
+                WEEKDAYS[x.weekday()][:3].capitalize() + " " + str(x.day) + " " + x.strftime("%b")
+                for x in days
+            )
+        )
+        start = start + datetime.timedelta(days=7)
     return "\n".join(lines)
 
 

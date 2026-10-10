@@ -907,3 +907,19 @@ def test_floor_as_a_percentage_of_past_due():
     p1 = block(call(spec, [CARD])["account_facts"], "P1")
     assert "- floor (30% of past due): 126.00" in p1  # CARD: 420.00 past due
     assert "floor 126.00" in p1
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_date_table_lists_every_day_with_its_weekday(mode):
+    # Styled runs at 676e9df: "Monday the 26th" became the after-deadline answer (2 Nov) in 5 of 6
+    # PUB-07 calls on 3-slot agents, and "this Friday" became 17 Oct. 26 Oct 2026 is a Monday and
+    # 16 Oct a Friday; in 2025 the 17th was the Friday. The model needs the weekdays in front of it.
+    table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
+    weeks = [line for line in table.splitlines() if line.startswith("week ")]
+    assert weeks[0].startswith(
+        "week 2026-10-12: Mon 12 Oct, Tue 13 Oct, Wed 14 Oct, Thu 15 Oct, Fri 16 Oct"
+    )
+    assert any("Mon 26 Oct" in w and "Sun 1 Nov" in w for w in weeks)
+    assert "Fri 17 Oct" not in table
+    assert 4 <= len(weeks) <= 8
+    assert len(table) < 2000  # sandbox outputs are kept small
