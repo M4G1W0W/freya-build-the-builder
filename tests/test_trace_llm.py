@@ -110,10 +110,18 @@ def test_falls_back_when_model_unavailable(monkeypatch):
     assert "model=old-model" in buf.getvalue()
 
 
-def test_model_id_requires_env(monkeypatch):
+def test_models_default_to_the_benchmarked_chain_without_env(monkeypatch):
+    # Review gap 1: the organisers' re-run from a fresh clone must not need BUILDER_MODEL.
     monkeypatch.delenv("BUILDER_MODEL", raising=False)
-    with pytest.raises(llm.LLMError):
-        llm.model_id()
+    monkeypatch.delenv("BUILDER_MODEL_FALLBACKS", raising=False)
+    assert llm.model_id() == "gpt-6.1-sol"
+    assert llm.model_chain() == ["gpt-6.1-sol", "gpt-5.5", "gpt-5.4"]
+
+
+def test_env_models_go_in_front_of_the_default_chain(monkeypatch):
+    monkeypatch.setenv("BUILDER_MODEL", "new-model")
+    monkeypatch.setenv("BUILDER_MODEL_FALLBACKS", "gpt-5.5, old-model")
+    assert llm.model_chain() == ["new-model", "gpt-5.5", "old-model", "gpt-6.1-sol", "gpt-5.4"]
 
 
 def test_rate_limit_after_retries_falls_back_to_the_next_model(monkeypatch):

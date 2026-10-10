@@ -12,10 +12,23 @@ Python 3.10+ and the standard library only. No install step is needed.
 export FREYA_API_KEY=fak_...          # Freya workspace key
 export FREYA_API_URL=https://staging-app.freyavoice.ai
 export OPENAI_API_KEY=sk-...          # the builder's own LLM (reads the brief); the phone agent does not use it
-export BUILDER_MODEL=gpt-6.1-sol      # fallbacks: BUILDER_MODEL_FALLBACKS=gpt-5.5,gpt-5.4
 
 python3 builder/build.py <brief file(s)> <tool_api.json> 2>&1 | tee traces/<name>.log
 ```
+
+### Organiser re-run (fresh clone)
+
+Only two values are needed. Nothing has to be installed.
+
+| Variable | Needed | What it is |
+|---|---|---|
+| `FREYA_API_KEY` | yes | the Freya workspace key the agent is created in |
+| `OPENAI_API_KEY` | yes | the key for the builder's own model calls (it reads the brief and writes the spec) |
+| `FREYA_API_URL` | no | defaults to `https://staging-app.freyavoice.ai` (kit `freya.py`) |
+| `BUILDER_MODEL`, `BUILDER_MODEL_FALLBACKS` | no | models tried **before** the built-in chain `gpt-6.1-sol` → `gpt-5.5` → `gpt-5.4`; a model the key cannot use is skipped |
+| `OPENAI_BASE_URL` | no | an OpenAI-compatible endpoint instead of `https://api.openai.com/v1` |
+
+`FREYA_BANK_TEAM_KEY` is used only by the kit's `run_cases.py`, not by the builder.
 
 - **Brief files.** Several brief files are read in order. For example, pass `brief-a.md brief-b.md` when the second
   extends the first. The last argument is always the tool API.

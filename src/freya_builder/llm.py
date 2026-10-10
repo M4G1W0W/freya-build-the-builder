@@ -1,7 +1,8 @@
 """The builder's only LLM door: OpenAI chat completions with strict JSON-schema output (stdlib).
 
 The phone agent never uses this; it runs on Freya's fixed model. Configure with env vars:
-OPENAI_API_KEY (required), BUILDER_MODEL (model id), OPENAI_BASE_URL (optional).
+OPENAI_API_KEY (required); BUILDER_MODEL and BUILDER_MODEL_FALLBACKS (optional, tried before
+DEFAULT_MODELS); OPENAI_BASE_URL (optional).
 Strict schemas must list every property in `required` and set additionalProperties false.
 """
 
@@ -14,6 +15,8 @@ import urllib.request
 from .trace import Trace
 
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
+# Benchmarked in exp02/exp03 (Decision log 2026-10-10 14:40). In code, so a fresh-clone re-run needs only the key.
+DEFAULT_MODELS = ("gpt-6.1-sol", "gpt-5.5", "gpt-5.4")
 
 
 class LLMError(RuntimeError):
@@ -21,10 +24,7 @@ class LLMError(RuntimeError):
 
 
 def model_id() -> str:
-    model = os.environ.get("BUILDER_MODEL", "").strip()
-    if not model:
-        raise LLMError("BUILDER_MODEL is not set (see .env.example)")
-    return model
+    return model_chain()[0]
 
 
 def _post(path: str, body: dict, timeout: float) -> dict:
@@ -47,9 +47,11 @@ class ModelUnavailable(LLMError):
 
 
 def model_chain() -> list[str]:
-    fallbacks = os.environ.get("BUILDER_MODEL_FALLBACKS", "")
-    chain = [model_id()] + [m.strip() for m in fallbacks.split(",") if m.strip()]
-    return list(dict.fromkeys(chain))
+    """Env models first (BUILDER_MODEL, then BUILDER_MODEL_FALLBACKS), then DEFAULT_MODELS."""
+    env = [os.environ.get("BUILDER_MODEL", "")] + os.environ.get(
+        "BUILDER_MODEL_FALLBACKS", ""
+    ).split(",")
+    return list(dict.fromkeys([m.strip() for m in env if m.strip()] + list(DEFAULT_MODELS)))
 
 
 def _unavailable(code: int, text: str) -> bool:
