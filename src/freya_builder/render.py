@@ -112,7 +112,7 @@ def _identity_task(spec: dict) -> str:
     )
     return f"""STEP: verify the customer's identity. Ask the security questions one at a time, in this order:
 {questions}
-CALL verify_identity once per complete answer, with {i["question_field"]} set to the question key and {i["answer_field"]} set to the answer in the format above. If only part of an answer was given, ask for the rest first.
+Whenever the customer's message contains an answer to the question you asked (even if the same message also asks something or complains), CALL verify_identity with that answer FIRST, then reply. CALL verify_identity once per complete answer, with {i["question_field"]} set to the question key and {i["answer_field"]} set to the answer in the format above. If only part of an answer was given, ask for the rest first.
 Obey what_to_do_next in every verify_identity result.
 If the customer does not want to answer, explain once: {_quote(i["decline_explain"])}
 Never mention the debt, the product, an amount or why you are calling in this step.

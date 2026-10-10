@@ -481,6 +481,12 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
+        if allowed > 0:
+            lines.append(
+                "- after attempt "
+                + str(allowed)
+                + " is refused, make NO further offer for this product (no other amount, no other date)"
+            )
     low = _ev(C["fn_window_min"], today, deadline, days_late) if C.get("fn_window_min") else None
     high = _ev(C["fn_window_max"], today, deadline, days_late) if C.get("fn_window_max") else None
     if C.get("business_days_only"):
