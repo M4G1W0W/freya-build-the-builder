@@ -9,8 +9,9 @@ The requirements come from `docs/hackathon_notes.md` → Submission (official pa
 - [ ] `git status` is clean. `date -u` is checked.
 - [ ] `set -a && source .env && set +a`. The FREYA_* vars, OPENAI_API_KEY, BUILDER_MODEL and
       BUILDER_MODEL_FALLBACKS are set.
-- [ ] Decisions from the user are in: the **team name**, **repo visibility** (public, or private with organiser access)
-      and the **OpenAI key question for the organisers' re-run** (see Open questions).
+- [x] Team name: **Pistalogic**. Repo: **private for now**; the user will make it public or share it later (it must be
+      cloneable by the organisers at the submitted commit).
+- [ ] The OpenAI key question for the organisers' re-run (see Open questions).
 - [ ] Practice the commands below once on `kit/briefs/brief-a.md` with slot `rehearsal`, so the steps are warm.
 
 ## 17:00: the hidden briefs arrive
@@ -52,7 +53,7 @@ git tag submission-final
 ```
 
 6. **Push only with the user's go-ahead.** Then send the form (JSON) to the address in the kit email, with these fields:
-   - `team`;
+   - `team`: `Pistalogic`;
    - `repo` (the GitHub URL);
    - `commit` (`git rev-parse HEAD`);
    - `run_command`: `python3 builder/build.py {brief_path} {tool_api_path}`;
@@ -75,4 +76,7 @@ git tag submission-final
 - The organisers re-run the top 10 builders. Ours needs an `OPENAI_API_KEY` ("You pay for your builder's own model
   calls"). How will they get a key? Options: we give them one with a spending limit, or we ask the organisers how
   they want it.
-- Repo visibility and team name (for the form).
+- Answered on 10 Oct: team Pistalogic; the repo stays private until the user shares it or makes it public.
+- The user asked whether the builder could use Freya instead of OpenAI. Our recommendation is no. The Freya API has no
+  completion endpoint, model names are undocumented free strings, `llmConfig.maxTokens` is capped at 4000 while our
+  extraction outputs are about 4.2–4.6k tokens, and long chat turns can return 504. Details are in the Decision log.

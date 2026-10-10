@@ -232,6 +232,28 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   4 baseline failure classes is removed by construction: get_account is never model-callable, close and transfer are
   engine-run in order, dates and floors are computed in code, and outcome aggregation is computed.
 
+- 2026-10-10 16:55 — **Notes end the call structurally: a negotiate → wrap_up route on the note results** (`92b83b5`).
+  When a brief uses notes, the model often said goodbye in the same message as its last `add_note` call(s). After the
+  results it returned empty content ("no speakable content", no tool call), so the call never reached `close_call`. This
+  happened in PUB-05 on the A+B agent in 3/3 reps, both at 90b737d and at d46b807, and in 1 PUB-12 rep. A prompt and hook
+  rewording (d46b807) did not change it. Alternatives:
+  - Notes right after each product settles: breaks Brief B rule 10, "no notes at all on a transfer".
+  - Engine-written notes from extracted per-product reasons: too large a change, and the extraction model is unproven.
+  - A farewell from the terminal node: it would come after `close_call`, but the brief wants the goodbye before it.
+
+  Chosen: a deterministic route that fires as soon as every product is recorded, noted or absent, with at least one note
+  (routing on a result fires before any further model turn, kit tools-and-code.md). It leads into a passthrough
+  conversation node whose `llm` entry line says any still-missing required sentence and goodbye, then always routes to the
+  default negotiate ending. The finalize code computes the outcome. Risk: a *speaking passthrough conversation node* is
+  not documented as verified. If passthrough is ignored, the `always` route fires after the next customer message.
+
+- 2026-10-10 16:55 — **Builder LLM stays on OpenAI (recommendation; the user asked about Freya).** The Freya public API
+  (96 paths) has no completion endpoint. Using it would mean running our prompts through a helper workflow over
+  `/chat/message`. Agent `llmConfig.provider/model` are free strings with no enum and no models endpoint, so we would be
+  guessing (and probing). `llmConfig.maxTokens` is capped at 4000, while our consolidate and extract outputs are
+  3.2–4.6k tokens. The kit warns that long chat turns can return 504. The Freya credits are needed for simulations:
+  200 → 181.3 credits after the whole day (~0.9 credits per 10-case 3-rep run).
+
 ## Score log
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
@@ -248,3 +270,7 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 10-10 16:14 | 90b737d | same; LLM spec, briefs A+B | B | 3 | **2 / 3** | f8f9b203 / b867b809 | 4 s (`--spec`) | PUB-12 **0/3**: 2 reps offered the floor after the car loan's only attempt (early band), the same as before the fix; 1 rep made no attempt at all. Facts were correct. Fixed generically in e186247 (ATTEMPTS procedure). `runs/dev/abB-r3-90b737d.json` |
 | 10-10 16:20 | 90b737d | same A+B agent on Brief A | A | 3 | **8 / 10** | f8f9b203 / b867b809 | 4 s | PUB-05 0/3: goodbye before add_note, then empty replies, no close_call (fixed in d46b807). The hardship note itself is right for an A+B agent (Brief B rule 8) but not for the A case. PUB-06 2/3: floor offered twice, "rest stays overdue" not said. `runs/dev/abA-r3-90b737d.json` |
 | 10-10 16:25 | fe1d7ef | **raw-material** brief `tests/fixtures/briefs/raw-a.md` (Brief A as e-mail + policy + amending memo + code list), full LLM build | A | 3 | **10 / 10** | 7286c0bd / eb321c47 | 109 s, 2 model calls | every rep 10/10 (83/115/95 s). The consolidation applied all 5 memo amendments. `runs/dev/rawA-r3-fe1d7ef.json` |
+| 10-10 16:29 | d46b807 | ATTEMPTS procedure + notes-before-goodbye wording | B | 3 | **1 / 3** | f8f9b203 / b867b809 | 4 s | PUB-12 1/3 (rep 2: goodbye with the notes, then empty replies, no close_call; rep 3: 2 offers on the early-band car loan). PUB-11 2/3 (rep 3 recorded the deadline instead of the agreed Friday for p1/p2). `runs/dev/abB-r3-d46b807.json` |
+| 10-10 16:36 | d46b807 | same A+B agent | A | 3 | **9 / 10** | f8f9b203 / b867b809 | 4 s | PUB-05 0/3: the same goodbye-with-note stall, so the wording fix did not work (fixed structurally in 92b83b5). `runs/dev/abA-r3-d46b807.json` |
+| 10-10 16:44 | d46b807 | LLM spec | A | 3 | (2 / 10) **invalid** | 81c14d7a / c6a57c76 | 4 s | reps 1 and 2 were 10/10. Rep 3: the platform went silent after the first customer turn in 8 calls; from 13:41 UTC the chat route returned 503 for every workflow. Re-run needed. `runs/dev/llmA-r3-d46b807.json` |
+| 10-10 16:48 | d46b807 | extra B cases (`tests/fixtures/cases/extra-b.json`) | B+ | 3 | (0 / 3) **invalid** | f8f9b203 / b867b809 | | the platform outage: no agent turn after the first customer message. Re-run needed. |
