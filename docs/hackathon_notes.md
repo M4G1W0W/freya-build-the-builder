@@ -154,6 +154,10 @@ promise), which none of the public cases covers.
 
 ## Open questions (resolve from the kit or the support channel)
 
+The full list (24 items, e.g. which tool records the outcome, how a dispute is recorded, whether extra ledger writes
+fail a case, how the team key is wired in exported workflows, what form hidden brief 2 takes on disk) is in
+`docs/hackathon_requirements.md`. The most important ones:
+
 - [ ] Exact kit `docs/` contents: the workflow JSON format, code-node language and runtime, and how routes and conditions are expressed.
 - [ ] How `run_cases.py` identifies the phone agent (`<agent_id>`) vs the workflow id; the practice bank URL and team key.
 - [ ] Must the submission repo be public, or is private with access acceptable?
@@ -171,6 +175,6 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 
 ## Score log
 
-| Time (Istanbul) | Git ref | Change | Eval set | Score | Notes |
-|---|---|---|---|---|---|
-| | | | | | |
+| Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |

@@ -8,8 +8,9 @@ Private working repo for Y Combinator's **Build the Builder** hackathon on the
 > on Freya. We run that agent against simulated customers. Your score is the share of cases the
 > agent handles correctly."
 
-**Status:** environment prepared; no competition logic yet. The official starter kit and rules
-(released at kickoff) are the source of truth.
+**Status:** environment prepared. The rules are published (`docs/reference/hackathon_page.md`, digest in
+`docs/hackathon_notes.md`). The kit arrived by email at the start. No builder code yet. The kit and organiser
+emails override this repo.
 
 ## Setup
 
@@ -35,6 +36,13 @@ src/freya_builder/        Python package (empty until kickoff)
 tests/                    pytest suite (smoke test for now)
 docs/freya_api_notes.md   Verified notes on the Freya API (confirmed vs. inferred) — start here
 docs/freya_api/           Detailed per-topic notes + agent config field tree
-docs/hackathon_notes.md   Event logistics, kickoff checklist, decision log
-docs/reference/           Offline snapshot of the public Freya docs + OpenAPI spec
+docs/hackathon_notes.md   Official rules digest, kickoff checklist, decision log, score log
+docs/hackathon_requirements.md  Every rule from the official page + open questions
+docs/reference/           Offline snapshot: Freya docs, OpenAPI spec, hackathon page + practice cases
+submission/               (committed) exported phone agents, hidden-N.workflow.json
+traces/                   (committed) builder run traces, hidden-N.log, keys stripped
 ```
+
+Builder, scoring and submission commands will be added once the kit is integrated. Page shape:
+`python3 builder/build.py <brief> <tool_api.json> 2>&1 | tee traces/<name>.log` and
+`python3 tools/run_cases.py <agent_id> --brief A --reps 3`.

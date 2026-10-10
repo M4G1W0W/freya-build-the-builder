@@ -32,6 +32,8 @@ htmlcov/
 runs/
 logs/
 *.log
+# ...except the builder traces we must submit (traces/hidden-N.log) — keys stripped before commit.
+!traces/*.log
 
 # --- Editors / OS ---
 .DS_Store

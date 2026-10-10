@@ -43,8 +43,9 @@ The **kit** (emailed at the start) overrides it. The full digest is in `docs/hac
 
 ## Non-negotiable rules
 
-1. Never invent Freya API functionality. Check `docs/freya_api_notes.md`, the live OpenAPI spec,
-   or the starter kit before using an endpoint or field. If it isn't documented, say so.
+1. Never invent Freya API functionality. Check the **kit first** (`docs/`, `freya.py`,
+   `examples/minimal_builder.py`, the brief's tool API file), then `docs/freya_api_notes.md` and the live spec.
+   If something isn't documented, say so.
 2. Always consult the documentation or starter kit; cite the source when adding API code.
 3. Never invent bank policies. Every rule the agent follows must trace back to the bank's brief
    (or official materials). No made-up compliance rules, amounts, deadlines or scripts.
@@ -57,6 +58,9 @@ The **kit** (emailed at the start) overrides it. The full digest is in `docs/hac
 9. Explain major architectural decisions (one paragraph in `docs/hackathon_notes.md` → Decision log).
 10. Official hackathon instructions override preliminary assumptions — including the pipeline
     hypothesis below.
+11. Never hard-code Brief A/B specifics (dates, holidays, amounts, codes, identity questions, tool
+    enums) into the builder. It must read a brief and a tool API file it has never seen. Test it on
+    rewritten or perturbed copies of the public briefs, including a messy "raw material" version.
 
 ## Project structure
 
@@ -68,9 +72,14 @@ tests/                    pytest; tests/test_smoke.py checks env + repo skeleton
 docs/freya_api_notes.md   verified Freya API notes ([C]onfirmed / [I]nferred / [ND] not documented)
 docs/freya_api/           detailed verified notes per topic + agent config field tree
 docs/hackathon_notes.md   logistics, event page facts, kickoff checklist, decision log, score log
-docs/reference/           offline snapshot of public Freya docs + live OpenAPI spec (2026-10-10)
+docs/reference/           offline snapshot: public Freya docs, live OpenAPI spec, official hackathon
+                          page (hackathon_page.md) + 13 practice cases (hackathon_practice_cases.json)
+docs/hackathon_requirements.md  every rule extracted from the official page + open questions
 runs/                     (gitignored) per-run artefacts: generated configs, transcripts, results
+submission/               (COMMITTED) exported phone agents: hidden-N.workflow.json
+traces/                   (COMMITTED) builder traces: hidden-N.log (keys stripped)
 ```
+Kit location: TBD when it arrives. Keep it separate from our `docs/` (the kit also has a `docs/`), e.g. `kit/`.
 
 Preliminary pipeline **hypothesis** (not a plan; validate against the kit first):
 brief + tool API → requirements extraction → structured policy → workflow config → Freya deploy →
@@ -83,6 +92,9 @@ simulated conversations → evaluation/failure analysis → improved config.
 - `uv sync` installs everything. Run tools via `uv run …` (or `source .venv/bin/activate`).
 - Add deps with `uv add <pkg>` (runtime) / `uv add --dev <pkg>` (dev). Justify each new dependency;
   prefer the standard library.
+- **The submitted `run_command` must work from a fresh clone.** It takes `{brief_path} {tool_api_path}`, finishes in
+  ≤30 min, and reads secrets from env vars. The organisers re-run the top 10. Either keep the builder stdlib-only
+  like `freya.py` (`python3 builder/build.py …`), or document `uv sync && uv run …` in the README.
 
 ## Coding standards
 
@@ -99,16 +111,29 @@ simulated conversations → evaluation/failure analysis → improved config.
 - Unit tests for deterministic logic (parsing, validation, config generation) — no network.
 - Tests that hit Freya or an LLM are marked (e.g. `@pytest.mark.live`) and skipped by default.
 - Every bug found in evaluation becomes a regression case before it is fixed.
-- Validate generated agent configs against the documented schema *before* deploying.
+- Validate the generated workflow against the kit's workflow format (kit `docs/`), and its tools
+  against the brief's tool API file, *before* calling `freya.py`.
 
 ## Verification-first engineering
 
-- Define "correct" from the official scoring rules before optimising anything.
-- Get the smallest end-to-end path working first (brief in → agent on Freya → one evaluated
-  conversation), then iterate.
-- After each change: re-run the evaluation set, record the score in `docs/hackathon_notes.md`
-  (Score log), and keep the change only if the score holds or improves.
+- "Correct" is defined officially: ledger right **and** policy followed **and** honest, 3/3 reps.
+- Get the smallest end-to-end path working first (kit's minimal builder → `run_cases.py`), then iterate.
+- Measure with `python3 tools/run_cases.py <agent_id> --brief A --reps 3` (and `--brief B`). Scores
+  vary between runs, so trust only rep-3 numbers. Record each run in `docs/hackathon_notes.md` (Score log).
+- Only 1 simulation can run per workspace, at 3–11 min per 10 cases, so use cheap local checks first (workflow validation,
+  date-arithmetic unit tests) and save simulations for real candidates.
 - Read failing transcripts before changing prompts. Fix causes, not symptoms.
+
+## Builder trace (required for submission)
+
+The builder writes its trace to stdout/stderr, and it is run as `<run_command> 2>&1 | tee traces/<name>.log`.
+It must always include:
+- the run's start and end time in UTC (build time is a tie-break);
+- one line per model call: the model id and a one-line purpose;
+- what it created on Freya: workflow id, agent id, number of steps and tools;
+- every self-test it ran, with the result.
+
+It must never contain API keys or the team key.
 
 ## Error handling & logging
 
@@ -142,7 +167,8 @@ simulated conversations → evaluation/failure analysis → improved config.
 - Before a risky change: commit, then `git tag good-<short-name>` (or `score-<value>` once we can
   measure) so we can always return to a known-good builder.
 - Never force-push, rewrite history, or change global git config.
-- Don't commit `.env`, `.venv/`, `runs/`, logs or other generated artefacts.
+- Don't commit `.env`, `.venv/`, `runs/` or scratch logs. **Do** commit the submission artefacts:
+  `submission/*.workflow.json` (from `freya.export_workflow`) and `traces/*.log` (keys stripped).
 
 ## Fast iteration
 

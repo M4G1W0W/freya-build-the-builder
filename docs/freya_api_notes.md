@@ -45,8 +45,10 @@ testing. **[ND]** Not documented anywhere we could find.
 3. **An agent can be created fully via the public API.** `POST /agents {name, language?, config}` [C].
    The public spec has only GET endpoints for workflows [C]. **But the hackathon phone agent is a
    workflow**, and the kit's `freya.py` and `docs/` provide workflow create, update and export. Use those.
-4. **The agent's behaviour is mostly in `config.llmConfig`:** `systemPrompt` (≤200 000 chars),
+4. **For a single agent, behaviour is mostly in `config.llmConfig`:** `systemPrompt` (≤200 000 chars),
    `firstMessage`, `firstMessageMode` (default `assistant-waits-for-user`), `temperature`, and `tools[]` [C].
+   For the hackathon **workflow**, behaviour is spread across steps: per-step prompts and tools, conditional routes and code
+   nodes. Field names come from the kit's `docs/`.
 5. **Text test loop exists.** `POST /chat/message` drives an agent turn by turn synchronously.
    `POST /chat/end` closes the conversation and triggers async post-call analysis [C].
 6. **Built-in evaluation exists.** Personas (simulated customers), Simulations (full conversations,
@@ -54,13 +56,21 @@ testing. **[ND]** Not documented anywhere we could find.
    routing/extraction/tool-call assertions, LLM judge) all have APIs [C].
 7. **Per-conversation evidence.** `GET /call/{callId}?workspaceId=` returns the transcript, messages,
    `endedReason`, `assertionResults`, `successCriteriaResult`, `problems` and `insights` [C].
-8. **Big unknowns** (must be tested with a real key) [ND]:
-   - Which `handler` strings tools accept.
-   - Whether `PUT /agents` merges or replaces config.
-   - Which version (published or working copy) chat, simulations and calls run.
-   - Whether `{{variables}}` are filled from `customerVariables` in API chats.
-9. **No official SDK** for Python or JS on PyPI, npm or GitHub [C]. Call the REST API directly.
-10. **No numeric rate limits are documented** [C]. Build in backoff anyway.
+8. **Big unknowns, now workflow-level** (settle from the kit's `docs/` first) [ND]:
+   - How steps reference `now`, `first_name`, `last_name` and `title`.
+   - How the bank tools and the team key are wired.
+   - The code-node runtime.
+   - Which version `run_cases.py` and `export_workflow` use after an in-place update.
+   - How the workflow id relates to the agent id.
+
+   The agent-level questions (`handler` strings, `PUT /agents` merge) are probably irrelevant now.
+9. **No official SDK** for Python or JS on PyPI, npm or GitHub [C]. **For the hackathon, use the kit's
+   `freya.py`** (stdlib-only: create and update workflow, `export_workflow`) rather than writing our own client.
+10. **The official evaluation is the kit's `tools/run_cases.py`** (hosted mock bank plus judge). Freya's own
+   Personas and Simulations are a secondary tool at most. If we use them, set `mode: "chat"`, and expect them to
+   compete for the single simulation slot [I].
+11. **No numeric rate limits are documented** [C]. Build in backoff anyway. The **hackathon limits** are
+   10 workflows per workspace (update in place), 1 practice simulation at a time, and a 30-minute builder run [C: page].
 
 ---
 
@@ -309,7 +319,7 @@ appear there is [I].
 ## 13. API limitations and hard caps (checklist 10)
 
 - **Missing APIs** [C]:
-  - Workflow creation
+  - Workflow creation. Missing from the *public* spec only; the kit's `freya.py` provides create, update and export
   - Assertion creation or listing
   - Knowledge-base management
   - Models or voices list

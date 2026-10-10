@@ -57,13 +57,18 @@ def test_secrets_and_venv_are_gitignored(rel_path):
     assert result.returncode == 0, f"{rel_path} is NOT ignored by git"
 
 
-def test_env_example_is_tracked_not_ignored():
+@pytest.mark.parametrize(
+    "rel_path",
+    [".env.example", "traces/hidden-1.log", "submission/hidden-1.workflow.json"],
+)
+def test_submission_files_are_committable(rel_path):
+    """Files the hackathon requires us to commit must never be gitignored."""
     result = subprocess.run(
-        ["git", "check-ignore", "--no-index", "-q", ".env.example"],
+        ["git", "check-ignore", "--no-index", "-q", rel_path],
         cwd=ROOT,
         capture_output=True,
     )
-    assert result.returncode == 1, ".env.example must be committable"
+    assert result.returncode == 1, f"{rel_path} must be committable"
 
 
 def test_env_example_has_no_real_values():
