@@ -182,6 +182,11 @@ fail a case, how the team key is wired in exported workflows, what form hidden b
   fixed lines (`tts`).
 - **2026-10-10 14:18 UTC:** a conversation node with `passthrough: true` did NOT route right after its entry line. It
   waited for the customer's next message, then took the `always` transition.
+- **2026-10-10 14:31–14:36 UTC: sandbox (snekbox) unreachable** (`function_call_error` "Failed to reach snekbox …").
+  Code nodes and tool hooks fail. A tool whose **post-hook** fails is reported to the model as an error **even though
+  the bank call succeeded**: the model retries, and the ledger gets duplicates or a service_error note. Hooks on
+  ledger-writing tools amplify sandbox flakes into ledger damage. Candidate change, if it recurs outside outage windows:
+  no post-hooks on create_promise/add_note.
 - **2026-10-10 13:41–14:14 UTC: platform outage.** `/chat/message` returned 503 for every workflow, and simulation agents
   went silent after the first customer turn. For about 5 minutes after recovery, sandbox and tool latency was 6–11 s and
   calls still stalled. Treat runs in such windows as invalid (check the setup and verify latency in transcripts).
@@ -289,3 +294,5 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 10-10 16:48 | d46b807 | extra B cases (`tests/fixtures/cases/extra-b.json`) | B+ | 3 | (0 / 3) **invalid** | f8f9b203 / b867b809 | | the platform outage: no agent turn after the first customer message. Re-run needed. |
 | 10-10 17:19 | 1bc0c1d | notes-done route + wrap_up (llm entry), OFFER PLAN, DATES | A, PUB-05 only (A+B agent) | 3 | 2/3 reps | f8f9b203 / b867b809 | 13 s | the stall is gone: rep 3 reached close_call through wrap_up. But (a) finalize read no note reason (key `_args.arg_reason`), so it closed as refused instead of hardship (fixed in 8ccd652), and (b) wrap_up's llm line was blocked and the platform said "Bir saniye lütfen." (replaced by ev_notes in 78936ae). Reps 1–2: the model chose the hardship ending itself, with no note. `runs/dev/abA05-r3-1bc0c1d.json` |
 | 10-10 17:25 | 1bc0c1d | same | B | 3 | 0 / 3 (reps 2–3: **3/3**) | f8f9b203 / b867b809 | 13 s | rep 1 (14:19 UTC, 5 min after the outage) was the platform: setup 6.8 s, verify 8–11 s, account_facts 11 s, then silence or repeated verify system errors. Reps 2–3 all passed, PUB-12 included (OFFER PLAN + notes route). `runs/dev/abB-r3-1bc0c1d.json` |
+| 10-10 17:33 | 52b947c | ev_notes (fixed closing) + finalize arg_ key + OFFER PLAN + DATES | A, PUB-05 only (A+B agent) | 3 | 0 / 3 (artefact + platform) | f8f9b203 / b867b809 | 4 s | reps 1 and 3: the outcome is correct (no_promise/hardship, so the finalize fix works), there was no conversation failure, and the closing line was spoken. They fail only because the Brief A case expects no note while Brief B requires one. Rep 2: sandbox unreachable (`snekbox-svc … Name or service not known`), so every verify errored. `runs/dev/abA05-r3-52b947c.json` |
+| 10-10 17:38 | 52b947c | same | B | 3 | 0 / 3 (rep 3: **3/3**) | f8f9b203 / b867b809 | 4 s | every failed call in reps 1–2 has `Failed to reach snekbox` / `Connection reset by peer` errors (14:33–14:36 UTC). A hook failure makes the tool call an error even though the bank recorded it, so the model retried and the ledger got duplicate notes. Rep 3, with a working sandbox, was 3/3. `runs/dev/abB-r3-52b947c.json` |
