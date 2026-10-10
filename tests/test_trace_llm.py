@@ -90,6 +90,26 @@ def test_chat_json_fails_fast_on_400(monkeypatch):
         llm.chat_json(trace, "p", "s", "u", SCHEMA, model="m")
 
 
+def test_falls_back_when_model_unavailable(monkeypatch):
+    trace, buf = make_trace(monkeypatch)
+    monkeypatch.setenv("BUILDER_MODEL", "new-model")
+    monkeypatch.setenv("BUILDER_MODEL_FALLBACKS", "old-model, older-model")
+    tried = []
+
+    def post(path, body, timeout):
+        tried.append(body["model"])
+        if body["model"] == "new-model":
+            msg = b'{"error": {"code": "model_not_found", "message": "The model does not exist"}}'
+            raise urllib.error.HTTPError("u", 404, "nf", {}, io.BytesIO(msg))
+        return fake_response('{"x": 2}')
+
+    monkeypatch.setattr(llm, "_post", post)
+    assert llm.chat_json(trace, "p", "s", "u", SCHEMA) == {"x": 2}
+    assert tried == ["new-model", "old-model"]
+    assert "falling back to old-model" in buf.getvalue()
+    assert "model=old-model" in buf.getvalue()
+
+
 def test_model_id_requires_env(monkeypatch):
     monkeypatch.delenv("BUILDER_MODEL", raising=False)
     with pytest.raises(llm.LLMError):

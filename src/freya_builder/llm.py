@@ -42,6 +42,30 @@ def _post(path: str, body: dict, timeout: float) -> dict:
         return json.load(r)
 
 
+class ModelUnavailable(LLMError):
+    pass
+
+
+def model_chain() -> list[str]:
+    fallbacks = os.environ.get("BUILDER_MODEL_FALLBACKS", "")
+    chain = [model_id()] + [m.strip() for m in fallbacks.split(",") if m.strip()]
+    return list(dict.fromkeys(chain))
+
+
+def _unavailable(code: int, text: str) -> bool:
+    low = text.lower()
+    return (
+        code in (400, 403, 404)
+        and "model" in low
+        and (
+            "not found" in low
+            or "does not exist" in low
+            or "access" in low
+            or "model_not_found" in low
+        )
+    )
+
+
 def chat_json(
     trace: Trace,
     purpose: str,
@@ -53,8 +77,26 @@ def chat_json(
     retries: int = 2,
     timeout: float = 600,
 ) -> dict:
-    """One structured call. Returns the parsed JSON object. Logs one trace line per success."""
-    model = model or model_id()
+    """One structured call. Returns the parsed JSON object. Logs one trace line per success.
+
+    Without an explicit `model`, tries BUILDER_MODEL then BUILDER_MODEL_FALLBACKS, moving on only
+    when a model is unavailable to the key (so a re-run elsewhere still works)."""
+    chain = [model] if model else model_chain()
+    for i, candidate in enumerate(chain):
+        try:
+            return _chat_once(
+                trace, purpose, system, user, schema, schema_name, candidate, retries, timeout
+            )
+        except ModelUnavailable as e:
+            if i == len(chain) - 1:
+                raise
+            trace.warn(
+                f"model {candidate} unavailable ({str(e)[:120]}); falling back to {chain[i + 1]}"
+            )
+    raise LLMError(f"{purpose}: no model available")
+
+
+def _chat_once(trace, purpose, system, user, schema, schema_name, model, retries, timeout) -> dict:
     body = {
         "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -69,7 +111,10 @@ def chat_json(
         try:
             resp = _post("/chat/completions", body, timeout)
         except urllib.error.HTTPError as e:
-            last = f"HTTP {e.code}: {e.read().decode(errors='replace')[:500]}"
+            text = e.read().decode(errors="replace")[:500]
+            last = f"HTTP {e.code}: {text}"
+            if _unavailable(e.code, text):
+                raise ModelUnavailable(f"{purpose}: {last}") from None
             if e.code in RETRY_STATUS and attempt < retries:
                 trace.warn(f"model call '{purpose}' failed ({last[:120]}), retrying")
                 time.sleep(2 * (attempt + 1))

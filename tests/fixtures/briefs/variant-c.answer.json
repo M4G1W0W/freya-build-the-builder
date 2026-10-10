@@ -1,0 +1,518 @@
+{
+ "bank_name": "Harbourline Bank",
+ "identity_questions": [
+  {
+   "field": "birth_year",
+   "how_asked": "the year of birth (asked first)",
+   "answer_format": "four digits, YYYY; a two-digit year is not sent to verify_identity: ask for all four digits, and it is not a wrong answer"
+  },
+  {
+   "field": "postcode",
+   "how_asked": "the postcode of the registered address (asked second)",
+   "answer_format": "five digits, no spaces"
+  }
+ ],
+ "max_wrong_answers_total": 2,
+ "confirmation_words": [
+  "yes",
+  "yes, it is",
+  "that's right",
+  "<the customer's own full name>"
+ ],
+ "callback_window": {
+  "days": "today if it is a business day, or one of the next two business days",
+  "earliest": "09:00",
+  "latest": "17:30",
+  "must_be_after_now": true
+ },
+ "business_days": [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday"
+ ],
+ "holidays": [
+  "2026-10-29",
+  "2026-11-02",
+  "2026-11-19",
+  "2026-12-24",
+  "2026-12-31"
+ ],
+ "bands": [
+  {
+   "days_late_min": 1,
+   "days_late_max": 10,
+   "name": "early",
+   "deadline_rule": "the 10th business day after today",
+   "deadline_business_days_after_today": 10,
+   "persuasion_attempts": 1,
+   "mandatory_transfer_queue": null
+  },
+  {
+   "days_late_min": 11,
+   "days_late_max": 60,
+   "name": "standard",
+   "deadline_rule": "the 5th business day after today",
+   "deadline_business_days_after_today": 5,
+   "persuasion_attempts": 2,
+   "mandatory_transfer_queue": null
+  },
+  {
+   "days_late_min": 61,
+   "days_late_max": 90,
+   "name": "senior",
+   "deadline_rule": "the 3rd business day after today",
+   "deadline_business_days_after_today": 3,
+   "persuasion_attempts": 0,
+   "mandatory_transfer_queue": "collections_senior"
+  }
+ ],
+ "floor_field_by_product_type": {
+  "credit_card": "minimum_payment",
+  "personal_loan": "monthly_instalment",
+  "overdraft": "minimum_due"
+ },
+ "outcome_table": [
+  {
+   "outcome": "promise_to_pay",
+   "reason": null,
+   "when": "at least one promise was recorded, and the call did not end with a transfer or with insolvency (rules 51, 47)"
+  },
+  {
+   "outcome": "already_paid",
+   "reason": null,
+   "when": "no promise recorded and every product ended already_paid (rule 41)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "senior",
+   "when": "get_account returned a product 61 to 90 days past due; transfer to collections_senior after all products are handled, unless an earlier transfer or insolvency (rule 33)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "hardship",
+   "when": "hardship mentioned and the customer accepts the hardship team (rule 34)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "payment_plan",
+   "when": "request for a new payment plan, lower instalments or a payment holiday (rule 43)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "human",
+   "when": "request for a human, at once, before or after verification (rule 44)"
+  },
+  {
+   "outcome": "no_commitment",
+   "reason": "refused",
+   "when": "no promise; the first product (get_account order) not ended already_paid ended refused (rules 32, 48)"
+  },
+  {
+   "outcome": "no_commitment",
+   "reason": "hardship",
+   "when": "no promise; the first product not ended already_paid ended hardship, i.e. the hardship team was declined (rule 34)"
+  },
+  {
+   "outcome": "no_commitment",
+   "reason": "dispute",
+   "when": "no promise; the first product not ended already_paid ended dispute (rule 42)"
+  },
+  {
+   "outcome": "no_commitment",
+   "reason": "insolvency",
+   "when": "the customer says they are bankrupt or in a formal insolvency procedure, even if a promise was recorded earlier (rule 47)"
+  },
+  {
+   "outcome": "no_commitment",
+   "reason": "system_error",
+   "when": "no promise; the first product not ended already_paid ended system_error after three failed create_promise tries (rule 39)"
+  },
+  {
+   "outcome": "not_verified",
+   "reason": "failed",
+   "when": "two wrong security answers in total (rule 14)"
+  },
+  {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "when": "declines the questions after one explanation, or a second 'what is this about' instead of answering, or says twice before verification that they do not want to talk (rules 15, 48)"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "callback",
+   "when": "a third party gives a time inside the callback window; schedule_callback first (rule 6)"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "no_callback",
+   "when": "a third party's second proposed time is also outside the window (rule 7)"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "wrong_number",
+   "when": "the number does not belong to the customer (rule 8)"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "deceased",
+   "when": "the customer has died (rule 9)"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "unconfirmed",
+   "when": "still no valid confirmation after the third ask of the identity question (rule 3)"
+  }
+ ],
+ "transfer_queues": {
+  "senior_band_product": "collections_senior",
+  "hardship_accepted": "hardship_team",
+  "payment_plan_request": "plan_team",
+  "human_request": "agent"
+ },
+ "note_reasons": [
+  "refused",
+  "hardship",
+  "dispute",
+  "already_paid",
+  "system_error",
+  "insolvency"
+ ],
+ "required_phrases": [
+  {
+   "sentence": "Am I speaking with {first_name} {last_name}?",
+   "when": "right after the opening sentence; asked again up to two more times while confirmation is unclear"
+  },
+  {
+   "sentence": "I am very sorry to hear that.",
+   "when": "a third party says the customer has died; then nothing else is asked"
+  },
+  {
+   "sentence": "Would you be able to settle this amount today?",
+   "when": "first ask after stating the debt, customer with one product"
+  },
+  {
+   "sentence": "Would you be able to settle all of these amounts today?",
+   "when": "first ask after stating the debts, customer with several products"
+  },
+  {
+   "sentence": "Is that correct?",
+   "when": "after reading all agreed promises back together, before any create_promise"
+  },
+  {
+   "sentence": "You will receive an email confirming your payment date.",
+   "when": "once, after the promises are recorded (create_promise returned ok: true)"
+  },
+  {
+   "sentence": "Thank you for letting us know. Payments can take up to two business days to show on your account.",
+   "when": "the customer says they already paid a product's overdue amount"
+  },
+  {
+   "sentence": "I will now transfer you to a senior colleague in our recoveries team.",
+   "when": "just before transfer_to_agent with queue collections_senior"
+  },
+  {
+   "sentence": "Thank you for telling us. We will not ask you for a payment on this call.",
+   "when": "the customer says they are bankrupt or in a formal insolvency procedure"
+  }
+ ],
+ "forbidden_before_verification": [
+  "recoveries",
+  "collections",
+  "debt",
+  "arrears",
+  "overdue",
+  "payment",
+  "credit card",
+  "personal loan",
+  "overdraft"
+ ],
+ "next_weekday_meaning": "next occurrence: the first such weekday strictly after today, never today itself (said on a Wednesday, 'next Friday' is two days later; said on a Friday, it is seven days later). A weekday on its own means the same. 'This <weekday>' is that weekday in the current Monday-to-Sunday week.",
+ "special_rules": [
+  "Identity questions are year of birth then postcode; two wrong answers in total end the check.",
+  "A two-digit birth year is not sent to verify_identity: ask for four digits; not a wrong answer.",
+  "The identity-confirmation question uses first and last name, not title; title plus last name is used after confirmation.",
+  "'Speaking' and a first name alone do not count as confirmation; up to three asks in total, then no_contact / unconfirmed.",
+  "Callback window 09:00-17:30, today (if a business day) or the next two business days, later than now; schedule_callback takes one field 'when' as 'YYYY-MM-DD HH:MM'.",
+  "An out-of-window callback offer: tell the calling hours once and ask for another time.",
+  "A named weekend day or holiday is replaced by the business day BEFORE it; if that is before today, the first business day after it.",
+  "'Next <weekday>' is the next occurrence, not the following calendar week; a bare weekday means the same.",
+  "Persuasion attempt 1 proposes the next business day after today (not the last business day of the week).",
+  "Three bands: 1-10 early (10th business day, 1 attempt), 11-60 standard (5th business day, 2 attempts), 61-90 senior (3rd business day, 0 attempts).",
+  "Any senior-band product makes the call end with a transfer to collections_senior (reason senior) after all products are handled, with a required sentence; only an earlier transfer or insolvency replaces it.",
+  "Overdraft is a product type with floor field minimum_due; personal loan floor is monthly_instalment; there is no car loan.",
+  "Hardship triggers include a large drop in income; the offer is the hardship team (queue hardship_team, reason hardship).",
+  "A request for a human is transferred at once (queue agent), without first asking whether the agent can help.",
+  "create_promise is tried up to three times in total before system_error.",
+  "add_note is used for every product without a recorded promise, also with only one product; notes are added after the last create_promise, before goodbye; no notes on any transfer.",
+  "New rule: a customer who is bankrupt or in formal insolvency gets a required sentence, no further promise, insolvency notes, and no_commitment / insolvency even if a promise was already recorded.",
+  "'Already paid' has an exact required sentence (two business days) and outcome/note code already_paid.",
+  "The post-promise sentence is about an email, not a text message.",
+  "Not-verified customers are sent to online banking or a branch; recorded promises can be changed in online banking.",
+  "Scam question: tell them to hang up and call the number on the back of their Harbourline Bank card.",
+  "A payment-plan transfer is also triggered by a payment-holiday request."
+ ],
+ "changes_vs_public": [
+  "Bank renamed Freya Bank -> Harbourline Bank; agent is a 'virtual assistant' (was 'digital assistant'); recording 'for quality and training'.",
+  "Team named after verification: 'Customer Recoveries team' about an 'overdue balance' (was 'collections team' about a 'late payment').",
+  "Forbidden-before-verification list now: recoveries, collections, debt, arrears, overdue, payment, any product name (was collections, debt, payment, product).",
+  "Confirmation question 'Am I speaking with {first_name} {last_name}?' (was {title} {last_name}).",
+  "Accepted confirmations: yes / yes, it is / that's right / own full name; 'speaking' no longer accepted; first name alone not accepted.",
+  "Confirmation asks: up to three in total (was two); failure reason renamed unclear -> unconfirmed.",
+  "Robot/AI answer: 'Harbourline Bank's virtual assistant, an automated system'.",
+  "Callback window 09:00-17:30 (was 10:00-19:00); today or the next two business days (was today or the next business day).",
+  "Out-of-window callback: tell the calling hours once, then ask for another time.",
+  "Deceased sentence 'I am very sorry to hear that.' (was 'I am sorry for your loss.').",
+  "Identity questions: birth_year then postcode (was date_of_birth then phone_last4); day_month_swapped hint removed; two-digit-year rule added.",
+  "Max wrong answers total 2 (was 3).",
+  "Not-verified advice: online banking or a branch (was mobile app or a branch).",
+  "Customers late 1-90 days on one to three products (A: 1-45 days, one product; B: up to three products).",
+  "Holidays 2026-10-29, 2026-11-02, 2026-11-19, 2026-12-24, 2026-12-31 (was 2026-10-26, 2026-11-11, 2026-11-26, 2026-12-25, 2027-01-01); 2026-12-25 and 2027-01-01 are business days here.",
+  "Bands: early 1-10 (10th business day, 1 attempt), standard 11-60 (5th business day, 2 attempts), new senior 61-90 (3rd business day, 0 attempts, mandatory collections_senior transfer) (was early 1-7 / 12th, late 8-45 / 7th).",
+  "Weekend/holiday promise date: offer the previous business day (was the next business day).",
+  "'Next <weekday>' = next occurrence; a bare weekday means the same (was the weekday in the following calendar week).",
+  "Floors: credit_card minimum_payment, personal_loan monthly_instalment (was instalment_amount), new overdraft minimum_due; car_loan removed.",
+  "First ask: 'Would you be able to settle this amount today?' / '... all of these amounts today?' (was 'Can you make this payment today?').",
+  "Persuasion attempt 1: next business day after today (was last business day of this week).",
+  "Hardship: triggers add a large drop in income; offer the hardship team, queue hardship_team, reason hardship (was support team, queue support, reason support).",
+  "Read-back question 'Is that correct?' (was 'Do you confirm?').",
+  "Promise change channel: online banking (was mobile app).",
+  "create_promise: three tries in total (was two); failure reason renamed service_error -> system_error.",
+  "Post-promise sentence 'You will receive an email confirming your payment date.' (was the text-message sentence).",
+  "Already paid: exact sentence 'Thank you for letting us know. Payments can take up to two business days to show on your account.' (was: say payments can take one business day, no exact sentence); outcome paid -> already_paid; note reason paid -> already_paid.",
+  "Payment-plan transfer: queue plan_team, reason payment_plan; also triggered by a payment holiday (was queue restructuring, reason restructuring).",
+  "Human request: transfer at once without first offering help; queue agent (was ask once whether you can help, then queue general).",
+  "Scam answer: hang up and call the number on the back of the card (was phone the customer service number).",
+  "New rule 47 (insolvency): required sentence, no further promise, notes insolvency, close no_commitment / insolvency even if a promise was recorded.",
+  "add_note now applies with a single product too (Brief A never used add_note); notes are added after the last create_promise; new note reason insolvency.",
+  "Outcomes renamed: promise -> promise_to_pay, paid -> already_paid, no_promise -> no_commitment, not_reached -> no_contact; transferred and not_verified kept.",
+  "Transfer reasons: senior (new), hardship, payment_plan, human (was restructuring, human, support).",
+  "Queues: plan_team, agent, hardship_team, collections_senior (was restructuring, general, support).",
+  "Tool API server https://bank-variant.example/v2 (was https://freya-bank-mock.freyavoice.workers.dev/v1).",
+  "verify_identity request fields question/value (was field/answer), enum postcode, birth_year; response fields correct, attempts_left, identity_confirmed (was verified, wrong_answers_left, all_verified, hint).",
+  "get_account product fields: last4 (was card_last4, now also for overdrafts), overdue_amount (was past_due), days_past_due (was days_late), monthly_instalment (was instalment_amount), new minimum_due; type enum credit_card, personal_loan, overdraft.",
+  "create_promise date field renamed date -> payment_date; response promise_id -> promise_ref.",
+  "add_note fields reason -> reason_code, text -> comment; enum refused, hardship, dispute, already_paid, system_error, insolvency.",
+  "schedule_callback takes one field 'when' as 'YYYY-MM-DD HH:MM' (was separate date and time).",
+  "close_call outcome enum promise_to_pay, already_paid, transferred, no_commitment, not_verified, no_contact."
+ ],
+ "extra": {
+  "brief_file": "variant-c.md",
+  "tool_api_file": "variant-c.openapi.json",
+  "agent_self_description": "Harbourline Bank's virtual assistant; the call is recorded for quality and training",
+  "identity_confirmation_question": "Am I speaking with {first_name} {last_name}?",
+  "address_after_confirmation": "title plus last name",
+  "confirmation_not_accepted": [
+   "speaking",
+   "hello",
+   "go ahead",
+   "who is calling",
+   "a first name on its own"
+  ],
+  "confirmation_max_asks": 3,
+  "robot_answer": "Harbourline Bank's virtual assistant, an automated system; then continue",
+  "team_after_verification": "Customer Recoveries team, about an overdue balance",
+  "product_names_in_words": {
+   "credit_card": "credit card ending {last4}",
+   "personal_loan": "personal loan",
+   "overdraft": "overdraft on the account ending {last4}"
+  },
+  "persuasion_offers": {
+   "attempt_1": "same amount (full, or floor if full already called too much) on the next business day after today",
+   "attempt_2": "standard band only: floor amount on the deadline"
+  },
+  "create_promise_max_tries": 3,
+  "not_verified_advice": "use online banking or visit a branch",
+  "promise_change_channel": "online banking",
+  "scam_answer": "they can hang up and call the number on the back of their Harbourline Bank card; then continue",
+  "hardship_triggers": [
+   "serious illness",
+   "a bereavement",
+   "losing their job",
+   "a large drop in income"
+  ],
+  "plan_triggers": [
+   "a new payment plan",
+   "lower instalments",
+   "a payment holiday"
+  ],
+  "insolvency_triggers": [
+   "bankrupt",
+   "a formal insolvency procedure"
+  ],
+  "closing_precedence": [
+   "a transfer (senior, hardship, payment_plan, human) -> transferred with that reason, no notes",
+   "insolvency -> no_commitment / insolvency, even with a recorded promise",
+   "at least one promise recorded -> promise_to_pay",
+   "every product already_paid -> already_paid",
+   "otherwise -> no_commitment with the reason of the first product (get_account order) whose reason is not already_paid"
+  ],
+  "tool_api": {
+   "server_url": "https://bank-variant.example/v2",
+   "verify_identity": {
+    "request": [
+     "customer_id",
+     "question",
+     "value"
+    ],
+    "question_enum": [
+     "postcode",
+     "birth_year"
+    ],
+    "response": [
+     "ok",
+     "error",
+     "correct",
+     "attempts_left",
+     "identity_confirmed"
+    ]
+   },
+   "get_account": {
+    "product_fields": [
+     "product_id",
+     "type",
+     "last4",
+     "overdue_amount",
+     "days_past_due",
+     "minimum_payment",
+     "monthly_instalment",
+     "minimum_due"
+    ],
+    "type_enum": [
+     "credit_card",
+     "personal_loan",
+     "overdraft"
+    ]
+   },
+   "create_promise": {
+    "request": [
+     "customer_id",
+     "product_id",
+     "amount",
+     "payment_date"
+    ],
+    "response": [
+     "ok",
+     "error",
+     "promise_ref"
+    ]
+   },
+   "add_note": {
+    "request": [
+     "customer_id",
+     "product_id",
+     "reason_code",
+     "comment"
+    ],
+    "reason_code_enum": [
+     "refused",
+     "hardship",
+     "dispute",
+     "already_paid",
+     "system_error",
+     "insolvency"
+    ]
+   },
+   "schedule_callback": {
+    "request": [
+     "customer_id",
+     "when"
+    ],
+    "when_format": "YYYY-MM-DD HH:MM"
+   },
+   "transfer_to_agent": {
+    "queue_enum": [
+     "plan_team",
+     "agent",
+     "hardship_team",
+     "collections_senior"
+    ]
+   },
+   "close_call": {
+    "outcome_enum": [
+     "promise_to_pay",
+     "already_paid",
+     "transferred",
+     "no_commitment",
+     "not_verified",
+     "no_contact"
+    ]
+   }
+  },
+  "worked_dates": [
+   {
+    "now": "2026-10-28T10:15",
+    "weekday": "Wednesday",
+    "deadline_early_10th_bd": "2026-11-13",
+    "deadline_standard_5th_bd": "2026-11-06",
+    "deadline_senior_3rd_bd": "2026-11-04",
+    "attempt1_next_business_day": "2026-10-30",
+    "next_friday": "2026-10-30",
+    "next_friday_if_brief_a_semantics": "2026-11-06",
+    "callback_days": [
+     "2026-10-28",
+     "2026-10-30",
+     "2026-11-03"
+    ],
+    "named_non_business_day_offer": {
+     "2026-10-31": "2026-10-30",
+     "2026-11-02": "2026-10-30"
+    }
+   },
+   {
+    "now": "2026-11-18T16:00",
+    "weekday": "Wednesday",
+    "deadline_early_10th_bd": "2026-12-03",
+    "deadline_standard_5th_bd": "2026-11-26",
+    "deadline_senior_3rd_bd": "2026-11-24",
+    "attempt1_next_business_day": "2026-11-20",
+    "next_friday": "2026-11-20",
+    "next_friday_if_brief_a_semantics": "2026-11-27",
+    "callback_days": [
+     "2026-11-18",
+     "2026-11-20",
+     "2026-11-23"
+    ],
+    "named_non_business_day_offer": {
+     "2026-11-19": "2026-11-18",
+     "2026-11-21": "2026-11-20"
+    }
+   },
+   {
+    "now": "2026-12-23T09:00",
+    "weekday": "Wednesday",
+    "deadline_early_10th_bd": "2027-01-08",
+    "deadline_standard_5th_bd": "2027-01-01",
+    "deadline_senior_3rd_bd": "2026-12-29",
+    "attempt1_next_business_day": "2026-12-25",
+    "next_friday": "2026-12-25",
+    "next_friday_if_brief_a_semantics": "2027-01-01",
+    "callback_days": [
+     "2026-12-23",
+     "2026-12-25",
+     "2026-12-28"
+    ],
+    "named_non_business_day_offer": {
+     "2026-12-24": "2026-12-23",
+     "2026-12-26": "2026-12-25"
+    }
+   },
+   {
+    "now": "2026-10-28T18:00",
+    "weekday": "Wednesday",
+    "deadline_early_10th_bd": "2026-11-13",
+    "deadline_standard_5th_bd": "2026-11-06",
+    "deadline_senior_3rd_bd": "2026-11-04",
+    "attempt1_next_business_day": "2026-10-30",
+    "next_friday": "2026-10-30",
+    "next_friday_if_brief_a_semantics": "2026-11-06",
+    "callback_days": [
+     "2026-10-30",
+     "2026-11-03"
+    ],
+    "named_non_business_day_offer": {}
+   }
+  ]
+ }
+}

@@ -1,0 +1,225 @@
+{
+ "bank_name": "Freya Bank",
+ "identity_questions": [
+  {
+   "field": "date_of_birth",
+   "how_asked": "first question: ask for the customer's date of birth",
+   "answer_format": "YYYY-MM-DD whatever way the customer said it; a date given only as numbers is read day, then month, then year; on hint day_month_swapped ask for the month as a word (that retry is not a wrong answer)"
+  },
+  {
+   "field": "phone_last4",
+   "how_asked": "second question: ask for the last four digits of the phone number on file",
+   "answer_format": "four digits"
+  }
+ ],
+ "max_wrong_answers_total": 3,
+ "confirmation_words": [
+  "yes",
+  "that's me",
+  "speaking",
+  "<the customer's own name>"
+ ],
+ "callback_window": {
+  "days": "today or the next business day",
+  "earliest": "10:00",
+  "latest": "18:00",
+  "must_be_after_now": true
+ },
+ "business_days": [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday"
+ ],
+ "holidays": [
+  "2026-10-26",
+  "2026-10-30",
+  "2026-11-26",
+  "2026-12-25",
+  "2027-01-01"
+ ],
+ "bands": [
+  {
+   "days_late_min": 1,
+   "days_late_max": 7,
+   "name": "early",
+   "deadline_rule": "the 12th business day after today",
+   "deadline_business_days_after_today": 12,
+   "persuasion_attempts": 1,
+   "mandatory_transfer_queue": null
+  },
+  {
+   "days_late_min": 8,
+   "days_late_max": 45,
+   "name": "late",
+   "deadline_rule": "the 7th business day after today",
+   "deadline_business_days_after_today": 7,
+   "persuasion_attempts": 3,
+   "mandatory_transfer_queue": null
+  }
+ ],
+ "floor_field_by_product_type": {
+  "credit_card": "minimum_payment",
+  "personal_loan": "instalment_amount",
+  "car_loan": "instalment_amount"
+ },
+ "outcome_table": [
+  {
+   "outcome": "promise",
+   "reason": null,
+   "when": "at least one promise was recorded (a transfer after a recorded promise closes as transferred with that transfer's reason)"
+  },
+  {
+   "outcome": "paid",
+   "reason": null,
+   "when": "the customer says they already paid this past-due amount; with several products: no promise recorded and every product noted paid"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "restructuring",
+   "when": "the customer asks for a new payment plan or lower instalments (queue restructuring)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "human",
+   "when": "the customer insists on a human after one offer to help (queue service_desk)"
+  },
+  {
+   "outcome": "transferred",
+   "reason": "support",
+   "when": "illness, a death in the family or job loss, and the customer accepts the customer support team (queue support)"
+  },
+  {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "when": "persuasion attempts used up, or a verified customer says twice they do not want to talk; with several products: no promise and the first non-paid note in get_account order is refused"
+  },
+  {
+   "outcome": "no_promise",
+   "reason": "hardship",
+   "when": "illness, a death in the family or job loss, and the customer declines the support transfer"
+  },
+  {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "when": "the customer says the debt or product is not theirs, or that the product was closed or paid off in the past"
+  },
+  {
+   "outcome": "no_promise",
+   "reason": "service_error",
+   "when": "create_promise failed twice and no promise was recorded"
+  },
+  {
+   "outcome": "not_verified",
+   "reason": "failed",
+   "when": "three wrong security answers in total"
+  },
+  {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "when": "the customer still refuses the security questions after one explanation, or asks twice what the call is about instead of answering, or says twice before verification that they do not want to talk"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "callback",
+   "when": "someone else answered and a callback inside the window was booked with schedule_callback"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "no_callback",
+   "when": "someone else answered and the offered time and the one re-ask were both outside the callback window"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "wrong_number",
+   "when": "the person says the number does not belong to the customer"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "deceased",
+   "when": "the person says the customer has died"
+  },
+  {
+   "outcome": "no_contact",
+   "reason": "unclear",
+   "when": "it is still unclear who is on the line after the second ask"
+  }
+ ],
+ "transfer_queues": {
+  "payment_plan_request": "restructuring",
+  "human_request": "service_desk",
+  "hardship_accepted": "support"
+ },
+ "note_reasons": [
+  "refused",
+  "hardship",
+  "dispute",
+  "paid",
+  "service_error"
+ ],
+ "required_phrases": [
+  {
+   "sentence": "Am I speaking with {title} {last_name}?",
+   "when": "right after the opening sentence, and once more if the answer is not a confirmation"
+  },
+  {
+   "sentence": "I am sorry for your loss.",
+   "when": "when the person who answers says the customer has died; then ask nothing else"
+  },
+  {
+   "sentence": "Can you make this payment today?",
+   "when": "the first ask after stating the debt (with several products, ask whether the customer can pay all of them today)"
+  },
+  {
+   "sentence": "Do you confirm?",
+   "when": "after reading back the product, amount and date (all promises together), before create_promise"
+  },
+  {
+   "sentence": "We will send you a text message with the details of this promise.",
+   "when": "after a promise is recorded (create_promise returned ok: true)"
+  }
+ ],
+ "forbidden_before_verification": [
+  "collections",
+  "debt",
+  "payment",
+  "credit card",
+  "personal loan",
+  "car loan"
+ ],
+ "next_weekday_meaning": "\"Next <weekday>\" is that weekday in the following calendar week; \"this <weekday>\" is the one in the current week; \"next Friday\" said on a Friday is the Friday of the following week.",
+ "special_rules": [
+  "Late band (8-45 days late) has 3 persuasion attempts (Brief A: 2); the early band stays at 1.",
+  "Attempt 3, late band only: propose the floor amount again and ask the customer to name any business day up to and including the deadline on which they can pay it.",
+  "2026-11-11 is an ordinary business day (removed from the holiday list).",
+  "Friday 2026-10-30 is a bank holiday (added), so in the week of 26 October the last business day is Thursday 29 October.",
+  "Callback window is 10:00 to 18:00, both included (Brief A: 19:00).",
+  "A request for a human transfers to queue service_desk (Brief A: general); the close reason stays human.",
+  "After a recorded promise say \"We will send you a text message with the details of this promise.\" (Brief A: \"You will receive a text message confirming this promise.\").",
+  "Outcome not_reached is renamed no_contact; its reasons callback, no_callback, wrong_number, deceased, unclear are unchanged.",
+  "Reason code third_party and outcome code not_reached are deprecated and must never be sent."
+ ],
+ "changes_vs_public": [
+  "Format: raw bank material (internal e-mail, policy extract COL-POL-004 v4.1, memo COL-MEMO-2026-17, CRM code list) instead of a clean specification.",
+  "Brief A and Brief B merged into one document: 1 to 3 products, Brief B rules (per-product bands, add_note, closing rule) apply throughout.",
+  "Policy clauses renumbered 4.1-4.12 and reworded in legalistic style with defined terms (Assistant, Customer, Business Day, Today, Floor Amount).",
+  "Policy holiday list (Schedule 2) written as DD/MM/YYYY with weekday names.",
+  "Memo 2.1: late band persuasion attempts 2 -> 3, with a new attempt 3 (floor amount, customer names a business day up to the deadline).",
+  "Memo 2.2: holiday 11/11/2026 removed.",
+  "Memo 2.2: holiday Friday 30 October 2026 added.",
+  "Memo 2.3: callback window latest time 19:00 -> 18:00 (18:00 still allowed).",
+  "Memo 2.4: human-request transfer queue renamed general -> service_desk (reason human unchanged).",
+  "Memo 2.5: post-promise sentence changed to \"We will send you a text message with the details of this promise.\"",
+  "Memo 2.6: close_call outcome not_reached renamed no_contact (reasons unchanged).",
+  "Code list: outcome not_reached marked DEPRECATED - do not use (replaced by no_contact).",
+  "Code list: extra reason code third_party marked DEPRECATED - do not use (use callback or no_callback).",
+  "Code list: internal crm_id column (OC-xx, RC-xx) that must never be sent; values are in column code.",
+  "Distractor (e-mail): author misremembers 'three wrong answers per question'; policy 4.4.2 (three in total) is binding.",
+  "Distractor (e-mail): dialler calling hours 09:00-20:00 Monday to Saturday, unrelated to the callback window.",
+  "Distractor (e-mail): callbacks '10 till 7' and 'general queue', both superseded by the later memo.",
+  "Distractor (e-mail and memo section 3): proposal to move the early deadline to the 15th business day, explicitly not approved.",
+  "Noise: e-mail chatter, signature, confidentiality footer, quoted earlier message, policy version history, omitted-sections note.",
+  "Tool API (variant-r.openapi.json): transfer_to_agent.queue enum restructuring/service_desk/support; close_call.outcome enum uses no_contact instead of not_reached; add_note summary no longer mentions Brief B. Everything else identical to kit/tools/openapi.json."
+ ]
+}
