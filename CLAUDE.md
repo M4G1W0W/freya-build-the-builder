@@ -1,9 +1,16 @@
 # CLAUDE.md — Freya "Build the Builder" hackathon
 
+> **NEW SESSION? Read these first, in order:**
+> 1. `docs/PROJECT_OVERVIEW.md`: the whole project (objective, scoring, rules, architecture, verified platform
+>    facts, conventions).
+> 2. `docs/WORKING_STATE.md`: the current state (latest scores, uncommitted work, deployed agents, next steps).
+>
+> Then check `date` and `git status`. **Update `docs/WORKING_STATE.md` before every context save.**
+
 ## Competition context
 
 Official page: <https://www.freyavoice.ai/hackathon> (snapshot `docs/reference/hackathon_page.md`).
-The **kit** (emailed at the start) overrides it. The full digest is in `docs/hackathon_notes.md`.
+The **kit** (downloaded from the page's Data tab into `kit/`) overrides it. The full digest is in `docs/hackathon_notes.md`.
 
 - **Window.** Sat 10 Oct 10:00 UTC (13:00 Istanbul) → hidden briefs at **Sun 17:00 UTC** (20:00 Istanbul) →
   submission closes **Sun 20:00 UTC** (23:00 Istanbul).
