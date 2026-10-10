@@ -323,3 +323,27 @@ def test_model_tool_fields_keep_the_api_description():
     body = wf["nodes"]["identity"]["tools"][0]["function"]["parameters"]["properties"]["body"]
     desc = body["properties"][SPEC_A["identity"]["answer_field"]]["description"]
     assert desc.startswith("The customer's answer") and " API: For date_of_birth:" in desc
+
+
+def _renamed_customer_api(tmp_path, new: str = "client_id"):
+    api = json.loads((ROOT / "kit" / "tools" / "openapi.json").read_text())
+    for op in api["paths"].values():
+        schema = op["post"]["requestBody"]["content"]["application/json"]["schema"]
+        schema["properties"][new] = schema["properties"].pop("customer_id")
+        schema["required"] = [new if r == "customer_id" else r for r in schema.get("required", [])]
+    path = tmp_path / "api.json"
+    path.write_text(json.dumps(api))
+    return load_tool_api(path)
+
+
+def test_a_renamed_customer_id_field_is_still_baked(tmp_path):
+    # audit F09/F56: the call variable stays customer_id, the API calls the field client_id.
+    tools = _renamed_customer_api(tmp_path)
+    assert check_spec(SPEC_A, tools) == []
+    wf = render(SPEC_A, tools, BRIEF)
+    dumped = json.dumps(wf)
+    assert '"client_id": {"type": "string", "default": "{{customer_id}}"' in dumped or (
+        '"client_id"' in dumped and "{{customer_id}}" in dumped
+    )
+    body = wf["nodes"]["load_account"]["pre_actions"][0]["function"]["parameters"]["properties"]
+    assert "{{customer_id}}" in json.dumps(body)

@@ -221,6 +221,13 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     p: list[str] = []
     need = ["verify_identity", "get_account", "create_promise", "close_call"]
     p += [f"tool API has no {n}" for n in need if n not in by]
+    if not p and not call_var(spec, "customer_id"):
+        p.append("meta.call_vars has no variable with role customer_id")
+    elif not p and not customer_field(spec, tools):
+        p.append(
+            f"no request field carries the customer id: get_account has no field "
+            f"{call_var(spec, 'customer_id')!r} and the tools share no single required field"
+        )
     if p:
         return p
 
@@ -340,6 +347,20 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
 
 def call_var(spec: dict, role: str) -> str:
     return next((v["name"] for v in spec["meta"]["call_vars"] if v["role"] == role), "")
+
+
+def customer_field(spec: dict, tools: list[Tool]) -> str:
+    """The request field that carries the customer id: the call variable's own name when
+    get_account has it, else the one field every tool requires (a renamed id, audit F09/F56)."""
+    cid = call_var(spec, "customer_id")
+    account = next((t for t in tools if t.name == "get_account"), None)
+    if cid and account and account.field(cid):
+        return cid
+    common: set[str] | None = None
+    for t in tools:
+        names = {f.name for f in t.request if f.required}
+        common = names if common is None else common & names
+    return next(iter(common)) if common and len(common) == 1 else ""
 
 
 def get(spec: dict, path: str) -> Any:

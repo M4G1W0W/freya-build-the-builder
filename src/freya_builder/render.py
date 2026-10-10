@@ -10,7 +10,7 @@ import re
 
 from . import codegen, hooks, nodes
 from .codegen import OK_FIELD
-from .spec import call_var
+from .spec import call_var, customer_field
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
@@ -106,7 +106,8 @@ def _exit_transitions(spec: dict, stage: str) -> list[dict]:
 
 def _bake_customer(spec: dict, tool: Tool) -> dict[str, str]:
     cid = call_var(spec, "customer_id")
-    return {cid: "{{" + cid + "}}"} if cid and tool.field(cid) else {}
+    field = spec.get("_customer_field") or cid
+    return {field: "{{" + cid + "}}"} if cid and tool.field(field) else {}
 
 
 # ---- prompts ---------------------------------------------------------------------------------
@@ -278,6 +279,7 @@ def opening_line(spec: dict) -> str:
 
 
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
+    spec = dict(spec, _customer_field=customer_field(spec, tools))
     by = _tools_by_name(tools)
     k = max(1, int(spec["meta"]["max_products"]))
     notes = bool(spec["notes"]["used"]) and "add_note" in by
