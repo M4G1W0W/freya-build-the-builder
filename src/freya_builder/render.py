@@ -120,7 +120,7 @@ def system_prompt(spec: dict, brief_text: str, engine_tools: list[str]) -> str:
 HOW TO WORK
 - Follow the BANK BRIEF below exactly. When a rule says to use a tool, call the tool: saying that you did something is not enough.
 - After every tool result, obey its what_to_do_next, then speak to the customer or call the next tool. Never end a turn with nothing.
-- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking: reply only "Please go on." Such a message is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Do not repeat your question, make a new offer or choose an ending on it.
+- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking: reply only "Please go on." Such a message is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Do not repeat your question, make a new offer or choose an ending on it. But if you said "Please go on." to their previous message too, repeat your last question or offer in a few words instead (unchanged: it is not a new offer or a new attempt).
 - Say a sentence of sympathy only where a brief rule asks for one, and only as often as that rule says in the whole call. Small talk needs no sympathy.
 - Something happened only if its tool result says so. Never say something was recorded or booked unless the result says it was.
 - Call at most one tool per message.

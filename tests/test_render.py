@@ -356,6 +356,9 @@ def test_prompts_handle_customer_speech_styles():
     wf = render(SPEC_A, TOOLS, BRIEF)
     system = wf["system_prompt"]
     assert "breaks off mid-sentence" in system and 'reply only "Please go on."' in system
+    # 19664c6 PUB-04 talkative: "Please go on." to every fragment looped for a minute (the persona
+    # restarted its chatter each time); a second fragment in a row gets the last question again.
+    assert 'if you said "Please go on." to their previous message too, repeat your last' in system
     assert "only as often as that rule says in the whole call" in system
     ident = wf["nodes"]["identity"]["task_message"]
     assert "join the parts the customer gave since the last verify_identity result" in ident
