@@ -419,8 +419,10 @@ prevails. All other clauses remain in force without change.
 2.1 *Persuasion attempts, Late band (Table 1; clauses 4.7.3 and 4.8.3).* The maximum number of
 persuasion attempts for the Late band (8 to 45 days late) is raised from two (2) to three (3). Insert
 in 4.8.3: "(c) Attempt 3, Late band only: propose the Floor Amount again and ask the Customer to name
-any Business Day, up to and including the deadline, on which they can pay it." In 4.7.3, read
-"Attempt 2 and attempt 3 may name the Floor Amount again". The Early band remains at one (1) attempt.
+any Business Day, up to and including the deadline, on which they can pay it." In 4.7.3, replace
+the last sentence with "Attempt 2 may name the Floor Amount again, on the deadline. Attempt 3 may
+name the Floor Amount again, on the Business Day the Customer names." The Early band remains at one
+(1) attempt.
 
 2.2 *Bank Holidays (Schedule 2).* Delete 11/11/2026: it is an ordinary Business Day and branches will
 open as normal. Insert Friday 30 October 2026 (branch network closed for the core banking migration).

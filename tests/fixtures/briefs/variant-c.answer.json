@@ -87,7 +87,7 @@
   {
    "outcome": "transferred",
    "reason": "senior",
-   "when": "get_account returned a product 61 to 90 days past due; transfer to collections_senior after all products are handled, unless an earlier transfer or insolvency (rule 33)"
+   "when": "get_account returned a product 61 to 90 days past due; transfer to collections_senior after all products are handled, unless an earlier transfer or insolvency (rule 33); this applies even when no promise was recorded"
   },
   {
    "outcome": "transferred",
@@ -122,7 +122,7 @@
   {
    "outcome": "no_commitment",
    "reason": "insolvency",
-   "when": "the customer says they are bankrupt or in a formal insolvency procedure, even if a promise was recorded earlier (rule 47)"
+   "when": "the customer says they are bankrupt or in a formal insolvency procedure, even if a promise was recorded earlier (rule 47); said before identity is verified, it is acted on only once the questions pass"
   },
   {
    "outcome": "no_commitment",
@@ -162,7 +162,7 @@
   {
    "outcome": "no_contact",
    "reason": "unconfirmed",
-   "when": "still no valid confirmation after the third ask of the identity question (rule 3)"
+   "when": "still no valid confirmation after the third ask of 'Am I speaking with {first_name} {last_name}?' (rule 3)"
   }
  ],
  "transfer_queues": {
@@ -246,12 +246,13 @@
   "A request for a human is transferred at once (queue agent), without first asking whether the agent can help.",
   "create_promise is tried up to three times in total before system_error.",
   "add_note is used for every product without a recorded promise, also with only one product; notes are added after the last create_promise, before goodbye; no notes on any transfer.",
-  "New rule: a customer who is bankrupt or in formal insolvency gets a required sentence, no further promise, insolvency notes, and no_commitment / insolvency even if a promise was already recorded.",
+  "New rule: a customer who is bankrupt or in formal insolvency gets a required sentence, no further promise, insolvency notes, and no_commitment / insolvency even if a promise was already recorded; said before verification, it is acted on only after the identity questions pass.",
   "'Already paid' has an exact required sentence (two business days) and outcome/note code already_paid.",
   "The post-promise sentence is about an email, not a text message.",
   "Not-verified customers are sent to online banking or a branch; recorded promises can be changed in online banking.",
   "Scam question: tell them to hang up and call the number on the back of their Harbourline Bank card.",
-  "A payment-plan transfer is also triggered by a payment-holiday request."
+  "A payment-plan transfer is also triggered by a payment-holiday request.",
+  "A product keeps the first reason it ended with: the blanket reasons of rules 34 (hardship team declined), 47 (insolvency) and 48 (refuses to talk) go only to products that have not ended yet."
  ],
  "changes_vs_public": [
   "Bank renamed Freya Bank -> Harbourline Bank; agent is a 'virtual assistant' (was 'digital assistant'); recording 'for quality and training'.",
@@ -342,7 +343,7 @@
    "a formal insolvency procedure"
   ],
   "closing_precedence": [
-   "a transfer (senior, hardship, payment_plan, human) -> transferred with that reason, no notes",
+   "the call ends with a transfer (senior, hardship, payment_plan, human) -> transferred with that reason, no notes; rule 47 (insolvency) replaces the senior transfer",
    "insolvency -> no_commitment / insolvency, even with a recorded promise",
    "at least one promise recorded -> promise_to_pay",
    "every product already_paid -> already_paid",
