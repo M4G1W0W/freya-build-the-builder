@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 19:00 Istanbul (16:00 UTC). Last commit `d2195cf`; the tree is clean. Hidden briefs open
+**Snapshot:** 2026-10-10 19:08 Istanbul (16:08 UTC). Last commit: see `git log` (after `7fb6ba0`). Hidden briefs open
 Sun 11 Oct 17:00 UTC (about 25 h from now).
 
 ## Phase
@@ -33,6 +33,18 @@ The phases come from `docs/design.md` §7:
   Ultracode is on: use the Workflow tool for substantive work.
 
 ## Running right now
+
+- **16:06 UTC, NEW FINDING (read first):** A talkative at `276302f` (dev-a-llm2, with a1499a8's bounded "Please go
+  on.") is **6/10** with **0 platform errors**: real failures.
+  - "Please go on." appears 5–46 times per failed call (PUB-06: 113 turns, the floor offered 4 times, a wrong date).
+  - PUB-02: no callback booked. PUB-05: support offered twice. PUB-07: no close_call.
+  - At 19664c6 (without the bound) the same style was 9/10 (1 rep; variance is high).
+  - **The fragment handling is fragile.** Next session:
+    - read these 4 calls (`runs/dev/style/a2-talkative-r1-276302f.json`, `all_rows`);
+    - compare with 19664c6;
+    - decide, e.g. revert a1499a8, or limit "Please go on." to identity, or reply to the content so far without
+      counting it.
+  - Measure at 3 reps before trusting any 1-rep number.
 
 - **chain3** (`<scratchpad>/chain3.sh`, background job `b6aj25921`, monitor `b1miemwej`). The mock bank recovered at
   15:54 UTC, then the chain deployed HEAD `276302f`: dev-ab-llm v9 and dev-a-llm2 v2. It then runs, in order:
