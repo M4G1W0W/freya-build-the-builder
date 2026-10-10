@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 18:26 Istanbul (15:26 UTC). Last commit: see `git log` (after `4f45d87`). Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 18:35 Istanbul (15:35 UTC). Last commit `a1499a8`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
@@ -16,6 +16,17 @@ The phases come from `docs/design.md` §7:
   fresh-clone timed build not done yet.
 
 ## Latest work (13:56 UTC)
+
+- **15:35 UTC:** the style fixes (`19664c6`) are deployed to **dev-ab-llm v8** and a **new slot dev-a-llm2**
+  (workflow `7cfc34a8-5b97-4bfc-a3a8-b4e884c4dd96`, agent `2485fc27-f1d4-47e1-ab89-a1a86fd12a87`, A LLM spec at HEAD;
+  dev-a-llm stays frozen for the user). The chain2 (`scratchpad/chain2.sh`, job b2iwbz018) results so far:
+  - A talkative 9/10 (was 6/10); B talkative 3/3 (was 2/3).
+  - A pieces 10/10 (was 8/10); B pieces 3/3 (was 2/3).
+  - The remaining A talkative failure is a "Please go on." loop. It is fixed in `a1499a8` (a second fragment in a
+    row gets the last question again), which is NOT deployed yet.
+  - Still to come in chain2: B asks_back, B in_words, a2A r3, abB r3, extraB r3.
+- `adf857a`: products.types[].floor_percent (a floor as a % of the past due). LLM dry builds of Brief A and
+  variant-r at HEAD pass every check (runs/dev/dry2/).
 
 - **USER IS TESTING `dev-a-llm` (v6, frozen) through the `voice-test` slot** (workflow `39e29145-…`, a copy with
   `test_variables`; `scripts/voice_test.py <src_wf> --case PUB-xx` gives it a fresh customer). Do NOT redeploy
