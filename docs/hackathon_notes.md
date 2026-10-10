@@ -235,3 +235,4 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 |---|---|---|---|---|---|---|---|---|
 | 10-10 14:07 | fc120f9 | kit minimal_builder (baseline) | A | 1 | 6 / 10 | e2f7b97e / 23c6c141 | <1 min | fails PUB-02, 03, 07, 09 (see Observations). `runs/baseline-minimal-A.json` |
 | 10-10 14:08 | 05eb2db | kit minimal_builder (baseline), briefs A+B | B | 1 | 1 / 3 | aab4bc00 / 6afab2aa | <1 min | PUB-12: persuasion attempts per product; PUB-13: loan recorded 21 Oct instead of its 23 Oct deadline (date arithmetic again). `runs/baseline-minimal-B.json` |
+| 10-10 15:27 | 5390bb5 | design v1, FIXTURE spec (renderer only, no LLM) | A | 1 | **10 / 10** | 349752be / f0354c17 | 3 s | all 4 baseline failure classes gone; median slowest turn 3 s. `runs/dev/a-fixture-r1.json` |
