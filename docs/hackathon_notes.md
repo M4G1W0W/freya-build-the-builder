@@ -173,6 +173,19 @@ fail a case, how the team key is wired in exported workflows, what form hidden b
 
 ## Observations from practice runs (evidence, not policy)
 
+- **2026-10-10 14:18 UTC (verified in call variable tables):** a model-called tool's arguments land as
+  `<tool>_args.arg_<field>` (for example `add_note_p1_args.arg_reason`), the `arg_` prefix coming from our
+  `{{arg_<field>}}` defaults. Our earlier assumption `<tool>_args.<field>` never exists.
+- **2026-10-10 14:18 UTC:** in a conversation node **without tools**, an `llm` entry line can come out as text with a
+  pseudo tool call ("…Goodbye.call:close_call{…}"). The platform blocks it (`wasBlocked: True`, `blockedContent`) and
+  speaks a **Turkish filler, "Bir saniye lütfen."**, instead. Never rely on an `llm` entry in a tool-less node; speak
+  fixed lines (`tts`).
+- **2026-10-10 14:18 UTC:** a conversation node with `passthrough: true` did NOT route right after its entry line. It
+  waited for the customer's next message, then took the `always` transition.
+- **2026-10-10 13:41–14:14 UTC: platform outage.** `/chat/message` returned 503 for every workflow, and simulation agents
+  went silent after the first customer turn. For about 5 minutes after recovery, sandbox and tool latency was 6–11 s and
+  calls still stalled. Treat runs in such windows as invalid (check the setup and verify latency in transcripts).
+
 Baseline = the kit's `examples/minimal_builder.py`: one node, the brief pasted in as the prompt, seven tools.
 Transcripts were read with `scripts/show_run.py <run.json> --calls`.
 
@@ -274,3 +287,5 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 10-10 16:36 | d46b807 | same A+B agent | A | 3 | **9 / 10** | f8f9b203 / b867b809 | 4 s | PUB-05 0/3: the same goodbye-with-note stall, so the wording fix did not work (fixed structurally in 92b83b5). `runs/dev/abA-r3-d46b807.json` |
 | 10-10 16:44 | d46b807 | LLM spec | A | 3 | (2 / 10) **invalid** | 81c14d7a / c6a57c76 | 4 s | reps 1 and 2 were 10/10. Rep 3: the platform went silent after the first customer turn in 8 calls; from 13:41 UTC the chat route returned 503 for every workflow. Re-run needed. `runs/dev/llmA-r3-d46b807.json` |
 | 10-10 16:48 | d46b807 | extra B cases (`tests/fixtures/cases/extra-b.json`) | B+ | 3 | (0 / 3) **invalid** | f8f9b203 / b867b809 | | the platform outage: no agent turn after the first customer message. Re-run needed. |
+| 10-10 17:19 | 1bc0c1d | notes-done route + wrap_up (llm entry), OFFER PLAN, DATES | A, PUB-05 only (A+B agent) | 3 | 2/3 reps | f8f9b203 / b867b809 | 13 s | the stall is gone: rep 3 reached close_call through wrap_up. But (a) finalize read no note reason (key `_args.arg_reason`), so it closed as refused instead of hardship (fixed in 8ccd652), and (b) wrap_up's llm line was blocked and the platform said "Bir saniye lütfen." (replaced by ev_notes in 78936ae). Reps 1–2: the model chose the hardship ending itself, with no note. `runs/dev/abA05-r3-1bc0c1d.json` |
+| 10-10 17:25 | 1bc0c1d | same | B | 3 | 0 / 3 (reps 2–3: **3/3**) | f8f9b203 / b867b809 | 13 s | rep 1 (14:19 UTC, 5 min after the outage) was the platform: setup 6.8 s, verify 8–11 s, account_facts 11 s, then silence or repeated verify system errors. Reps 2–3 all passed, PUB-12 included (OFFER PLAN + notes route). `runs/dev/abB-r3-1bc0c1d.json` |
