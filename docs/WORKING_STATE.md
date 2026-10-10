@@ -3,8 +3,8 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 00:20 Istanbul (21:20 UTC Sat). Last commit: see `git log` (after `23bddd9`). Hidden briefs
-open Sun 11 Oct 17:00 UTC (about 20 h from now). Tag `good-pre-f1` = the builder before F1.
+**Snapshot:** 2026-10-11 01:52 Istanbul (22:52 UTC Sat). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+17:00 UTC (about 18 h from now). Tags: `good-pre-f1` = the builder before tonight's FACTS changes.
 
 ## Phase
 
@@ -29,28 +29,48 @@ open Sun 11 Oct 17:00 UTC (about 20 h from now). Tag `good-pre-f1` = the builder
 - The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
-## Running right now (updated 22:20 UTC)
+## Running right now (updated 22:52 UTC; the user asked to stop starting new work for a context save)
 
-- `qrun2` (names `-15bcbad`): **styledA-a2 at F1** on dev-a-llm2 v7 (the PUB-06 check after removing the too-much line).
-- `takeover3.sh` then deploys **F2 (bd4da7c)** to dev-a-llm2 and starts `qrun3` (queue `queue3.txt`, names
-  `-bd4da7c`): styled-a (dev-a-llm2), styled-ab-a, styled-b, styled-extra-b (dev-ab-llm **v14 = F2**, deployed 22:18).
-- All runs use `scripts/run_cases_retry.py` (GET 5xx retries + **report-only STUCK detection**, fed67b1). A monitor
-  forwards STUCK lines. A stuck simulation was paused once with the user's OK (21:55, see freya_api_notes); ask again
-  before any further PUT.
+- **qrun3** (`<scratchpad>/qrun3.sh`, queue `queue3.txt`, output `qrun3.out`, result names `-bd4da7c` whatever the
+  agent): **G1-p06-talkative** running (since 22:49), then **G2-p06-talkative** queued. Nothing else is queued. When it
+  ends, the runner prints "queue empty" and stops. Read `runs/dev/r3/G1-p06-talkative-bd4da7c.json` / `G2-...`.
+- All runs use `scripts/run_cases_retry.py` (GET 5xx retries + report-only STUCK detection, fed67b1). A stuck
+  simulation was paused once with the user's OK (21:55 UTC); **ask again before any further PUT** on Freya.
+- `<scratchpad>` = `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/84c40ea0-ff94-472f-b564-a8a424800981/scratchpad`
+  (may be gone after a restart; the queue runner is just: pop a line "name agent brief args", run
+  `scripts/run_cases_retry.py <agent> --brief <b> --reps 3 --out runs/dev/r3/<name>-<sha>.json <args>`, repeat).
 
-**PUB-07: F2 (bd4da7c) = F1 + "start the answer to a named date with that date as written in FACTS": 6/6 calls
-(echodate). F1 alone: 4/6.** Root cause (exp07, `experiments/exp07_p07_dates_ablation.py`, Score log 10-10 22:28 to 11-10 00:10):** the
-runtime FACTS, not the prompt text. The passing 52b947c agent's exact prompts on HEAD FACTS failed 0/3. The failure
-needs both the DATE TABLE period rows (19664c6/aa94ccb) and the FACTS "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO
-MUCH" line (35c030a). Over 6 calls: HEAD 1, isokey 2, noperiodrows 4, notoomuch 5, both removed 5. **F1 (15bcbad)**
-removes both and the DATES row reference. Wording tops out near 5/6 here; 6/6 would need the date decision in code
-(a code_exec check tool, ~4 h, undocumented platform links; see the design workflow notes in the Score log row).
-Experiment slots exp-p07-* (11 workflows) are throwaway.
+## Builder state tonight (all committed; read the Score log rows 10-10 22:28 to 11-10 "running")
 
-**styled-ab-a at c45758f (v13): 6/10** (reps 8, 8, 9). PUB-08 3/3 (39d7dd9 verified on the A+B agent). PUB-05 r2
-**real**: after refusing a discount the agent offered "our restructuring team for a new payment plan" (rules 32,
-33). PUB-09 r1 mixed (the too-much line made the floor salient on a cut-off "can't afford"; F1 removes that line).
-PUB-04 r2 simulator.
+| Name | Commit | What | PUB-07 (6 calls) | PUB-06 talkative | Full sets |
+|---|---|---|---|---|---|
+| HEAD before | c45758f (= aa94ccb code) | | 1/6 | 3/3 (pre-F1 8/8 calls) | styled-a 7/10 (a8b70ea) |
+| F1 | 15bcbad | no DATE TABLE period rows; no separate too-much FACTS line | 4/6 | **1/3 (regression)** | styled-a 6/10 |
+| F2 | bd4da7c | F1 + DATES: "start your reply to a named date with that date as written in FACTS" | **6/6** | 1/3 in styled-a | **styled-a 8/10** (PUB-07 3/3) |
+| F3 = **HEAD code** | a069dd2 | F2 + too-much rule on the attempt-1 line and OFFER PLAN item | dates 6/6 (1 judge fail: re-asked after a question back) | **1/3** (still "floor ... today?") | not run |
+| G1 (candidate) | a069dd2 + `runs/dev/exp07/g1-on-a069dd2.patch` | F3 + the old trigger line "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH ... offer exactly the floor X on <date> ... not today" | not run | **running** | |
+| G2 (candidate) | a069dd2 + `exp07 offerdate` | F3 + ATTEMPTS: "Each offer of yours names its amount and its date as written in FACTS; the only today question is the opening one" | not run | queued | |
+
+**Next steps, in order:**
+1. Read G1 and G2 PUB-06. Pick the one that fixes PUB-06 (target 3/3), then run PUB-07 asks + pieces on it (the
+   too-much line once interacted with PUB-07, but that needed the period rows, which are gone, and echo-date was
+   not there). Adopt the winner into the builder (G1 = apply the patch; G2 = move the sentence into render.py), with
+   a regression test, commit, tag.
+2. Deploy the winner to dev-a-llm2 and dev-ab-llm (`--spec runs/dev/spec-a-llm.json` and
+   `--spec runs/dev/spec-ab-llm-c45758f.json`), then the four styled sets: styled-a, styled-ab-a, styled-b,
+   styled-extra-b. The A+B sets have **not** been measured since c45758f (styled-ab-a 6/10 there; extra-B was cut by
+   the stuck simulation at reps 1/3, 1/3).
+3. Pending user decisions: PUB-05 fix (no improvised offers after refusing something the brief forbids); review
+   finding 2 (`event_row_in` precedence for an ending that overrides a recorded promise, variant-c rule 47).
+4. Generic follow-ups found tonight (not started): the identity step's "answer a question back, do not repeat your
+   question in that message" made global (F3 PUB-07 asks r2); a message ending in "." is complete even if it ends on a
+   number word (F1 PUB-03 r1: a full DOB got "Please go on."); never ask "how much can you pay" (one echodate call).
+5. Classify the extra-B c45758f reps 1-2 failures (PUB-11 x2, PUB-13, PUB-12; Score log row 11-10 00:54).
+6. Freeze about Sun 15:30 UTC (tag `freeze-final`); from 17:00 UTC follow `docs/RUNBOOK.md`.
+
+**Slots:** dev-a-llm2 = F2 v8 (7cfc34a8 / 2485fc27); dev-ab-llm = F2 v14 (f8f9b203 / b867b809); exp-f3-a 35098a88;
+exp-g1-a 31f79439 (dirty G1 build); exp-g2-a efb690fd; exp-p07-* (throwaway). About 30 workflows of 200 used.
+dev-a-llm (52b947c v6) and voice-test unchanged.
 
 **Results so far tonight** (styled = every case in one of the 5 kit speech styles; a case counts at 3/3):
 
@@ -63,21 +83,7 @@ PUB-04 r2 simulator.
 
 Every failure is read and classified in the Score log (rows 10-10 20:09 to 21:35).
 
-**Open problems, in order:**
-1. Measure F1: PUB-07 (both styles), styled-a, then the A+B sets after the dev-ab-llm redeploy. Watch PUB-06 (the
-   too-much line was its fix; the ATTEMPTS prompt line and the attempt-1 line still carry the floor date) and "Monday"
-   said alone after a period (what the rows were for).
-2. PUB-05 real (improvised restructuring offer after a refused discount). Generic fix idea from the classifier: "When
-   the customer asks for something the brief says never to offer, say once that you cannot offer it; offer nothing
-   in its place. An ending tied to a request applies only when the customer makes that request." Not implemented.
-3. Review finding 2 (variant-c rule 47 = direction-review gap 7): close_precedence puts `promise_recorded` above an
-   insolvency ending that the brief says overrides a promise. Proposed: a generic `event_row_in` precedence entry
-   with extracted row ids, ordered before `promise_recorded`; test "promise recorded -> overriding ending". Not started.
-4. PUB-09 r1: a cut-off without final punctuation ("I really can't afford to pay") was read as a complete reply.
-   Optional: treat a message with no final punctuation as possibly cut off. Measure before adopting.
-5. Sandbox output size: keep the date table and other variables small (F1 makes the table shorter).
-6. Simulator artefacts: hang-ups, garbled dates, endless cut-offs, corrects-style conflicts. Classify, do not chase.
-7. Diff-review 13, 18, part of 5; direction-review 9, 11, 8b.
+**Open problems:** see "Next steps" above (they replace the earlier list).
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
