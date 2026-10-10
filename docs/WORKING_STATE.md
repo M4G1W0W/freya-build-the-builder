@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 20:27 Istanbul (17:27 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+**Snapshot:** 2026-10-10 20:50 Istanbul (17:50 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
 Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Phase
@@ -31,18 +31,17 @@ Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Running right now
 
-- **chain4** (`<scratchpad>/chain4.sh`, job `b9brwzcqx`, monitor `bzqzi7p8k`) at **676e9df**, styled 3-rep runs:
-  - `styledA-a2` (A spec, 3 slots): **7/10** at 3/3 (reps 9, 7, 9). Logged and read: PUB-07 date in pieces (fixed
-    96c37ad), PUB-06 floor "today" + "this Friday" = 17 Oct + a cut-off loop (fixed 35c030a), PUB-09 r2 simulator.
-  - `styledB-ab`: **2/3** (PUB-12 1/3: car-loan attempt count; r1 judge wanted the phone question re-asked, not
-    "Please go on.").
-  - `styledXB-ab`: **1/3** (PUB-12 0/3: paid sentence missing, "today" re-asked, notes without the car-loan attempt;
-    PUB-13 1 rep: "I paid both" took the paid ending with no notes). Fixed in e233cb8.
-  - `styledABA-ab` (A cases with A+B ledgers): running, rep 1 7/10.
-- **evening-diff-review** workflow (`w9bdf1mrl`): 4 adversarial lenses over `git diff 3a55e6d..HEAD`. Read its
-  report, fix confirmed defects, THEN start chain5.
-- **chain5 (to start):** deploy HEAD to dev-a-llm2 (spec-a-llm) and dev-ab-llm (spec-ab-llm) with `--spec`, then the
-  same four styled runs at 3 reps. Compare with chain4 case by case.
+- **chain5** (`<scratchpad>/chain5.sh`, job `blvy0u0cw`, monitor `bl5dj1p1p`), started 17:49 UTC at **347e01d**:
+  deploy dev-a-llm2 + dev-ab-llm from the saved specs, then the same four styled 3-rep runs as chain4
+  (`runs/dev/r3/{styledA-a2,styledB-ab,styledXB-ab,styledABA-ab}-347e01d.*`). Compare case by case with chain4
+  (676e9df): styledA 7/10, styledB 2/3, styledXB 1/3, styledABA 5/10 (all in the Score log, every failure read).
+  Log each result; read every failure; classify simulator vs real.
+- Fixed since 676e9df and measured by chain5: 96c37ad (parts), 35c030a (loop breaker, floor date line, weekday
+  rule), a3e6c77 (EVERY DAY weeks in the DATE TABLE: the 2025-calendar date slips), 347e01d (diff-review fixes:
+  note endings stay with a pointer to the notes route, deferred notes, one "complete" definition, transfer
+  precedence, failed repair keeps the best spec, engine_fields checks), e233cb8 superseded by 347e01d.
+- Reviews: `docs/reviews/2026-10-10-direction-review.md` (page vs repo) and `docs/reviews/2026-10-10-diff-review.md`
+  (the evening's diff; open: 13, 17, 18 and part of 5).
 
 ## Latest measured results (3 reps unless marked; a case counts only at 3/3)
 
@@ -87,7 +86,8 @@ the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
 - dcb3915 (gap 13): 25-min model-call budget, 240 s per call, a stall falls back, repair skipped under 5 min.
 - 4e6629f (gap 16): variant-c/-r rebuilt at dcb3915 with the real LLM (both PASS, 11 tools) and are pytest fixtures.
 - e233cb8: with notes, note-derived rows are no negotiate ending; NOTES says do the ending's duty, then note.
-- `make verify`: **743 passed**.
+- a3e6c77: DATE TABLE EVERY DAY weeks. 347e01d: diff-review fixes (see Running right now).
+- `make verify`: **751 passed**.
 
 
 ## What changed earlier today (all committed; details in the Decision log and git log)
