@@ -367,6 +367,9 @@ def test_prompts_handle_customer_speech_styles():
         in system
     )
     assert "repeat your last" not in system
+    # 676e9df styled PUB-06 rep 2: the simulated customer's chatter was cut at the same point 20+
+    # times; "Please go on." only invited more chatter. A second cut-off asks for a short answer.
+    assert "Sorry, your message was cut off. Could you answer in a few words?" in system
     assert "only as often as that rule says in the whole call" in system
     ident = wf["nodes"]["identity"]["task_message"]
     assert "join the parts the customer gave since the last verify_identity result" in ident
@@ -427,4 +430,6 @@ def test_negotiate_joins_dates_and_amounts_given_in_parts():
     # instead of the holiday line (27 Oct). The page: customers say "a number said in two parts".
     nego = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "A date or an amount may come in parts over several messages" in nego
+    # PUB-06 talkative, twice: "this Friday" became "Friday, October 17th" (a Friday in 2025).
+    assert "never pair a weekday with a date from memory" in nego
     assert "join the parts the customer gave since your last question" in nego

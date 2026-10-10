@@ -116,3 +116,20 @@ def test_facts_state_when_offers_must_stop():
         "after attempt 1 is refused: NO further offer for this product (not even the floor)"
         in facts
     )
+
+
+def test_facts_say_exactly_when_and_what_the_floor_offer_is():
+    # 676e9df styled PUB-06 (2 of 3 reps): after "the full amount is too much" the floor was
+    # offered "today", then again on attempt 1's date, and the judge counted two floor offers.
+    card = {
+        "product_id": "p1",
+        "type": "credit_card",
+        "card_last4": "1903",
+        "past_due": "2125.1",
+        "days_late": "12",
+        "minimum_payment": "637.5",
+    }
+    facts = _account(SPEC_A, "2026-10-14T11:00", card)
+    line = next(x for x in facts.splitlines() if "SAYS THE FULL AMOUNT IS TOO MUCH" in x)
+    assert "637.50 on 2026-10-16 (Friday 16 October 2026)" in line
+    assert "this IS attempt 1" in line and "no other date" in line
