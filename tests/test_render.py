@@ -189,50 +189,67 @@ def _products(n: int) -> dict:
     return {f"load_account_response.data.products.{i}.product_id": f"p{i + 1}" for i in range(n)}
 
 
+def _first_route(wf: dict, vs: dict) -> str | None:
+    for tr in wf["nodes"]["negotiate"]["transitions"]:
+        if "logic" in tr["condition"] and _holds(tr["condition"], vs):
+            return tr["target_node"]
+    return None
+
+
 def test_notes_done_route_fires_only_when_every_product_is_settled_and_noted():
     # PUB-05 / PUB-12 at d46b807: goodbye said with the last add_note, then empty replies, no
-    # close_call. negotiate now leaves to ev_notes on the note results themselves.
+    # close_call. negotiate now leaves to ev_notes(_p) on the note results themselves.
     wf = render(_notes_spec(3), TOOLS, BRIEF)
-    route = wf["nodes"]["negotiate"]["transitions"][0]
-    assert route["target_node"] == "ev_notes"
-    assert len(route["condition"]["conditions"]) == 14  # 2*3*3 combos minus the 4 without a note
-    cond = route["condition"]
-    ok = {f"add_note_p{n}_response.data.ok": "true" for n in (1, 2, 3)}
+    first, second = wf["nodes"]["negotiate"]["transitions"][:2]
+    assert (first["target_node"], second["target_node"]) == ("ev_notes_p", "ev_notes")
+    assert len(first["condition"]["conditions"]) + len(second["condition"]["conditions"]) == 14
+    note = {f"add_note_p{n}_response.data.ok": "true" for n in (1, 2, 3)}
     three = _products(3)
-    assert _holds(cond, three | {"p1_recorded": "yes"} | {k: ok[k] for k in list(ok)[1:]})
-    assert _holds(cond, three | ok)
-    assert _holds(cond, _products(1) | {"add_note_p1_response.data.ok": "True"})
-    assert _holds(
-        cond, _products(2) | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"}
-    )
+    p1_rec_rest_noted = three | {"p1_recorded": "yes"} | {k: note[k] for k in list(note)[1:]}
+    assert _first_route(wf, p1_rec_rest_noted) == "ev_notes_p"
+    assert _first_route(wf, three | note) == "ev_notes"
+    assert _first_route(wf, _products(1) | {"add_note_p1_response.data.ok": "True"}) == "ev_notes"
+    two = _products(2) | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"}
+    assert _first_route(wf, two) == "ev_notes_p"
     # still open: p3 has neither a promise nor a note
-    assert not _holds(cond, three | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"})
+    still_open = three | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"}
+    assert _first_route(wf, still_open) is None
     # promises only: the model's own goodbye and ENDING close the call as before
-    assert not _holds(cond, three | {f"p{n}_recorded": "yes" for n in (1, 2, 3)})
+    assert _first_route(wf, three | {f"p{n}_recorded": "yes" for n in (1, 2, 3)}) is None
     # a failed note does not count
-    assert not _holds(cond, _products(1) | {"add_note_p1_response.data.ok": "false"})
+    assert _first_route(wf, _products(1) | {"add_note_p1_response.data.ok": "false"}) is None
 
 
-def test_ev_notes_speaks_a_fixed_closing_then_ends_through_the_default_negotiate_event():
-    # 1bc0c1d rep 3: an llm entry line in a tool-less node was blocked (the model wrote a pseudo
-    # close_call as text) and the platform spoke a Turkish filler instead. ev_notes uses no model.
+def test_ev_notes_speak_fixed_closings_then_end_through_the_default_negotiate_event():
+    # 1bc0c1d rep 3: an llm entry line was blocked and a Turkish filler was spoken; 52b947c: when
+    # the setup sandbox run failed, "{{closing_text}}" was read out literally. Fixed text only.
     wf = render(_notes_spec(3), TOOLS, BRIEF)
-    ev = wf["nodes"]["ev_notes"]
-    assert ev["node_type"] == "code" and ev["passthrough"] is True
-    assert ev["on_enter"] == {"type": "tts", "text": "{{closing_text}}"}
-    assert ev["transitions"] == [
-        {"target_node": "finalize", "description": "always", "condition": {"operator": "always"}}
-    ]
     default = wf["nodes"][f"ev_{SPEC_A['default_rows']['negotiate']}"]
-    assert ev["pre_actions"] == default["pre_actions"]  # same event as the default ending
-    assert "wrap_up" not in wf["nodes"]
+    line = SPEC_A["success_lines"]["promise"]
+    for name, text in (
+        ("ev_notes_p", f"{line} Thank you for your time. Goodbye."),
+        ("ev_notes", "Thank you for your time. Goodbye."),
+    ):
+        ev = wf["nodes"][name]
+        assert ev["node_type"] == "code" and ev["passthrough"] is True
+        assert ev["on_enter"] == {"type": "tts", "text": text} and "{{" not in text
+        assert ev["transitions"] == [
+            {
+                "target_node": "finalize",
+                "description": "always",
+                "condition": {"operator": "always"},
+            }
+        ]
+        assert ev["pre_actions"] == default["pre_actions"]  # same event as the default ending
     assert validate(wf) == []
 
 
 def test_no_notes_route_without_notes():
     wf = render(SPEC_A, TOOLS, BRIEF)
-    assert "ev_notes" not in wf["nodes"]
-    assert all(t["target_node"] != "ev_notes" for t in wf["nodes"]["negotiate"]["transitions"])
+    assert not {"ev_notes", "ev_notes_p"} & set(wf["nodes"])
+    assert all(
+        not t["target_node"].startswith("ev_notes") for t in wf["nodes"]["negotiate"]["transitions"]
+    )
 
 
 def test_dates_resolve_weekday_phrases_before_comparing():

@@ -45,15 +45,17 @@ def _endings_text(spec: dict, stage: str) -> str:
     return "\n".join(lines)
 
 
-def _notes_done_transition(k: int, note_tool: str, target: str) -> dict:
-    """negotiate -> ev_notes once every product has a recorded promise, a saved note or does not
+def _notes_done_transitions(k: int, note_tool: str, with_promise: str, without: str) -> list[dict]:
+    """negotiate -> ev_notes* once every product has a recorded promise, a saved note or does not
     exist, and at least one note was saved. A model that says goodbye together with its last
     add_note call then returns empty replies and the call never closes (PUB-05/PUB-12 at d46b807);
     routing on the result fires before any further model turn (kit tools-and-code.md).
 
     Only platform-set result keys and the sticky recorded flag are read, so parallel add_note calls
     cannot race. Conditions nest one AND level under the top OR (kit workflow-format.md), so the
-    AND over products of (recorded OR noted OR absent) is expanded into AND groups.
+    AND over products of (recorded OR noted OR absent) is expanded into AND groups. Combinations
+    with a recorded promise go to `with_promise` (its fixed closing carries the brief's promise
+    sentence), the rest to `without`; the first matching transition wins.
     """
 
     def options(n: int) -> list[tuple[str, dict]]:
@@ -73,16 +75,26 @@ def _notes_done_transition(k: int, note_tool: str, target: str) -> dict:
             out.append(("absent", {"variable": absent, "operator": "is_not_set"}))
         return out
 
-    groups = [
-        {"logic": "and", "conditions": [c for _, c in combo]}
-        for combo in itertools.product(*(options(n) for n in range(1, k + 1)))
-        if any(kind == "note" for kind, _ in combo)
+    combos = [
+        c
+        for c in itertools.product(*(options(n) for n in range(1, k + 1)))
+        if any(kind == "note" for kind, _ in c)
     ]
-    return {
-        "target_node": target,
-        "description": "Every product is settled and the notes are saved",
-        "condition": {"logic": "or", "conditions": groups},
-    }
+    out = []
+    for target, keep in (
+        (with_promise, lambda c: any(kind == "rec" for kind, _ in c)),
+        (without, lambda c: not any(kind == "rec" for kind, _ in c)),
+    ):
+        groups = [{"logic": "and", "conditions": [x for _, x in c]} for c in combos if keep(c)]
+        if groups:
+            out.append(
+                {
+                    "target_node": target,
+                    "description": "Every product is settled and the notes are saved",
+                    "condition": {"logic": "or", "conditions": groups},
+                }
+            )
+    return out
 
 
 def _exit_transitions(spec: dict, stage: str) -> list[dict]:
@@ -238,6 +250,7 @@ def _slot_tool(
 # ---- graph -----------------------------------------------------------------------------------
 
 
+GOODBYE = "Thank you for your time. Goodbye."
 RECORDED_DISCLOSURE = re.compile(r"\b(this|the) call is (being )?recorded\b", re.IGNORECASE)
 
 
@@ -368,7 +381,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
             for n in range(1, k + 1)
         ]
     neg_default = f"ev_{spec['default_rows']['negotiate']}"
-    wrap = [_notes_done_transition(k, by["add_note"].name, "ev_notes")] if notes else []
+    wrap = (
+        _notes_done_transitions(k, by["add_note"].name, "ev_notes_p", "ev_notes") if notes else []
+    )
     wf_nodes["negotiate"] = nodes.conversation(
         "negotiate",
         _negotiate_task(spec, k, notes),
@@ -380,16 +395,22 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         max_turn_target=neg_default,
     )
     if notes:
-        # Speaks the closing (the brief's promise sentence when one was recorded, then goodbye) as a
-        # fixed line: no model turn, so nothing to block and no empty reply. Then the default
-        # negotiate event; finalize computes the outcome from what was recorded.
-        ev_notes = nodes.code_node(
-            "ev_notes",
-            codegen.exit_source(spec["default_rows"]["negotiate"]),
-            [nodes.always("finalize")],
-        )
-        ev_notes["on_enter"] = {"type": "tts", "text": "{{" + hooks.CLOSING_VAR + "}}"}
-        wf_nodes["ev_notes"] = ev_notes
+        # A fixed closing (no model turn: nothing to block, no empty reply; no variable, so nothing
+        # unset to be read out when a sandbox run failed), then the default negotiate event;
+        # finalize computes the outcome from what was recorded. The platform speaks a passthrough
+        # node's line when the call ends (seen 10 Oct, 14:3x UTC).
+        line = spec["success_lines"]["promise"]
+        for name, text in (
+            ("ev_notes_p", (line + " " + GOODBYE) if line else GOODBYE),
+            ("ev_notes", GOODBYE),
+        ):
+            node = nodes.code_node(
+                name,
+                codegen.exit_source(spec["default_rows"]["negotiate"]),
+                [nodes.always("finalize")],
+            )
+            node["on_enter"] = {"type": "tts", "text": text}
+            wf_nodes[name] = node
 
     cf = spec["close_fields"]
     ct = by["close_call"]

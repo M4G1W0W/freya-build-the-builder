@@ -456,17 +456,6 @@ def test_promise_success_says_the_brief_line(ok, split):
     assert "header" not in result
 
 
-def test_promise_success_sets_the_closing_for_a_notes_ending(split):
-    # render's ev_notes speaks {{closing_text}}: after a recorded promise it must carry the brief's
-    # promise sentence (it is often said only after the notes, and the notes route skips that turn).
-    vs = {}
-    post(PROMISE_POST, envelope({"ok": "true", "promise_id": "pr_1"}), split, vs)
-    assert vs[hooks.CLOSING_VAR] == PROMISE_LINE + " " + hooks.GOODBYE
-    vs = {}
-    post(PROMISE_POST, envelope({"ok": "false", "error": "x"}), split, vs)
-    assert hooks.CLOSING_VAR not in vs
-
-
 @pytest.mark.parametrize("ok", [False, "false", "False"])
 def test_promise_ok_false_is_not_recorded_with_the_bank_error(ok, split):
     result = post(PROMISE_POST, envelope({"ok": ok, "error": "date after deadline"}), split)
