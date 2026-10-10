@@ -26,6 +26,16 @@ def _quote(text: str) -> str:
 
 
 def _rows_for(spec: dict, stage: str) -> list[dict]:
+    if stage == "third_party":
+        # The opening routes wrong_number/deceased answers to third_party, so "who answered"
+        # endings tagged 'opening' only must exist there too (audit F03). Endings that also apply
+        # after identification (declined, human) stay out: they are about the customer.
+        before = {"opening", "third_party"}
+        return [
+            r
+            for r in spec["rows"]
+            if "third_party" in r["phases"] or (r["phases"] and set(r["phases"]) <= before)
+        ]
     return [r for r in spec["rows"] if stage in r["phases"]]
 
 

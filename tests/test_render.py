@@ -301,3 +301,17 @@ def test_callback_prompt_with_separate_fields_is_unchanged():
     assert (
         f"with {cb['date_field']} as YYYY-MM-DD and {cb['time_field']} as HH:MM (24 hour)." in task
     )
+
+
+def test_opening_only_endings_are_reachable_from_third_party():
+    # audit F03: the opening routes wrong_number/deceased answers to third_party; a row the LLM
+    # tagged 'opening' only had no exit there, so the call could only close as callback/no_callback.
+    spec = copy.deepcopy(SPEC_A)
+    for r in spec["rows"]:
+        if r["id"] in ("not_reached_wrong_number", "not_reached_deceased"):
+            r["phases"] = ["opening"]
+    n = render(spec, TOOLS, BRIEF)["nodes"]
+    targets = {t["target_node"] for t in n["third_party"]["transitions"] if t.get("is_tool_call")}
+    assert {"ev_not_reached_wrong_number", "ev_not_reached_deceased"} <= targets
+    assert exit_tool_name("not_reached_deceased") in n["third_party"]["task_message"]
+    assert "ev_not_verified_declined" not in targets  # about the customer, not a third party
