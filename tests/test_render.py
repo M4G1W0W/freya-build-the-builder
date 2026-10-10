@@ -185,8 +185,9 @@ def _notes_spec(k: int) -> dict:
     return s
 
 
-def _products(n: int) -> dict:
-    return {f"load_account_response.data.products.{i}.product_id": f"p{i + 1}" for i in range(n)}
+def _products(n: int, k: int = 3) -> dict:
+    """Slot ids as setup/account_facts write them: p1..pn used, the rest 'none'."""
+    return {f"p{i}_id": (f"p{i}" if i <= n else "none") for i in range(1, k + 1)}
 
 
 def _first_route(wf: dict, vs: dict) -> str | None:
@@ -202,13 +203,15 @@ def test_notes_done_route_fires_only_when_every_product_is_settled_and_noted():
     wf = render(_notes_spec(3), TOOLS, BRIEF)
     first, second = wf["nodes"]["negotiate"]["transitions"][:2]
     assert (first["target_node"], second["target_node"]) == ("ev_notes_p", "ev_notes")
-    assert len(first["condition"]["conditions"]) + len(second["condition"]["conditions"]) == 14
+    assert len(first["condition"]["conditions"]) + len(second["condition"]["conditions"]) == 11
     note = {f"add_note_p{n}_response.data.ok": "true" for n in (1, 2, 3)}
     three = _products(3)
     p1_rec_rest_noted = three | {"p1_recorded": "yes"} | {k: note[k] for k in list(note)[1:]}
     assert _first_route(wf, p1_rec_rest_noted) == "ev_notes_p"
     assert _first_route(wf, three | note) == "ev_notes"
     assert _first_route(wf, _products(1) | {"add_note_p1_response.data.ok": "True"}) == "ev_notes"
+    # names of the bank's list and id fields play no part (audit F17/F41/F58)
+    assert "products" not in json.dumps(wf["nodes"]["negotiate"]["transitions"][:2])
     two = _products(2) | {"p1_recorded": "yes", "add_note_p2_response.data.ok": "true"}
     assert _first_route(wf, two) == "ev_notes_p"
     # still open: p3 has neither a promise nor a note
@@ -266,3 +269,17 @@ def test_attempts_never_re_ask_today_and_carry_the_listed_date():
     task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "never ask again whether the customer can pay today" in task
     assert "uses exactly the date listed for that attempt" in task
+
+
+def test_notes_route_grows_linearly_enough_for_five_products():
+    # audit F20: the old expansion was 3^K; for each product count n it is now 2^n - 1 groups
+    wf = render(_notes_spec(5), TOOLS, BRIEF)
+    first, second = wf["nodes"]["negotiate"]["transitions"][:2]
+    assert len(first["condition"]["conditions"]) + len(second["condition"]["conditions"]) == 57
+    vs = (
+        _products(4, 5)
+        | {"p1_recorded": "yes"}
+        | {f"add_note_p{n}_response.data.ok": "true" for n in (2, 3, 4)}
+    )
+    assert _first_route(wf, vs) == "ev_notes_p"
+    assert _first_route(wf, _products(5, 5) | {"p1_recorded": "yes"}) is None

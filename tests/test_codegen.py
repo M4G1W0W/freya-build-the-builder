@@ -877,3 +877,13 @@ def test_finalize_wrap_up_default_ending_takes_the_note_reason():
     extra = {"end_event": spec["default_rows"]["negotiate"], **note(1, "hardship")}
     vs = finalize(spec, extra, 1)
     assert (vs["close_outcome"], vs["close_reason"]) == ("no_promise", "hardship")
+
+
+def test_account_marks_unused_slots_even_without_setup():
+    # The notes-done route reads p<k>_id == 'none' for unused slots. setup writes that default, but
+    # setup's sandbox run can fail (seen 10 Oct, 14:3x UTC); account_facts writes it too.
+    vs = {"now": "2026-10-14T11:00", "load_account_response.data.ok": "true"}
+    for key, value in CARD.items():
+        vs[f"load_account_response.data.products.0.{key}"] = value
+    exec(codegen.account_source(spec_multi()), {"vars": vs})
+    assert vs["p1_id"] == "p1" and vs["p2_id"] == "none" and vs["p3_id"] == "none"

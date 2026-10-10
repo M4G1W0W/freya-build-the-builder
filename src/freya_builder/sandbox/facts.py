@@ -600,6 +600,7 @@ def account_main(vs, C):
                 + " have tools."
             )
         for k in range(len(used) + 1, K + 1):
+            vs["p" + str(k) + "_id"] = "none"  # also when setup's run failed: routes read it
             unused = C.get("promise_tool", "") + str(k)
             if C.get("notes_used"):
                 unused += " or " + C.get("note_tool", "") + str(k)

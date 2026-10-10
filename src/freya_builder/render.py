@@ -9,6 +9,7 @@ import json
 import re
 
 from . import codegen, hooks, nodes
+from .codegen import OK_FIELD
 from .spec import call_var
 from .toolapi import Tool, engine_call, model_tool
 
@@ -46,55 +47,44 @@ def _endings_text(spec: dict, stage: str) -> str:
 
 
 def _notes_done_transitions(k: int, note_tool: str, with_promise: str, without: str) -> list[dict]:
-    """negotiate -> ev_notes* once every product has a recorded promise, a saved note or does not
-    exist, and at least one note was saved. A model that says goodbye together with its last
-    add_note call then returns empty replies and the call never closes (PUB-05/PUB-12 at d46b807);
-    routing on the result fires before any further model turn (kit tools-and-code.md).
+    """negotiate -> ev_notes* once every product has a recorded promise or a saved note, and at
+    least one note was saved. A model that says goodbye together with its last add_note call then
+    returns empty replies and the call never closes (PUB-05/PUB-12 at d46b807); routing on the
+    result fires before any further model turn (kit tools-and-code.md).
 
-    Only platform-set result keys and the sticky recorded flag are read, so parallel add_note calls
-    cannot race. Conditions nest one AND level under the top OR (kit workflow-format.md), so the
-    AND over products of (recorded OR noted OR absent) is expanded into AND groups. Combinations
-    with a recorded promise go to `with_promise` (its fixed closing carries the brief's promise
-    sentence), the rest to `without`; the first matching transition wins.
+    Reads only our own slot ids (p<n>_id, 'none' for an unused slot: setup and account_facts write
+    it, whatever the bank calls its list and id fields), the sticky recorded flag and the
+    platform-set note result, so parallel add_note calls cannot race. Conditions nest one AND level
+    under the top OR (kit workflow-format.md): products fill slots 1..n in order, so for each count
+    n the groups are "slots 1..n each recorded or noted, at least one noted, slot n+1 unused"
+    (2^(K+1) - K - 2 groups). Groups with a recorded promise go to `with_promise` (its fixed
+    closing carries the brief's promise sentence), the rest to `without`.
     """
-
-    def options(n: int) -> list[tuple[str, dict]]:
-        out = [
-            ("rec", {"variable": hooks.recorded_flag(n), "operator": "equals", "operand": "yes"}),
-            (
-                "note",
-                {
-                    "variable": f"{note_tool}_p{n}_response.data.ok",
-                    "operator": "contains",
-                    "operand": "true",
-                },
-            ),
-        ]
-        if n > 1:  # get_account returns at least one product
-            absent = f"load_account_response.data.products.{n - 1}.product_id"
-            out.append(("absent", {"variable": absent, "operator": "is_not_set"}))
-        return out
-
-    combos = [
-        c
-        for c in itertools.product(*(options(n) for n in range(1, k + 1)))
-        if any(kind == "note" for kind, _ in c)
+    rec = lambda i: {"variable": hooks.recorded_flag(i), "operator": "equals", "operand": "yes"}  # noqa: E731
+    noted = lambda i: {  # noqa: E731
+        "variable": f"{note_tool}_p{i}_response.data.{OK_FIELD}",
+        "operator": "contains",
+        "operand": "true",
+    }
+    unused = lambda i: {"variable": f"p{i}_id", "operator": "equals", "operand": "none"}  # noqa: E731
+    split: dict[str, list[dict]] = {with_promise: [], without: []}
+    for n in range(1, k + 1):
+        tail = [unused(n + 1)] if n < k else []
+        for kinds in itertools.product(("rec", "note"), repeat=n):
+            if "note" not in kinds:
+                continue
+            conds = [rec(i + 1) if kd == "rec" else noted(i + 1) for i, kd in enumerate(kinds)]
+            target = with_promise if "rec" in kinds else without
+            split[target].append({"logic": "and", "conditions": conds + tail})
+    return [
+        {
+            "target_node": target,
+            "description": "Every product is settled and the notes are saved",
+            "condition": {"logic": "or", "conditions": groups},
+        }
+        for target, groups in split.items()
+        if groups
     ]
-    out = []
-    for target, keep in (
-        (with_promise, lambda c: any(kind == "rec" for kind, _ in c)),
-        (without, lambda c: not any(kind == "rec" for kind, _ in c)),
-    ):
-        groups = [{"logic": "and", "conditions": [x for _, x in c]} for c in combos if keep(c)]
-        if groups:
-            out.append(
-                {
-                    "target_node": target,
-                    "description": "Every product is settled and the notes are saved",
-                    "condition": {"logic": "or", "conditions": groups},
-                }
-            )
-    return out
 
 
 def _exit_transitions(spec: dict, stage: str) -> list[dict]:
