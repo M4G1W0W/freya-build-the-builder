@@ -1,4 +1,4 @@
-# Direction review, 2026-10-10 ~17:00 UTC
+# Direction review, 2026-10-10 ~16:45 UTC
 
 Four read-only reviewers (submission, generalisation, scoring, rules) compared the live page (`docs/reference/hackathon_page_live_2026-10-10.md`) with the repo at 3a55e6d. Each finding was re-checked by a skeptic; the main session re-verified gaps 1-3 (llm.py:24-27 has no default model; spec-a and raw-a extracted max_products=1; render.py:17 caps opening 8 / third_party 12 / identity 20).
 

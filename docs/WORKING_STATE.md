@@ -3,15 +3,15 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 20:25 Istanbul (17:25 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
-Sun 11 Oct 17:00 UTC (about 23.5 h from now).
+**Snapshot:** 2026-10-10 19:58 Istanbul (16:58 UTC). Last commit: see `git log` (after `676e9df`). Hidden briefs open
+Sun 11 Oct 17:00 UTC (about 24 h from now).
 
 ## Phase
 
 - **Phases 1–2 (Briefs A and B):** working.
 - **Phase 3 (robustness):** today's afternoon: a generalisation audit (fixed), customer speech styles, then a
   **direction review against the live page** (`docs/reviews/2026-10-10-direction-review.md`, 20 ranked gaps,
-  skeptic-checked). Gaps 1, 2, 3, 5 and 6 are fixed (17:00–17:25 UTC); gap 4, the measurement, is running.
+  skeptic-checked). Gaps 1, 2, 3, 5 and 6 are fixed (16:47–16:57 UTC); gap 4, the measurement, is running.
 - **Phase 4 (submission):** RUNBOOK, `scripts/check_secrets.py`, the fresh-clone build, the 3.10+ guard: done. Open:
   review gaps 12 and 14 (RUNBOOK: one brief file only; `mkdir -p traces submission`, explicit `--slot hidden-N`, a
   rehearsal), the freeze and the Sunday run.
@@ -31,7 +31,8 @@ Sun 11 Oct 17:00 UTC (about 23.5 h from now).
 
 ## Running right now
 
-- **chain4** (`<scratchpad>/chain4.sh`, background job `b9brwzcqx`, started 17:25 UTC at `676e9df`):
+- **chain4** (`<scratchpad>/chain4.sh`, background job `b9brwzcqx`, started 16:57 UTC at `676e9df`; both deploys PASS: dev-a-llm2 v3 27 steps 8 tools,
+  dev-ab-llm v10 29 steps 11 tools):
   deploy dev-a-llm2 (spec-a-llm, now with 3 product slots) and dev-ab-llm (spec-ab-llm) from saved specs, then
   four styled 3-rep runs, one at a time:
   1. `styledA-a2`: dev-a-llm2 on `tests/fixtures/cases/styled-a.json` (Brief A, each case one of 5 styles);
@@ -63,7 +64,7 @@ The Score log in `docs/hackathon_notes.md` has every run with its reasons. The e
 (`tests/fixtures/cases/extra-b.json`: refuse-all, paid+dispute+refused, all-paid) were checked on Freya at 52b947c:
 the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
 
-## What changed this evening (17:00–17:25 UTC, from the direction review)
+## What changed this evening (16:47–16:57 UTC, from the direction review)
 
 - 3a55e6d: `kit/` is now the official **kit v3** (only README and examples differ from v1); the live page snapshot is
   `docs/reference/hackathon_page_live_2026-10-10.md`.
