@@ -356,17 +356,30 @@ def test_prompts_handle_customer_speech_styles():
     wf = render(SPEC_A, TOOLS, BRIEF)
     system = wf["system_prompt"]
     assert "breaks off mid-sentence" in system and 'reply only "Please go on."' in system
-    # 19664c6 PUB-04 talkative: "Please go on." to every fragment looped for a minute (the persona
-    # restarted its chatter each time); a second fragment in a row gets the last question again.
-    assert 'if you said "Please go on." to their previous message too, repeat your last' in system
+    # 276302f talkative PUB-07: "Yes, I confirm. I'm just looking" was cut off, so the yes was
+    # ignored and the read-back asked 3 more times until the customer hung up. PUB-06/PUB-05: the
+    # "repeat your last offer" rule for a second fragment re-offered the floor 3 times and the support
+    # team twice, which the judge counts as offering again.
+    assert "First read what it already says" in system
+    assert "act on that part as you would on a complete message" in system
+    assert (
+        "Never repeat a question, an offer, an amount or a date because a message was cut off"
+        in system
+    )
+    assert "repeat your last" not in system
     assert "only as often as that rule says in the whole call" in system
     ident = wf["nodes"]["identity"]["task_message"]
     assert "join the parts the customer gave since the last verify_identity result" in ident
     assert "never ask the whole question again for it" in ident
     assert "Do not repeat the security question in that message" in ident
     nego = wf["nodes"]["negotiate"]["task_message"]
-    assert "a cut-off message is no reply" in nego and "uses no attempt" in nego
+    assert "a cut-off message that holds no yes, no, date or amount is no reply" in nego
+    assert "uses no attempt" in nego
     assert "only after the customer has described that situation" in nego
+    # Voice test 577a2cd4: "can we make it in instalments" got "would you like me to connect you
+    # with restructuring?" and a "not right now"; brief A rule 41 says to transfer.
+    assert "do it at once without asking whether they want it" in nego
+    assert "ask first only when the rule itself says to offer it or to ask" in nego
     assert "that day lies INSIDE that period" in nego
 
 
@@ -398,3 +411,12 @@ def test_a_single_product_brief_still_gets_three_product_slots():
     wide = copy.deepcopy(SPEC_A)
     wide["meta"]["max_products"] = 5
     assert len(tool_names(render(wide, TOOLS, BRIEF)["nodes"]["negotiate"])) == 5
+
+
+def test_stage_caps_leave_room_for_cut_off_messages():
+    # 276302f talkative PUB-02: 11 cut-off messages in 30 s used up the third_party cap of 12 and
+    # closed as no_callback just before the callback time was given. Only user turns count.
+    from freya_builder.render import CAPS
+
+    assert CAPS["opening"] >= 25 and CAPS["third_party"] >= 40 and CAPS["identity"] >= 40
+    assert CAPS["negotiate"] >= 120

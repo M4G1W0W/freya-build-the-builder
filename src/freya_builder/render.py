@@ -14,7 +14,9 @@ from .spec import call_var, customer_field
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
-CAPS = {"opening": 8, "third_party": 12, "identity": 20, "negotiate": 60}
+# Safety nets against stalls, not brief rules. Only user turns count, and a talkative customer sends a
+# cut-off message about every 2 s (276302f PUB-02 hit a cap of 12 in 30 s), so they are generous.
+CAPS = {"opening": 25, "third_party": 40, "identity": 40, "negotiate": 120}
 
 
 def _tools_by_name(tools: list[Tool]) -> dict[str, Tool]:
@@ -120,7 +122,7 @@ def system_prompt(spec: dict, brief_text: str, engine_tools: list[str]) -> str:
 HOW TO WORK
 - Follow the BANK BRIEF below exactly. When a rule says to use a tool, call the tool: saying that you did something is not enough.
 - After every tool result, obey its what_to_do_next, then speak to the customer or call the next tool. Never end a turn with nothing.
-- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking: reply only "Please go on." Such a message is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Do not repeat your question, make a new offer or choose an ending on it. But if you said "Please go on." to their previous message too, repeat your last question or offer in a few words instead (unchanged: it is not a new offer or a new attempt).
+- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking. First read what it already says: if it already holds a reply to your last question or offer (a yes, a no, a date, an amount, a security answer) or a request, act on that part as you would on a complete message. Otherwise reply only "Please go on.", as many times in a row as it takes: a cut-off message without such a part is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Never repeat a question, an offer, an amount or a date because a message was cut off: each repeat counts as asking or offering again.
 - Say a sentence of sympathy only where a brief rule asks for one, and only as often as that rule says in the whole call. Small talk needs no sympathy.
 - Something happened only if its tool result says so. Never say something was recorded or booked unless the result says it was.
 - Call at most one tool per message.
@@ -204,7 +206,8 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
         "ATTEMPTS: persuasion attempts are counted per product, and FACTS lists each product's "
         "attempts in order. Unless a brief rule says to make no persuasion attempt, each time the "
         "customer refuses or does not answer for a product (not answering is a complete reply with no "
-        'yes, no, date or amount, such as "I don\'t know"; a cut-off message is no reply, and a first '
+        'yes, no, date or amount, such as "I don\'t know"; a cut-off message that holds no yes, no, date '
+        "or amount is no reply, and a first "
         'reply to an offer that is only small talk gets "Please go on." and uses no attempt), make '
         "that product's NEXT listed attempt, "
         "with exactly its amount and date: never skip one, never add one. After a product's last "
@@ -225,7 +228,7 @@ DATE TABLE:
 
 Follow the brief from the first ask to the confirmation and recording.
 DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. If the customer first named a period (like "next week" or "the week after next") and then gives only a weekday or a day number, that day lies INSIDE that period (DATE TABLE week rows). Never offer the latest date unless those lines say so.
-{attempts_line}Offer a transfer, the support team or any other option the brief ties to a situation (see ENDINGS) only after the customer has described that situation.
+{attempts_line}Use an ending the brief ties to a situation (a transfer, the support team or another option, see ENDINGS) only after the customer has described that situation. Then do what its rule says: when the rule says to transfer or close, do it at once without asking whether they want it; ask first only when the rule itself says to offer it or to ask.
 RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
