@@ -283,3 +283,21 @@ def test_notes_route_grows_linearly_enough_for_five_products():
     )
     assert _first_route(wf, vs) == "ev_notes_p"
     assert _first_route(wf, _products(5, 5) | {"p1_recorded": "yes"}) is None
+
+
+def test_callback_prompt_follows_a_combined_date_time_field():
+    # audit F04/F31/F61: variant-c has one 'when' field; the prompt said
+    # "with when as YYYY-MM-DD and  as HH:MM" (an empty second field name).
+    spec = copy.deepcopy(SPEC_A)
+    spec["callback"]["time_field"] = ""
+    task = render(spec, TOOLS, BRIEF)["nodes"]["third_party"]["task_message"]
+    assert " and  as HH:MM" not in task
+    assert "holding the date and the time together, exactly in this format:" in task
+
+
+def test_callback_prompt_with_separate_fields_is_unchanged():
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["third_party"]["task_message"]
+    cb = SPEC_A["callback"]
+    assert (
+        f"with {cb['date_field']} as YYYY-MM-DD and {cb['time_field']} as HH:MM (24 hour)." in task
+    )

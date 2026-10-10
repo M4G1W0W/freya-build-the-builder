@@ -132,12 +132,20 @@ No bank tool is available in this step.
 {_endings_text(spec, "opening")}"""
 
 
-def _third_party_task(spec: dict) -> str:
+def _third_party_task(spec: dict, when_desc: str = "") -> str:
     cb = spec["callback"]
+    if cb["time_field"]:
+        how = (
+            f"call schedule_callback with {cb['date_field']} as YYYY-MM-DD and "
+            f"{cb['time_field']} as HH:MM (24 hour)."
+        )
+    else:  # one field holds date and time together (audit F04/F31/F61): its API wording rules
+        how = (
+            f"call schedule_callback with {cb['date_field']} holding the date and the time "
+            f"together, exactly in this format: {when_desc or 'YYYY-MM-DD HH:MM (24 hour)'}"
+        )
     callback = (
-        f"CALLBACK: only these slots are possible:\n{{{{callback_slots}}}}\n"
-        f"To book one, call schedule_callback with {cb['date_field']} as YYYY-MM-DD and "
-        f"{cb['time_field']} as HH:MM (24 hour)."
+        f"CALLBACK: only these slots are possible:\n{{{{callback_slots}}}}\nTo book one, {how}"
         if cb["enabled"]
         else "No callback can be booked."
     )
@@ -145,6 +153,12 @@ def _third_party_task(spec: dict) -> str:
 {spec["stage_rules"]["third_party"]}
 {callback}
 {_endings_text(spec, "third_party")}"""
+
+
+def _field_desc(by: dict, tool: str, field: str) -> str:
+    t = by.get(tool)
+    f = t.field(field) if t and field else None
+    return f.description.strip() if f and f.description else ""
 
 
 def _identity_task(spec: dict) -> str:
@@ -309,7 +323,9 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     )
     wf_nodes["third_party"] = nodes.conversation(
         "third_party",
-        _third_party_task(spec),
+        _third_party_task(
+            spec, _field_desc(by, "schedule_callback", spec["callback"]["date_field"])
+        ),
         _exit_transitions(spec, "third_party"),
         tools=tp_tools,
         first_entry_only=True,
