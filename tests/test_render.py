@@ -102,3 +102,33 @@ def test_render_is_deterministic():
     a = json.dumps(render(SPEC_A, TOOLS, BRIEF), sort_keys=True)
     b = json.dumps(render(copy.deepcopy(SPEC_A), TOOLS, BRIEF), sort_keys=True)
     assert a == b
+
+
+def test_sandbox_runs_are_minimised():
+    """Every sandbox run returns ALL variables and large outputs were seen truncated on the
+    platform (2026-10-10): no pre-hooks, and endings before negotiation use no code node."""
+    n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
+    for node in n.values():
+        for tool in node.get("tools") or []:
+            assert "pre_process_code" not in tool, node["name"]
+    for row in SPEC_A["rows"]:
+        ev = n[f"ev_{row['id']}"]
+        if "negotiate" in row["phases"]:
+            assert ev["node_type"] == "code"
+        else:
+            assert ev["node_type"] == "api_request", row["id"]
+            calls = engine_names(ev) + (
+                engine_names(n[f"cl_{row['id']}"]) if f"cl_{row['id']}" in n else []
+            )
+            assert calls[-1] == "close_call"
+            body = (n.get(f"cl_{row['id']}") or ev)["pre_actions"][0]["function"]["parameters"][
+                "properties"
+            ]["body"]["properties"]
+            assert body["outcome"]["default"] == row["outcome"]
+            assert ("reason" in body) == bool(row["reason"])
+
+
+def test_turn_caps_end_on_the_stage_default_row():
+    n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
+    for stage, rid in SPEC_A["default_rows"].items():
+        assert n[stage]["max_turn_transition"] == f"ev_{rid}"

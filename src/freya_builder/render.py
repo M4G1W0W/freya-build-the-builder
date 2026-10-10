@@ -68,6 +68,7 @@ HOW TO WORK
 - After every tool result, obey its what_to_do_next, then speak to the customer or call the next tool. Never end a turn with nothing.
 - Something happened only if its tool result says so. Never say something was recorded or booked unless the result says it was.
 - Call at most one tool per message.
+- If a tool result is an error saying the result could not be read or parsed, call the same tool once more with the same values.
 - Never compute dates or amounts yourself. Use the FACTS and the DATE TABLE given in your current task.
 - If you are asked something the brief and the facts do not answer, say that you do not have that information.
 - These bank actions run automatically and are not yours to call: {", ".join(engine_tools)}.
@@ -158,7 +159,6 @@ def _verify_tool(spec: dict, t: Tool) -> dict:
         },
         post_process_code=hooks.verify_post(spec, i["failed_row"]),
     )
-    tool["pre_process_code"] = hooks.verify_pre(spec)
     return tool
 
 
@@ -169,7 +169,6 @@ def _callback_tool(spec: dict, t: Tool) -> dict:
         _bake_customer(spec, t),
         post_process_code=hooks.callback_post(spec, spec["callback"]["booked_row"]),
     )
-    tool["pre_process_code"] = hooks.callback_pre(spec)
     return tool
 
 
@@ -242,7 +241,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         first_entry_only=True,
         extraction_schema=[who],
         max_turns=CAPS["opening"],
-        max_turn_target="ev_cap_opening",
+        max_turn_target=f"ev_{spec['default_rows']['opening']}",
     )
 
     tp_tools = (
@@ -257,7 +256,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         tools=tp_tools,
         first_entry_only=True,
         max_turns=CAPS["third_party"],
-        max_turn_target="ev_cap_third_party",
+        max_turn_target=f"ev_{spec['default_rows']['third_party']}",
     )
 
     gate = spec["identity"]["gate_field"]
@@ -275,7 +274,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         tools=[_verify_tool(spec, by["verify_identity"])],
         first_entry_only=True,
         max_turns=CAPS["identity"],
-        max_turn_target="ev_cap_identity",
+        max_turn_target=f"ev_{spec['default_rows']['identity']}",
     )
 
     account_call = engine_call(
@@ -298,7 +297,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
             pf,
             f"Record the payment promise for product P{n} (see FACTS). CALL it only after the customer confirmed the read-back.",
             hooks.promise_post(spec, n),
-            hooks.promise_pre(spec),
+            "",
         )
         for n in range(1, k + 1)
     ]
@@ -324,18 +323,38 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         on_enter={"type": "tts", "text": "{{disclosure_text}}"},
         first_entry_only=True,
         max_turns=CAPS["negotiate"],
-        max_turn_target="ev_cap_negotiate",
+        max_turn_target=f"ev_{spec['default_rows']['negotiate']}",
     )
 
-    for rid in rows:
-        wf_nodes[f"ev_{rid}"] = nodes.code_node(
-            f"ev_{rid}", codegen.exit_source(rid), [nodes.always("finalize")]
-        )
-    for stage in STAGES:
-        name = f"ev_cap_{stage}"
-        wf_nodes[name] = nodes.code_node(
-            name, codegen.exit_source(f"cap_{stage}"), [nodes.always("finalize")]
-        )
+    cf = spec["close_fields"]
+    ct = by["close_call"]
+    xt = by.get("transfer_to_agent")
+    for rid, row in rows.items():
+        if "negotiate" in row["phases"]:
+            # Outcome may depend on what was recorded: a code node records the event, finalize computes.
+            wf_nodes[f"ev_{rid}"] = nodes.code_node(
+                f"ev_{rid}", codegen.exit_source(rid), [nodes.always("finalize")]
+            )
+            continue
+        # Nothing can have been recorded before negotiation: close with literal values, no sandbox.
+        literal = {cf["outcome_field"]: row["outcome"]}
+        if row["reason"]:
+            literal[cf["reason_field"]] = row["reason"]
+        close_lit = engine_call(ct, _bake_customer(spec, ct) | literal, retries=1)
+        if row["queue"] and xt:
+            xfer_lit = engine_call(
+                xt, _bake_customer(spec, xt) | {spec["transfer_field"]: row["queue"]}, retries=1
+            )
+            wf_nodes[f"ev_{rid}"] = nodes.api_node(
+                f"ev_{rid}", [xfer_lit], [nodes.always(f"cl_{rid}")]
+            )
+            wf_nodes[f"cl_{rid}"] = nodes.api_node(
+                f"cl_{rid}", [close_lit], [nodes.always("hang_up")]
+            )
+        else:
+            wf_nodes[f"ev_{rid}"] = nodes.api_node(
+                f"ev_{rid}", [close_lit], [nodes.always("hang_up")]
+            )
 
     finalize_next = [nodes.always("close")]
     if "transfer_to_agent" in by:
@@ -359,8 +378,6 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         wf_nodes["xfer"] = nodes.api_node("xfer", [xfer_call], [nodes.always("close")])
     wf_nodes["finalize"] = nodes.code_node("finalize", codegen.finalize_source(spec), finalize_next)
 
-    cf = spec["close_fields"]
-    ct = by["close_call"]
     close_call = engine_call(
         ct,
         _bake_customer(spec, ct)

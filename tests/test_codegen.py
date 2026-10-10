@@ -80,12 +80,26 @@ def block(facts: str, slot: str) -> str:
 
 
 def table_line(table: str, iso: str) -> str:
-    return next(line for line in table.splitlines() if line.startswith(iso + " = "))
+    """The compact calendar's entry for a date: its non-business-day entry, or 'business day'.
+    Fails if the date is outside the covered range."""
+    end = re.search(r"from today to (\d{4}-\d{2}-\d{2})", table).group(1)
+    today = re.search(r"today is \w{3} (\d{4}-\d{2}-\d{2})", table).group(1)
+    assert today <= iso <= end, (iso, today, end)
+    for entry in table.splitlines()[2].split("; "):
+        if entry[4:14] == iso:
+            return entry
+    return iso + ": business day"
 
 
 def relative(table: str, name: str) -> str:
-    line = next(line for line in table.splitlines() if line.startswith("- " + name + " = "))
-    return line.split(" = ", 1)[1][:10]
+    """'next Friday' / 'this Friday' / 'tomorrow' / 'end of this month' -> ISO date."""
+    lines = table.splitlines()
+    if name in ("tomorrow", "end of this month"):
+        line = next(x for x in lines if x.startswith(name + " = "))
+        return line.split(" = ", 1)[1][4:14]
+    which, day = name.split(" ", 1)
+    line = next(x for x in lines if x.startswith(which + " <weekday>"))
+    return next(e for e in line.split(": ", 1)[1].split(", ") if e.startswith(day[:3]))[4:14]
 
 
 CARD = {
@@ -220,10 +234,10 @@ def test_setup_on_brief_a(mode):
     assert "close_reason" not in vs
 
     table = vs["date_table"]
-    assert table.splitlines()[1].startswith("2026-10-14 = Wednesday 14 October 2026: business day")
-    assert "next business day: 2026-10-27" in table_line(table, "2026-10-26")
+    assert table.startswith("CALENDAR: today is Wed 2026-10-14.")
+    assert table_line(table, "2026-10-14").endswith("business day")
+    assert "-> 2026-10-27" in table_line(table, "2026-10-26")
     assert "holiday" in table_line(table, "2026-10-26")
-    assert "business day before: 2026-10-23" in table_line(table, "2026-10-26")
     assert table_line(table, "2026-11-02").endswith("business day")
     table_line(table, "2026-11-16")  # max deadline (2 Nov) + 14 days is covered
     assert relative(table, "next Friday") == "2026-10-23"  # following_week
@@ -258,7 +272,7 @@ def test_callback_before_the_window_opens_and_after_it_closes():
 )
 def test_setup_on_awkward_days(now, business):
     vs = run(codegen.setup_source(spec_a()), {"now": now})
-    assert vs["date_table"].startswith("DATE TABLE")
+    assert vs["date_table"].startswith("CALENDAR")
     assert vs["callback_slots"].startswith("CALLBACK SLOTS")
     if business is None:
         assert vs["setup_debug"] == "now unreadable; server clock used"
@@ -611,13 +625,12 @@ def test_mutated_spec_dates():
     assert "credit card ending 0042" in block(facts, "P1")
 
     table = vs["date_table"]
-    assert table.startswith("DATE TABLE (business days: Monday, Tuesday, Wednesday, Thursday,")
+    assert table.startswith("CALENDAR") and "Business days: Mon, Tue, Wed, Thu," in table
     friday = table_line(table, "2026-10-16")
     # A Friday off is a non-working day, not a weekend (the model repeats these words).
-    assert "non-working day, not a business day" in friday and "weekend" not in friday
+    assert "non-working day" in friday and "weekend" not in friday
     assert "weekend" in table_line(table, "2026-10-17")
-    assert f"next business day: {ref.on_or_after(dt.date(2026, 10, 16)).isoformat()}" in friday
-    assert f"business day before: {ref.on_or_before(dt.date(2026, 10, 16)).isoformat()}" in friday
+    assert f"-> {ref.on_or_after(dt.date(2026, 10, 16)).isoformat()}" in friday
     assert "holiday" in table_line(table, "2026-10-20")
     assert relative(table, "next Thursday") == "2026-10-15"  # next_occurrence, not 2026-10-22
     assert relative(table, "next Wednesday") == "2026-10-21"  # never today

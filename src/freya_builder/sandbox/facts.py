@@ -220,64 +220,54 @@ def _when(d, today):
     return " (already past)" if d < today else ""
 
 
+def _wd(d):
+    """'Sat 2026-10-17': compact, unambiguous, ISO for tool calls."""
+    return WEEKDAYS[d.weekday()][:3].capitalize() + " " + d.isoformat()
+
+
+def _kind(d):
+    if d.isoformat() in HOLIDAYS:
+        return "holiday"
+    return "weekend" if d.weekday() >= 5 else "non-working day"
+
+
 def date_table(today, end, C):
-    names = ", ".join(WEEKDAYS[w].capitalize() for w in sorted(WORKDAYS)) or "none"
-    lines = ["DATE TABLE (business days: " + names + ", except bank holidays):"]
-    d = today
-    while d <= end and len(lines) < 200:
-        lines.append(
-            d.isoformat() + " = " + spoken(d) + ": " + _day_note(d, today) + _when(d, today)
-        )
+    """Compact calendar (it is a workflow variable: every sandbox run returns all variables, and
+    large outputs were seen truncated by the platform, so this stays small)."""
+    names = ", ".join(WEEKDAYS[w][:3].capitalize() for w in sorted(WORKDAYS)) or "none"
+    lines = [
+        "CALENDAR: today is " + _wd(today) + ". Business days: " + names + ", except holidays.",
+        "Days that are NOT business days, from today to "
+        + end.isoformat()
+        + " (-> next business day):",
+    ]
+    d, off = today, []
+    while d <= end and len(off) < 80:
+        if not is_business_day(d):
+            after = business_day_on_or_after(d)
+            off.append(_wd(d) + " " + _kind(d) + (" -> " + after.isoformat() if after else ""))
         d = d + datetime.timedelta(days=1)
-    lines.append("")
-    lines.append("RELATIVE DAYS (as said today):")
+    lines.append("; ".join(off) if off else "(none)")
+    lines.append("Every other date in that range is a business day.")
     tomorrow = today + datetime.timedelta(days=1)
-    lines.append("- today = " + _short(today) + ": " + _day_note(today, today))
-    lines.append("- tomorrow = " + _short(tomorrow) + ": " + _day_note(tomorrow, today))
-    monday = weekday_in_week(today, 0, 0)
+    lines.append("tomorrow = " + _wd(tomorrow))
+    this_days = [weekday_in_week(today, wd, 0) for wd in range(7)]
     lines.append(
-        "- this week = "
-        + _short(monday)
-        + " to "
-        + _short(monday + datetime.timedelta(days=6))
-        + "; next week = "
-        + _short(monday + datetime.timedelta(days=7))
-        + " to "
-        + _short(monday + datetime.timedelta(days=13))
+        "this <weekday> (this Monday-to-Sunday week): " + ", ".join(_wd(x) for x in this_days)
     )
     following = C.get("next_weekday") != "next_occurrence"
-    for wd in range(7):
-        this_day = weekday_in_week(today, wd, 0)
-        name = WEEKDAYS[wd].capitalize()
-        lines.append(
-            "- this "
-            + name
-            + " = "
-            + _short(this_day)
-            + _when(this_day, today)
-            + ": "
-            + _day_note(this_day, today)
-        )
-    for wd in range(7):
-        if following:
-            next_day = weekday_in_week(today, wd, 1)
-        else:
-            next_day = next_occurrence(today, wd, False)
-        name = WEEKDAYS[wd].capitalize()
-        lines.append(
-            "- next " + name + " = " + _short(next_day) + ": " + _day_note(next_day, today)
-        )
-    month_end = end_of_month(today)
-    last_bd = last_business_day_of_month(today)
-    line = "- end of this month = " + _short(month_end) + ": " + _day_note(month_end, today)
-    if last_bd is not None:
-        line += "; last business day of this month: " + _short(last_bd)
-    lines.append(line)
     if following:
-        lines.append("('next <weekday>' = that weekday in the following Monday-to-Sunday week.)")
+        nxt = [weekday_in_week(today, wd, 1) for wd in range(7)]
+        rule = "next <weekday> (that weekday in the following week): "
     else:
-        lines.append("('next <weekday>' = the first such weekday after today, never today.)")
-    lines.append("('this <weekday>' = that weekday in the current Monday-to-Sunday week.)")
+        nxt = [next_occurrence(today, wd, False) for wd in range(7)]
+        rule = "next <weekday> (the first such weekday after today): "
+    lines.append(rule + ", ".join(_wd(x) for x in nxt))
+    last_bd = last_business_day_of_month(today)
+    line = "end of this month = " + _wd(end_of_month(today))
+    if last_bd is not None:
+        line += "; last business day of this month = " + _wd(last_bd)
+    lines.append(line)
     return "\n".join(lines)
 
 
