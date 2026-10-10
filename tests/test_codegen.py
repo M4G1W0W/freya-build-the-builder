@@ -444,8 +444,10 @@ def promise_ok(k: int, flag: object = "true") -> dict:
 
 
 def note(k: int, reason: str) -> dict:
+    # The key the platform writes (seen in route_evaluated variable tables, 10 Oct 14:18 UTC):
+    # <tool>_args.<ARG_PREFIX><field>. The earlier assumed key "<tool>_args.reason" never exists.
     return {
-        f"add_note_p{k}_args.reason": reason,
+        f"add_note_p{k}_args.arg_reason": reason,
         f"add_note_p{k}_response.status": "success",
         f"add_note_p{k}_response.data.ok": "true",
     }
@@ -834,7 +836,7 @@ def test_finalize_envelope_without_an_ok_flag():
 
 def test_finalize_note_reason_under_body_args():
     extra = {"end_event": "done", **note(1, "dispute")}
-    extra["add_note_p1_args.body.reason"] = extra.pop("add_note_p1_args.reason")
+    extra["add_note_p1_args.body.reason"] = extra.pop("add_note_p1_args.arg_reason")
     vs = finalize(spec_multi(), extra, 1)
     assert (vs["close_outcome"], vs["close_reason"]) == ("no_promise", "dispute")
 
@@ -865,3 +867,13 @@ def test_offer_plan_sets_the_attempt_counts_side_by_side():
     assert "not even the floor" in plan
     assert "P1: 1 offer only: 1) 300.00 on 2026-10-16" in plan
     assert "P2: 2 offers: 1) 900.00 on 2026-10-16, 2) floor 300.00 on 2026-10-23" in plan
+
+
+def test_finalize_wrap_up_default_ending_takes_the_note_reason():
+    # PUB-05 on the A+B agent, 1bc0c1d rep 3: wrap_up ends through the default negotiate row and
+    # finalize must take the outcome from the saved note. The reason sat under ..._args.arg_reason,
+    # which finalize did not read, so the call closed as no_promise/refused instead of hardship.
+    spec = spec_multi()
+    extra = {"end_event": spec["default_rows"]["negotiate"], **note(1, "hardship")}
+    vs = finalize(spec, extra, 1)
+    assert (vs["close_outcome"], vs["close_reason"]) == ("no_promise", "hardship")

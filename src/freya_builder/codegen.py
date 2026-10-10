@@ -9,6 +9,7 @@ No brief knowledge: every value comes from the spec. Node and tool names are the
 """
 
 from .expr import check_expr, normalise
+from .hooks import ARG_PREFIX
 from .sandbox import assemble
 from .spec import call_var
 
@@ -210,6 +211,7 @@ def finalize_config(spec: dict) -> dict:
         "K": _slots(spec),
         "notes_used": spec["notes"]["used"],
         "note_reason_field": spec["notes"]["reason_field"],
+        "arg_prefix": ARG_PREFIX,
         "promise_tool": PROMISE_TOOL,
         "note_tool": NOTE_TOOL,
         "ok_field": OK_FIELD,

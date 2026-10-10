@@ -686,8 +686,11 @@ def finalize_main(vs, C):
             note_tool = C.get("note_tool", "") + str(k)
             if C.get("notes_used") and _succeeded(vs, note_tool, ok_field):
                 field = str(C.get("note_reason_field") or "reason")
+                prefix = str(C.get("arg_prefix") or "")
                 reason = None
-                for key in ("_args." + field, "_args.body." + field, "_args.reason"):
+                # observed on the platform: <tool>_args.<arg_prefix><field>; the rest are fallbacks
+                keys = ("_args." + prefix + field, "_args." + field, "_args.body." + field)
+                for key in keys:
                     if reason in (None, ""):
                         reason = vs.get(note_tool + key)
                 notes.append((k, str(reason or "").strip()))
