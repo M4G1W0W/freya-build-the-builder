@@ -33,8 +33,8 @@ class Trace:
     def line(self, kind: str, message: str) -> None:
         print(self._redact(f"{utc_now()} {kind:<7} {message}"), file=self.stream, flush=True)
 
-    def start(self, brief_paths: list[str], tool_api_path: str) -> None:
-        self.line("START", f"briefs={brief_paths} tool_api={tool_api_path}")
+    def start(self, brief_paths: list[str], tool_api_path: str, code: str = "") -> None:
+        self.line("START", f"briefs={brief_paths} tool_api={tool_api_path} {code}".rstrip())
 
     def step(self, message: str) -> None:
         self.line("STEP", message)

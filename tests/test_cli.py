@@ -34,6 +34,22 @@ def test_dry_run_end_to_end(capsys):
         assert needle in err
 
 
+def test_start_line_ties_the_trace_to_the_code_and_inputs(capsys, monkeypatch):
+    # Review gap 10: the organisers' reviewer compares the trace with the submitted commit.
+    monkeypatch.setattr(cli, "code_version", lambda: ("abc1234", True))
+    cli.run([BRIEF, API, "--dry"], fake_extract, fake_render)
+    err = capsys.readouterr().err
+    start = next(line for line in err.splitlines() if " START " in line)
+    for needle in ("git=abc1234", "dirty=True", "python=", "models=gpt-6.1-sol", "sha256="):
+        assert needle in start
+    assert "uncommitted changes" in err
+
+
+def test_code_version_reads_this_checkout():
+    commit, dirty = cli.code_version()
+    assert commit != "unknown" and isinstance(dirty, bool)
+
+
 def test_invalid_workflow_stops_before_platform(capsys):
     def broken(spec, tools):
         wf = fake_render(spec, tools)

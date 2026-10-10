@@ -7,12 +7,14 @@ The requirements come from `docs/hackathon_notes.md` → Submission (official pa
 - [ ] **15:30 freeze.** `make verify` is green, then `git tag freeze-final`. After this, only generic crash and bug
       fixes are allowed.
 - [ ] `git status` is clean. `date -u` is checked.
-- [ ] `set -a && source .env && set +a`. The FREYA_* vars, OPENAI_API_KEY, BUILDER_MODEL and
-      BUILDER_MODEL_FALLBACKS are set.
+- [ ] `set -a && source .env && set +a`. FREYA_API_KEY and OPENAI_API_KEY are set (BUILDER_MODEL and
+      BUILDER_MODEL_FALLBACKS are optional: the chain gpt-6.1-sol → gpt-5.5 → gpt-5.4 is in code).
 - [x] Team name: **Pistalogic**. Repo: **private for now**; the user will make it public or share it later (it must be
       cloneable by the organisers at the submitted commit).
-- [ ] The OpenAI key question for the organisers' re-run (see Open questions).
-- [ ] Practice the commands below once on `kit/briefs/brief-a.md` with slot `rehearsal`, so the steps are warm.
+- [ ] The OpenAI key question for the organisers' re-run (see Open questions; the README's "Organiser re-run"
+      section lists exactly what they need).
+- [ ] Rehearse steps 2–5 once on `kit/briefs/brief-a.md` with `--slot rehearsal` and `traces/rehearsal.log`,
+      including the secret check on the log and the exported JSON. Delete the rehearsal files afterwards.
 
 ## 17:00: the hidden briefs arrive
 
@@ -20,27 +22,32 @@ The requirements come from `docs/hackathon_notes.md` → Submission (official pa
 rule, value, name, date or code in `src/`, `builder/`, `tests/`, fixtures or prompts. Only generic bug fixes, which
 must make sense for any brief.
 
-1. Save the files **outside the repo** (for example `~/hidden/`). Note the file names and check whether a brief says it
-   builds on another brief.
+1. Save the files **outside the repo** (for example `~/hidden/`). Note the file names. Each hidden brief is **one
+   file** (FAQ); build each from exactly its own file.
 2. The official run command is `python3 builder/build.py {brief_path} {tool_api_path}`. Here the system `python3` is
    3.9, so put the venv first on PATH. The command stays the same:
 
 ```bash
 export PATH="$PWD/.venv/bin:$PATH"
 python3 --version   # must be 3.10+
-python3 builder/build.py ~/hidden/<brief-1> ~/hidden/<api-1> --export submission/hidden-1.workflow.json 2>&1 | tee traces/hidden-1.log
-python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --export submission/hidden-2.workflow.json 2>&1 | tee traces/hidden-2.log
+mkdir -p traces submission && set -o pipefail   # tee writes nothing into a missing folder
+python3 builder/build.py ~/hidden/<brief-1> ~/hidden/<api-1> --slot hidden-1 --export submission/hidden-1.workflow.json 2>&1 | tee traces/hidden-1.log
+python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --slot hidden-2 --export submission/hidden-2.workflow.json 2>&1 | tee traces/hidden-2.log
 ```
 
-   Each build takes about 2 minutes. They can run one after the other or in two terminals (separate slots, no
-   simulation slot needed).
-3. Read each trace. Check for:
-   - `END ok=True`;
-   - `spec check: PASS` (in round 1 or after repair);
-   - `local workflow validation: PASS` and `platform dry-run validation: PASS`;
-   - `chat smoke test: PASS`;
-   - the number of steps and tools;
-   - for the raw-material brief, the `amendment:` lines. **Every memo change must be listed.**
+   Each build takes about 2 minutes. Run them **one after the other** in one terminal. The explicit `--slot` names
+   keep the two agents in separate workflows.
+3. Read each trace. These greps must each print a line:
+
+```bash
+grep -E "END +ok=True" traces/hidden-N.log
+grep -E "TEST +spec check \(round [0-9]+\): PASS" traces/hidden-N.log
+grep -E "TEST +local workflow validation: PASS|TEST +platform dry-run validation: PASS" traces/hidden-N.log
+grep -E "TEST +chat smoke test: opening reply: PASS" traces/hidden-N.log
+grep -E "CREATED +workflow_id=" traces/hidden-N.log   # steps= and tools= are on this line
+```
+
+   For the raw-material brief, read the `amendment:` lines. **Every memo change must be listed.**
 
    New since 10 Oct evening, so grep the trace for each:
    - `UNRESOLVED spec problem (deployed anyway)`: the LLM could not repair it. Read each one. If it is a builder bug,
@@ -53,7 +60,9 @@ python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --export submission
    - `falling back to`: the primary model was unavailable; fine, but note it.
 4. If a build fails or looks wrong, **re-run the same command.** That updates the same slot in place and the new
    trace replaces the old one. Never edit the agent by hand. If it fails again, read the error. A **generic** fix to
-   the builder is allowed: commit it, then re-run.
+   the builder is allowed: commit it, then **re-run both briefs**, so both agents come from the same commit.
+   Every trace's START line has `git=<commit> dirty=<flag>`: before submitting, both traces must show
+   `dirty=False` and the same commit as the form's `commit` field (`grep -o "git=[0-9a-f]* dirty=[A-Za-z]*" traces/hidden-*.log`).
 5. Secret check, then commit:
 
 ```bash
@@ -79,13 +88,13 @@ git tag submission-final
 | `spec check` still has problems after 2 repair rounds | Read the problem list. If it is a builder bug, make a generic fix and re-run. |
 | Freya 5xx or 429 | Wait a minute and re-run. Do not hammer the platform. |
 | `python3` is 3.9 | Run `export PATH="$PWD/.venv/bin:$PATH"` (`build.py` exits with a clear message on < 3.10). |
-| A brief builds on another brief | The run command takes one brief. Pass both brief files in order: the builder accepts several briefs before the tool API, as with A+B. Note it in the form. |
+| A brief seems to depend on another document | The FAQ says each hidden brief is one file and `{brief_path}` is that file. Build from that one file only. If in doubt, ask the organisers by replying to the login mail. |
 
 ## Open questions (for the user, before Sunday)
 
 - The organisers re-run the top 10 builders. Ours needs an `OPENAI_API_KEY` ("You pay for your builder's own model
-  calls"). How will they get a key? Options: we give them one with a spending limit, or we ask the organisers how
-  they want it.
+  calls"). How will they get a key? The user is asking the organisers (draft in the 10 Oct chat). Options: we send one
+  privately with a spending limit and an expiry, or they use their own. Never put a key in the repo.
 - Answered on 10 Oct: team Pistalogic; the repo stays private until the user shares it or makes it public.
 - The user asked whether the builder could use Freya instead of OpenAI. Our recommendation is no. The Freya API has no
   completion endpoint, model names are undocumented free strings, `llmConfig.maxTokens` is capped at 4000 while our

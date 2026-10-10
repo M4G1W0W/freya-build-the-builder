@@ -8,13 +8,15 @@ The last positional argument is the tool API (OpenAPI JSON); everything before i
 """
 
 import argparse
+import hashlib
 import json
+import subprocess
 import sys
 import traceback
 from collections.abc import Callable
 from pathlib import Path
 
-from . import platform
+from . import llm, platform
 from .toolapi import Tool, load_tool_api
 from .trace import Trace
 from .validate import unsent_required, validate
@@ -82,11 +84,49 @@ def load_dotenv(path: Path = platform.ROOT / ".env") -> None:
                 os.environ.setdefault(key.strip(), value.strip())
 
 
+def code_version() -> tuple[str, bool]:
+    """(short commit, uncommitted changes in tracked files), or ("unknown", False) outside git."""
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=platform.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=platform.ROOT,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return "unknown", False
+    if head.returncode != 0:
+        return "unknown", False
+    return head.stdout.strip(), bool(status.stdout.strip())
+
+
+def _sha(path: str) -> str:
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
+    except OSError:
+        return "unreadable"
+
+
 def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int:
     a = parse_args(argv)
     load_dotenv()
     trace = Trace()
-    trace.start(a.briefs, a.tool_api)
+    commit, dirty = code_version()
+    inputs = ",".join(_sha(p) for p in [*a.briefs, a.tool_api])
+    trace.start(
+        a.briefs,
+        a.tool_api,
+        f"sha256={inputs} git={commit} dirty={dirty} python={sys.version.split()[0]} "
+        f"models={','.join(llm.model_chain())}",
+    )
+    if dirty:
+        trace.warn(f"uncommitted changes in tracked files: this run is not exactly commit {commit}")
     ok = False
     try:
         brief_text = read_briefs(a.briefs)
