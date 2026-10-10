@@ -75,6 +75,10 @@ docs/hackathon_notes.md   logistics, event page facts, kickoff checklist, decisi
 docs/reference/           offline snapshot: public Freya docs, live OpenAPI spec, official hackathon
                           page (hackathon_page.md) + 13 practice cases (hackathon_practice_cases.json)
 docs/hackathon_requirements.md  every rule extracted from the official page + open questions
+docs/reference/workflows/ organiser base workflow + kit minimal-builder workflow, as exported JSON
+kit/                      the official kit, UNMODIFIED (freya.py, briefs, docs, run_cases.py, ...)
+scripts/                  dev tools (not the builder): env_check, show_run, show_call, chat, credits
+Makefile                  dev loop: make check | cases | show | call | chat | credits (make help)
 runs/                     (gitignored) per-run artefacts: generated configs, transcripts, results
 submission/               (COMMITTED) exported phone agents: hidden-N.workflow.json
 traces/                   (COMMITTED) builder traces: hidden-N.log (keys stripped)

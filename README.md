@@ -43,6 +43,18 @@ submission/               (committed) exported phone agents, hidden-N.workflow.j
 traces/                   (committed) builder run traces, hidden-N.log, keys stripped
 ```
 
-Builder, scoring and submission commands will be added once the kit is integrated. Page shape:
-`python3 builder/build.py <brief> <tool_api.json> 2>&1 | tee traces/<name>.log` and
-`python3 tools/run_cases.py <agent_id> --brief A --reps 3`.
+## Dev loop
+
+`kit/` is the official kit, unmodified. Our dev tools are in `scripts/`, wrapped by `make` (`make help`).
+
+```bash
+make check                                   # env vars, Freya API, workspace, credits (read-only)
+make baseline                                # kit's minimal builder on brief A -> prints workflow_id, agent_id
+make cases AGENT=<agent_id> BRIEF=A REPS=3   # practice run (also STYLE=talkative, ONLY=PUB-04)
+make show RUN=runs/<timestamp>-A.json        # summary + transcripts of failed cases
+make call ID=<call_id>                       # one transcript: speech, tool calls, results, routes
+make chat WF=<workflow_id> CASE=PUB-01       # talk to a workflow over text (no judge)
+make credits LABEL="after X"                 # log credit use
+```
+
+Builder (to be written): `python3 builder/build.py <brief> <tool_api.json> 2>&1 | tee traces/<name>.log`.

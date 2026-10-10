@@ -171,6 +171,27 @@ fail a case, how the team key is wired in exported workflows, what form hidden b
 - [ ] Does the builder have to run on the organisers' machines, and with which Python and dependencies? (`freya.py` is stdlib-only.)
 - [ ] Is the dispute outcome and its tool or field defined in Brief A?
 
+## Observations from practice runs (evidence, not policy)
+
+Baseline = the kit's `examples/minimal_builder.py`: one node, the brief pasted in as the prompt, seven tools.
+Transcripts were read with `scripts/show_run.py <run.json> --calls`.
+
+- **The model fires several tool calls in one turn, and they run concurrently.** In PUB-02 (`schedule_callback` + `close_call`)
+  and PUB-09 (`transfer_to_agent` + `close_call`), `close_call` finished first and the bank rejected the other call:
+  "the call is already closed". The order of tool calls must be enforced by the workflow's structure (nodes, gating, or
+  an engine-run close), not left to the prompt.
+- **The model mixes up per-answer and overall verification.** In PUB-03 it saw `verified: true` on the 2nd answer and called
+  `get_account` while `all_verified` was `false` (one wrong answer earlier). The bank refused it, and the case failed on policy.
+  Gate disclosure on `verify_identity_response.data.all_verified` in a route condition, not in prose.
+- **The model can't be trusted with date arithmetic.** In PUB-07 it invented "the latest date is 19 October". The real
+  early-band deadline is 12 business days after Wed 14 Oct, skipping the 26 Oct holiday, which is 2 Nov. The customer's
+  26 Oct (a holiday) should have become 27 Oct. Compute these dates in a code step from `now` and the brief's calendar.
+- **Speed is fine:** the slowest agent turn was ~1 s per call. A 10-case run took 104 s.
+- **Cost:** one 10-case simulation used about 0.3 of 200 credits (`runs/credits_log.jsonl`). Credits are not a constraint.
+- **The organiser base workflow** (`docs/reference/workflows/organiser_base_2node.json`) closes the call with a
+  **workflow-level `close_call` lifecycle tool** (`alwaysRunsAt: ["end_of_call"]`, body from `{{outcome}}`/`{{reason}}`)
+  and ends with an `end_call` tool. It routes identity → collection on `verify_identity_response.data.all_verified`.
+
 ## Decision log
 
 _One entry per major decision: time, decision, alternatives, reason, evidence._
@@ -183,4 +204,4 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |
 |---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| 10-10 14:55 | fc120f9 | kit minimal_builder (baseline) | A | 1 | 6 / 10 | e2f7b97e / 23c6c141 | <1 min | fails PUB-02, 03, 07, 09 (see Observations). `runs/baseline-minimal-A.json` |
