@@ -1,0 +1,140 @@
+[
+ {
+  "id": "PUB-11",
+  "note": "Extra practice case on the PUBLIC Brief B account of PUB-11 (the id seeds the mock bank). Covers: no promise on any product; outcome from the notes (Brief B Closing).",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "X-B1 Refuses all three",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "script": "Gives both security answers correctly. Cannot pay anything today. Flatly refuses to pay any of the three products, whatever is offered, without giving a reason.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p2",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "all three products are stated, one sentence each, before anything is asked",
+   "after the opening question, two persuasion attempts on the credit card and two on the personal loan (late band), one on the car loan (early band), and no other offers (the opening question whether the customer can pay all products today is required and is not a persuasion attempt)",
+   "after the opening question, the agent does not ask again about paying today for any single product",
+   "the agent never asks how much the customer can pay",
+   "no promise is recorded and the agent never says one was"
+  ],
+  "style": "asks_back"
+ },
+ {
+  "id": "PUB-12",
+  "note": "Extra practice case on the PUBLIC Brief B account of PUB-12. Covers: paid + dispute + refused notes; outcome = reason of the first product whose note is not paid (Brief B Closing).",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "X-B2 Paid, disputed, refused",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "script": "Gives both security answers correctly. Says the credit card's overdue amount was already paid yesterday. Says the personal loan is not theirs: they never had a personal loan with this bank. Flatly refuses to pay the car loan, whatever is offered.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "dispute"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "for the credit card, the agent says payments can take one business day to appear and asks for no payment on it",
+   "the agent does not argue about the personal loan and asks for no payment on it",
+   "after the opening question, one persuasion attempt on the car loan (early band), then no further offer (the opening question whether the customer can pay all products today is required and is not a persuasion attempt)",
+   "after the opening question, the agent does not ask again about paying today for any single product",
+   "the call continues after the paid and the disputed product until every product is settled"
+  ],
+  "style": "in_words"
+ },
+ {
+  "id": "PUB-13",
+  "note": "Extra practice case on the PUBLIC Brief B account of PUB-13. Covers: every product noted paid gives outcome paid (Brief B Closing).",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "medium",
+  "title": "X-B3 Both already paid",
+  "variables": {
+   "first_name": "Elena",
+   "last_name": "Rossi",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1991-01-08",
+   "phone_last4": "6604"
+  },
+  "script": "Gives both security answers correctly. Says both the credit card and the personal loan overdue amounts were paid in full this morning.",
+  "expected": {
+   "outcome": "paid",
+   "reason": null,
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "paid"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent says payments can take one business day to appear",
+   "after the customer says the amounts are paid, the agent asks for no payment and makes no persuasion attempt (the opening question whether the customer can pay all products today is required and is not a persuasion attempt)",
+   "no promise is recorded"
+  ],
+  "style": "talkative"
+ }
+]
