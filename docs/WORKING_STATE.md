@@ -3,15 +3,17 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-10 16:22 Istanbul (13:22 UTC). Last commit: see `git log`. Hidden briefs open Sun 11 Oct 17:00 UTC.
+**Snapshot:** 2026-10-10 16:25 Istanbul (13:25 UTC). Last commit `031344c`. Hidden briefs open Sun 11 Oct 17:00 UTC.
 
 ## Phase
 
 The phases come from `docs/design.md` §7:
 - **Phase 1 (Brief A):** mostly done.
 - **Phase 2 (Brief B, multi-product):** started.
-- **Phase 3 (robustness):** partly done (sandbox truncation hardening).
-- **Phase 4 (submission hardening):** not started (README run command done).
+- **Phase 3 (robustness):** sandbox hardening done; variant dry builds done; raw-a fixture built (score pending);
+  `--style` runs not started.
+- **Phase 4 (submission hardening):** `docs/RUNBOOK.md` written; `scripts/check_secrets.py`; Python version guard;
+  fresh-clone timed build not done yet.
 
 ## Latest work (13:00 UTC)
 
@@ -19,8 +21,14 @@ The phases come from `docs/design.md` §7:
   "after attempt N is refused, make NO further offer", only when N > 0). `make verify`: 678 passed.
 - All 3 dev agents were redeployed from saved specs with `90b737d` (now version 3, same ids). Validation, dry run and
   smoke test PASS.
-- **3-rep results with `90b737d`:** fixA **10/10**, llmA **10/10** (both logged). Still running in the background:
-  abB, then abA, then rawA. Results go to `runs/dev/{abB,abA}-r3-90b737d.*` and `runs/dev/rawA-r3-fe1d7ef.*`.
+- **3-rep results with `90b737d`:** fixA **10/10**, llmA **10/10**, abB **2/3** (PUB-12 0/3), abA **8/10** (PUB-05 0/3
+  no close_call after the note, PUB-06 2/3). All are logged in the Score log.
+- `e186247` adds an explicit per-product ATTEMPTS procedure and read-back honesty (PUB-12). `d46b807` puts notes before
+  the goodbye and makes the reply after a note re-say goodbye with the ending, never empty (PUB-05). `make verify`: 682
+  passed. dev-ab-llm and dev-a-llm were redeployed with `d46b807` (version 4).
+- **Running (background):** rawA (dev-raw-a, built at `fe1d7ef`), then abB, abA and llmA at `d46b807`. Results go to
+  `runs/dev/rawA-r3-fe1d7ef.*` and `runs/dev/{abB,abA,llmA}-r3-d46b807.*`.
+- **Correction:** the subject of commit `9646cdf` says raw-a scored 10/10. It had not been scored yet; see the Score log.
 - `fe1d7ef`: `build.py` exits with a clear message on Python < 3.10. The kit needs 3.10+, and the system `python3`
   here is 3.9.
 - Trace redaction check: the actual secret values from `.env` and key patterns appear in none of the builder logs
@@ -42,7 +50,9 @@ Official-style scoring counts a case only at 3/3.
 | baseline (kit minimal_builder) | n/a | A / B | n/a | 6/10 (1 rep) / 1/3 |
 | dev-a-fixture | `tests/fixtures/spec_a.json` | A | `90b737d` | 3 reps: **10/10** |
 | dev-a-llm | LLM | A | `90b737d` | 3 reps: **10/10** |
-| dev-ab-llm | LLM | B (3 cases) | before `6393c16` | 3 reps: **2/3** (PUB-12 1/3 attempt count); re-run with `90b737d` in progress |
+| dev-ab-llm | LLM | B (3 cases) | `90b737d` | 3 reps: **2/3** (PUB-12 0/3); re-run at `d46b807` queued |
+| dev-ab-llm | LLM | A (10 cases) | `90b737d` | 3 reps: **8/10** (PUB-05 0/3, PUB-06 2/3); re-run at `d46b807` queued |
+| dev-raw-a | LLM from raw-a.md | A | `fe1d7ef` | running |
 
 ## Deployed agents (slot → ids; the slots file is `.freya-agents.json` in the repo root, gitignored)
 
@@ -59,23 +69,18 @@ Redeploy them with `--spec` to skip the LLM.
 
 ## Next steps (in order)
 
-1. DONE: `make verify` and commit (`90b737d`).
-2. DONE: redeploy the three dev agents. To redeploy again (the `--spec` builds take about 5 s, with 0 model calls):
+1. Read the rawA, abB, abA and llmA results as they land. Log each in the Score log and read every failure transcript.
+   Per-rep calls are in the result JSON `all_rows` (show_run shows only one call per case). To redeploy (`--spec`,
+   about 5 s, 0 model calls):
    - `.venv/bin/python builder/build.py kit/briefs/brief-a.md kit/tools/openapi.json --spec tests/fixtures/spec_a.json --slot dev-a-fixture`
    - `... brief-a.md ... --spec runs/dev/spec-a-llm.json --slot dev-a-llm`
    - `... brief-a.md brief-b.md ... --spec runs/dev/spec-ab-llm.json --slot dev-ab-llm`
-3. IN PROGRESS: 3-rep runs for dev-a-fixture `--brief A`, dev-a-llm `--brief A`, dev-ab-llm `--brief B` and dev-ab-llm
-   `--brief A`. Log each in the Score log and read every failure transcript (`scripts/show_run.py --calls`).
-4. **Phase 3 robustness:**
-   - `--style pieces|corrects|talkative|asks_back|in_words` runs on A and B.
-   - DONE: `--dry` builds of variant-c and variant-r (exp05 all OK).
-   - DONE (scoring queued): raw-a fixture, built as dev-raw-a. Score it with `--brief A --reps 3`.
-5. **Phase 4 submission hardening:**
-   - Fresh-clone timed build. Trace completeness and redaction check.
-   - A runbook for Sun 17:00–20:00 UTC: run the builder on each hidden brief with `| tee traces/hidden-N.log`, then
-     `--export submission/hidden-N.workflow.json`, then commit, then send the form.
-   - **Ask the user:** GitHub repo visibility (public, or private with organiser access) and the team name for the form.
-6. Freeze target about Sun 15:30 UTC (tag `freeze-final`). After 17:00 UTC: generic bug fixes only, no hidden-brief content.
+   - Note: dev-a-fixture is still at `90b737d` (version 3).
+2. **Phase 3 robustness:** `--style pieces|corrects|talkative|asks_back|in_words` runs on A and B.
+3. **Phase 4:** a fresh-clone timed build (`git clone` to scratch, then the RUNBOOK command, then a check of the trace).
+4. **Ask the user** (RUNBOOK → Open questions): repo visibility, team name, and the OpenAI key for the organisers' re-run.
+5. Freeze target about Sun 15:30 UTC (tag `freeze-final`). After 17:00 UTC: generic bug fixes only, no hidden-brief
+   content. Follow `docs/RUNBOOK.md`.
 
 ## Open questions / risks being tracked
 
