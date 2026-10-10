@@ -429,3 +429,76 @@ All scores use `python3 kit/tools/run_cases.py <agent> --brief X --reps 3`, wher
    - Time: phase gates with tags, a freeze at 15:30 UTC, and the cut list.
    - Latency: a large system prompt plus the date table can slow turns. Watch the median slowest turn printed by `run_cases` and keep it under 10 s; trim the date table window first.
    - "pieces"-style partial identity answers count as wrong at the bank. The prompt rule is "complete answers only"; measure with `--style pieces`.
+## 9. Implementation contract v1 (binding for all modules)
+
+Spec: `src/freya_builder/spec.py` (`SPEC_SCHEMA`, `check_spec`), and the fixture `tests/fixtures/spec_a.json` (Brief A, test-only).
+Slots: `K = spec.meta.max_products`; slot k is 1..K. Row ids come from `spec.rows[].id`.
+
+**Node names.** `setup`, `opening`, `third_party`, `identity`, `load_account`, `account_facts`, `negotiate`,
+`ev_<row_id>`, `ev_done`, `ev_cap_<stage>`, `finalize`, `xfer`, `close`, `hang_up`.
+The model fires an exit with the tool `transition_to_ev_<row_id>`; the engine names it after the target node.
+
+**Model-called tool names.**
+- `verify_identity`
+- `schedule_callback`
+- `create_promise_p<k>`: per slot; same URL; `<promise product_field>` baked to `{{p<k>_id}}`
+- `add_note_p<k>`: per slot; only if `notes.used`
+
+All of them have `customer_id` (the call var whose role is `customer_id`) baked.
+
+**Variables.** All variables are strings unless noted.
+
+| Written by | Variables |
+|---|---|
+| `setup` | `today_iso`, `today_facts`, `date_table`, `callback_slots`, `end_event`=`none`, `xfer_queue`=`none`, `close_outcome`=outcome of the `default_rows.opening` row, `account_facts`=`(not loaded)`, `disclosure_text`=`""`, `product_count`=`0`, `p<k>_id`=`none` for all k, `finalize_debug`=`""`. It NEVER sets `close_reason`. |
+| `account_facts` | Reads `load_account_response.data.<products.list_field>` via `flatvars.collect_list`. Writes `product_count`, `p<k>_id` (bank order; unused slots stay `none`), `account_facts` (multi-line, see below), `disclosure_text` (intro + one product sentence per product + first ask, single or multi), `account_status` (`ok` or `unavailable`). |
+| `ev_<x>` | `end_event` = `<x>` (a row id, `done`, or `cap_<stage>`). |
+| `finalize` | Reads `end_event`, `create_promise_p<k>_response.data.ok`, `add_note_p<k>_response.data.ok`, `add_note_p<k>_args.<notes.reason_field>` (fallback `add_note_p<k>_args.reason`), and `p<k>_id`. Writes `close_outcome`, `close_reason` (ONLY when the chosen row has a non-empty reason), `xfer_queue` (`none` or the row's queue), `finalize_debug`. |
+
+**The `account_facts` text, per product line block:**
+- slot, id, label (from the type label template with `{field}` from the product);
+- past due, days late, band;
+- deadline (ISO and spoken);
+- floor (field and value);
+- each attempt that applies to the band, with concrete amount and date;
+- the valid promise window;
+- a "MANDATORY TRANSFER: end with transition_to_ev_<row>" line when the band has a `transfer_row`.
+
+**`finalize` rules.**
+- `done` maps to `default_rows.negotiate`, and `cap_<stage>` maps to `default_rows[<stage>]`. Either is used only when no precedence rule fires on recorded facts.
+- `close_precedence` is evaluated top-down:
+  - `transferred`: the event row has a queue → that row.
+  - `promise_recorded`: any `create_promise_p<k>` ok.
+  - `all_notes_reason`: there are notes and all of them have that reason.
+  - `any_note`: → `first_note_reason_not` (`note_reason`) in slot order, with the given outcome.
+  - `always`: → the event row.
+
+**Code rules.**
+- Code nodes = `sandbox.assemble([...modules], main, CONFIG)`.
+- Spec expressions are INLINED as Python functions at build time: `def _x0(today, now_date, deadline, p_days_late): return <expr>`. There is no `eval` at run time.
+- The helper vocabulary in `sandbox/policy_helpers.py` uses the module globals `WORKDAYS` and `HOLIDAYS`, set from CONFIG:
+
+| Helper | Meaning |
+|---|---|
+| `add_days(d, n)` | `n` calendar days later |
+| `add_business_days(d, n)` | the n-th business day strictly after `d`; `n == 0` gives `d` |
+| `next_business_day(d)` | strictly after `d` |
+| `business_day_on_or_after(d)`, `business_day_on_or_before(d)` | |
+| `last_business_day_of_week(d)` | the Mon–Sun week |
+| `last_business_day_of_month(d)`, `end_of_month(d)` | |
+| `weekday_in_week(d, wd, k)` | |
+| `is_business_day(d)` | |
+| `date(y, m, d)` | |
+
+**Hooks** (`hooks.py`, returning code strings):
+
+| Function | What it writes |
+|---|---|
+| `verify_post(spec)` | `result['data']['what_to_do_next']` from the response roles: gate, answer_ok, remaining, hint |
+| `verify_pre(spec)` | Normalises the answer by question format: `date` → ISO zero-pad, `digits:N` → digits only, `year` → 4 digits, `alnum` → upper case without spaces |
+| `promise_post(spec, k)` | On success: "Recorded. Say exactly: <success line>"; on failure: "NOT recorded…" + failure rule |
+| `promise_pre(spec)` | Amount rounded to 2 decimals, ISO date padded |
+| `note_post(spec)`, `callback_post(spec)` | |
+| `callback_pre(spec)` | Normalises HH:MM |
+
+Every hook: try/except, pops `header`, detects failure from `status_code` ≥ 400, `status` ≠ success, `ok` false or missing `data`, and contains no double braces.
