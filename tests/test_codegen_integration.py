@@ -112,4 +112,7 @@ def test_opening_line_never_says_recorded():
 
 def test_facts_state_when_offers_must_stop():
     facts = _account(SPEC_A, "2026-10-14T11:00", LOAN_5)
-    assert "after attempt 1 is refused, make NO further offer for this product" in facts
+    assert (
+        "after attempt 1 is refused: NO further offer for this product (not even the floor)"
+        in facts
+    )

@@ -129,6 +129,16 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
         if notes
         else "Notes are not used."
     )
+    attempts_line = (
+        "ATTEMPTS: persuasion attempts are counted per product, and FACTS lists each product's "
+        "attempts in order. Unless a brief rule says to make no persuasion attempt, each time the "
+        "customer refuses or does not answer for a product, make that product's NEXT listed attempt, "
+        "with exactly its amount and date: never skip one, never add one. After a product's last "
+        "listed attempt is refused, make no other offer of your own for it (not even the floor). An "
+        "amount or a date the customer proposes is not a refusal: handle it with the brief and FACTS.\n"
+        if spec["attempts"]
+        else ""
+    )
     return f"""STEP: the customer is verified and the account is loaded (get_account already ran; never call it). You have just stated the debt.
 FACTS (computed by code from the brief; use these exact values, never compute your own):
 {{{{today_facts}}}}
@@ -138,7 +148,7 @@ DATE TABLE:
 
 Follow the brief from the first ask to the confirmation and recording.
 DATES: when the customer names a date, find it in that product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Never offer the latest date unless those lines say so.
-RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message.
+{attempts_line}RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
 {_endings_text(spec, "negotiate")}"""

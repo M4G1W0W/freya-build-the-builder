@@ -485,7 +485,7 @@ def _product(k, raw, today, C, vs):
             lines.append(
                 "- after attempt "
                 + str(allowed)
-                + " is refused, make NO further offer for this product (no other amount, no other date)"
+                + " is refused: NO further offer for this product (not even the floor)"
             )
     low = _ev(C["fn_window_min"], today, deadline, days_late) if C.get("fn_window_min") else None
     high = _ev(C["fn_window_max"], today, deadline, days_late) if C.get("fn_window_max") else None

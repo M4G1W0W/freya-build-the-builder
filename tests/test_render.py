@@ -132,3 +132,21 @@ def test_turn_caps_end_on_the_stage_default_row():
     n = render(SPEC_A, TOOLS, BRIEF)["nodes"]
     for stage, rid in SPEC_A["default_rows"].items():
         assert n[stage]["max_turn_transition"] == f"ev_{rid}"
+
+
+def test_negotiate_states_the_attempt_procedure_and_read_back_honesty():
+    # PUB-12 (3-rep runs at 78994a2 and 90b737d): with correct per-product facts the model still
+    # offered the floor after an early-band product's only attempt, and once made no attempt at all.
+    # It also read back "I have recorded ..." before create_promise ran.
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "make that product's NEXT listed attempt" in task
+    assert "never skip one, never add one" in task
+    assert "(not even the floor)" in task
+    assert 'never say "I have recorded" before the create_promise result says so' in task
+
+
+def test_negotiate_has_no_attempt_procedure_without_an_attempt_plan():
+    s = copy.deepcopy(SPEC_A)
+    s["attempts"] = []
+    task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert "ATTEMPTS:" not in task
