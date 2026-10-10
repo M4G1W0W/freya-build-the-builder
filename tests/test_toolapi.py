@@ -13,6 +13,15 @@ def test_kit_tool_api_parses_all_tools():
     assert all(t.field("customer_id") and t.field("customer_id").required for t in tools.values())
 
 
+def test_nested_response_items_are_parsed():
+    tools = {t.name: t for t in load_tool_api(KIT_API)}
+    products = next(f for f in tools["get_account"].response if f.type == "array")
+    names = {c.name for c in products.children}
+    assert {"product_id", "type", "past_due", "days_late"} <= names
+    type_field = next(c for c in products.children if c.name == "type")
+    assert len(type_field.enum) == 3
+
+
 def test_enums_and_required_flags_come_from_the_file():
     tools = {t.name: t for t in load_tool_api(KIT_API)}
     field = tools["verify_identity"].field("field")

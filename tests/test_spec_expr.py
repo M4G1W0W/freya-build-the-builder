@@ -45,6 +45,9 @@ def test_schema_is_strict_everywhere():
         (lambda s: s["default_rows"].update(opening="nope"), "default row"),
         (lambda s: s["bands"][0].update(deadline_expr="__import__('os')"), "deadline"),
         (lambda s: s["close_precedence"][1].update(row="ghost"), "unknown row"),
+        (lambda s: s["products"].update(id_field="pid"), "is not a field of"),
+        (lambda s: s["products"]["types"][0].update(api_value="mortgage"), "product type"),
+        (lambda s: s["products"]["types"][0].update(floor_field="min_due"), "floor field"),
     ],
 )
 def test_check_spec_catches(mutate, needle):

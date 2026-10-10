@@ -19,6 +19,7 @@ class Field:
     description: str = ""
     enum: tuple[str, ...] = ()
     format: str = ""
+    children: tuple["Field", ...] = ()  # properties of an object, or of an array's object items
 
 
 @dataclass(frozen=True)
@@ -48,12 +49,18 @@ def _resolve(spec: dict, node: Any) -> Any:
     return node
 
 
-def _fields(spec: dict, schema: Any) -> tuple[Field, ...]:
+def _fields(spec: dict, schema: Any, depth: int = 0) -> tuple[Field, ...]:
     schema = _resolve(spec, schema) or {}
     required = set(schema.get("required") or [])
     out = []
     for name, prop in (schema.get("properties") or {}).items():
         prop = _resolve(spec, prop) or {}
+        nested = prop
+        if prop.get("type") == "array":
+            nested = _resolve(spec, prop.get("items") or {}) or {}
+        children = (
+            _fields(spec, nested, depth + 1) if depth < 4 and nested.get("properties") else ()
+        )
         out.append(
             Field(
                 name=name,
@@ -62,6 +69,7 @@ def _fields(spec: dict, schema: Any) -> tuple[Field, ...]:
                 description=str(prop.get("description") or ""),
                 enum=tuple(str(v) for v in prop.get("enum") or ()),
                 format=str(prop.get("format") or ""),
+                children=children,
             )
         )
     return tuple(out)

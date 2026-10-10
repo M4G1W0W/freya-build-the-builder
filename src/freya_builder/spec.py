@@ -126,6 +126,7 @@ SPEC_SCHEMA = obj(
                 "after_now": BOOL,
                 "date_field": STR,
                 "time_field": STR,
+                "booked_row": STR,
             }
         ),
         "opening": obj(
@@ -147,6 +148,7 @@ SPEC_SCHEMA = obj(
                 "hints": arr(HINT),
                 "failed_line": STR,
                 "decline_explain": STR,
+                "failed_row": STR,
             }
         ),
         "rows": arr(ROW),
@@ -238,6 +240,10 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
         if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
             p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
+    if spec["identity"]["failed_row"] not in rows:
+        p.append(f"identity.failed_row is unknown: {spec['identity']['failed_row']!r}")
+    if spec["callback"]["enabled"] and spec["callback"]["booked_row"] not in rows:
+        p.append(f"callback.booked_row is unknown: {spec['callback']['booked_row']!r}")
     for b in spec["bands"]:
         if b["transfer_row"] and b["transfer_row"] not in rows:
             p.append(f"band {b['name']}: unknown transfer_row {b['transfer_row']!r}")
@@ -275,10 +281,23 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
             for role in ("date_field", "time_field"):
                 if cb[role] and not st.field(cb[role]):
                     p.append(f"schedule_callback has no field {cb[role]!r}")
-    api_types = _enum(by, "get_account", spec["products"]["type_field"])
-    for t in spec["products"]["types"]:
-        if api_types and t["api_value"] not in api_types:
-            p.append(f"product type {t['api_value']!r} not in API enum {api_types}")
+    pr = spec["products"]
+    plist = next((f for f in by["get_account"].response if f.name == pr["list_field"]), None)
+    if not plist:
+        p.append(f"get_account response has no list field {pr['list_field']!r}")
+    else:
+        item = {c.name: c for c in plist.children}
+        for role in ("id_field", "type_field", "past_due_field", "days_late_field"):
+            if item and pr[role] not in item:
+                p.append(f"products.{role} {pr[role]!r} is not a field of {pr['list_field']} items")
+        api_types = item[pr["type_field"]].enum if pr["type_field"] in item else ()
+        for t in pr["types"]:
+            if api_types and t["api_value"] not in api_types:
+                p.append(f"product type {t['api_value']!r} not in API enum {api_types}")
+            if item and t["floor_field"] not in item:
+                p.append(
+                    f"floor field {t['floor_field']!r} is not a field of {pr['list_field']} items"
+                )
 
     exprs: list[tuple[str, str]] = [
         (f"band {b['name']} deadline", b["deadline_expr"]) for b in spec["bands"]
