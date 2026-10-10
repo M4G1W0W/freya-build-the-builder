@@ -268,7 +268,10 @@ def test_verify_unknown_hint_is_passed_on(split):
     data = {"ok": True, "verified": False, "hint": "year_off_by_one", "wrong_answers_left": 2}
     text = what(post(VERIFY_POST, envelope(data), split))
     assert text.startswith("The bank returned hint year_off_by_one; follow the brief for it.")
-    assert text.endswith("Wrong answer. You may ask that question again.")
+    assert text.endswith(
+        "Wrong answer; do not say it was correct. Wrong answers left: 2. "
+        "You may ask that same question again."
+    )
 
 
 @pytest.mark.parametrize("ok", [False, "false", "False"])
@@ -285,7 +288,11 @@ def test_verify_unreadable_answer_is_not_wrong(ok, split):
 def test_verify_wrong_with_answers_left_may_ask_again(left, split):
     data = {"ok": True, "verified": False, "all_verified": False, "wrong_answers_left": left}
     result = post(VERIFY_POST, envelope(data), split)
-    assert what(result) == "Wrong answer. You may ask that question again."
+    # the count tells the model where it stands (PUB-03 talkative: an 18-turn loop on one question)
+    assert what(result) == (
+        f"Wrong answer; do not say it was correct. Wrong answers left: {int(left)}. "
+        "You may ask that same question again."
+    )
 
 
 @pytest.mark.parametrize("left", [0, "0"])

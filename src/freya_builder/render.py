@@ -120,6 +120,8 @@ def system_prompt(spec: dict, brief_text: str, engine_tools: list[str]) -> str:
 HOW TO WORK
 - Follow the BANK BRIEF below exactly. When a rule says to use a tool, call the tool: saying that you did something is not enough.
 - After every tool result, obey its what_to_do_next, then speak to the customer or call the next tool. Never end a turn with nothing.
+- If a customer message breaks off mid-sentence (it ends on a word like "and", "because" or "the", or on half a word), they are still talking: reply only "Please go on." Such a message is never an answer, a refusal, a non-answer, a no to a read-back or a reason to end the call. Do not repeat your question, make a new offer or choose an ending on it.
+- Say a sentence of sympathy only where a brief rule asks for one, and only as often as that rule says in the whole call. Small talk needs no sympathy.
 - Something happened only if its tool result says so. Never say something was recorded or booked unless the result says it was.
 - Call at most one tool per message.
 - If a tool result is an error saying the result could not be read or parsed, call the same tool once more with the same values.
@@ -180,9 +182,9 @@ def _identity_task(spec: dict) -> str:
     )
     return f"""STEP: verify the customer's identity. Ask the security questions one at a time, in this order:
 {questions}
-Whenever the customer's message contains an answer to the question you asked (even if the same message also asks something or complains), CALL verify_identity with that answer FIRST, then reply. CALL verify_identity once per complete answer, with {i["question_field"]} set to the question key and {i["answer_field"]} set to the answer in the format above. If only part of an answer was given, ask for the rest first.
+Whenever the customer's message contains an answer to the question you asked (even if the same message also asks something or complains), CALL verify_identity with that answer FIRST, then reply. CALL verify_identity once per complete answer, with {i["question_field"]} set to the question key and {i["answer_field"]} set to the answer in the format above. An answer may come in parts over several messages (a date, then its year; two digits, then two more): join the parts the customer gave since the last verify_identity result and CALL verify_identity as soon as together they make a complete answer; if they correct a part, use the corrected part. While a part is missing, reply only "Please go on."; never ask the whole question again for it.
 Obey what_to_do_next in every verify_identity result.
-If the customer does not want to answer, explain once: {_quote(i["decline_explain"])}
+If the customer asks a question back (why you need it, what the call is about) or does not want to answer, explain once: {_quote(i["decline_explain"])} Do not repeat the security question in that message; they answer next.
 Never mention the debt, the product, an amount or why you are calling in this step.
 {spec["stage_rules"]["identity"]}
 {_endings_text(spec, "identity")}"""
@@ -201,7 +203,10 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     attempts_line = (
         "ATTEMPTS: persuasion attempts are counted per product, and FACTS lists each product's "
         "attempts in order. Unless a brief rule says to make no persuasion attempt, each time the "
-        "customer refuses or does not answer for a product, make that product's NEXT listed attempt, "
+        "customer refuses or does not answer for a product (not answering is a complete reply with no "
+        'yes, no, date or amount, such as "I don\'t know"; a cut-off message is no reply, and a first '
+        'reply to an offer that is only small talk gets "Please go on." and uses no attempt), make '
+        "that product's NEXT listed attempt, "
         "with exactly its amount and date: never skip one, never add one. After a product's last "
         "listed attempt is refused, make no other offer of your own for it (not even the floor). After "
         "the opening question, never ask again whether the customer can pay today: every offer of your "
@@ -219,8 +224,9 @@ DATE TABLE:
 {{{{date_table}}}}
 
 Follow the brief from the first ask to the confirmation and recording.
-DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. Never offer the latest date unless those lines say so.
-{attempts_line}RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
+DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. If the customer first named a period (like "next week" or "the week after next") and then gives only a weekday or a day number, that day lies INSIDE that period (DATE TABLE week rows). Never offer the latest date unless those lines say so.
+{attempts_line}Offer a transfer, the support team or any other option the brief ties to a situation (see ENDINGS) only after the customer has described that situation.
+RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
 {note_line}
 {spec["stage_rules"]["negotiate"]}
 {_endings_text(spec, "negotiate")}"""

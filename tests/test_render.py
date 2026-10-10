@@ -347,3 +347,21 @@ def test_a_renamed_customer_id_field_is_still_baked(tmp_path):
     )
     body = wf["nodes"]["load_account"]["pre_actions"][0]["function"]["parameters"]["properties"]
     assert "{{customer_id}}" in json.dumps(body)
+
+
+def test_prompts_handle_customer_speech_styles():
+    # Style sweep at 52b947c (0 sandbox errors): cut-off customer turns were taken as refusals,
+    # answers in pieces re-asked whole, questions back answered by restating the question,
+    # sympathy repeated, support offered for mere stress.
+    wf = render(SPEC_A, TOOLS, BRIEF)
+    system = wf["system_prompt"]
+    assert "breaks off mid-sentence" in system and 'reply only "Please go on."' in system
+    assert "only as often as that rule says in the whole call" in system
+    ident = wf["nodes"]["identity"]["task_message"]
+    assert "join the parts the customer gave since the last verify_identity result" in ident
+    assert "never ask the whole question again for it" in ident
+    assert "Do not repeat the security question in that message" in ident
+    nego = wf["nodes"]["negotiate"]["task_message"]
+    assert "a cut-off message is no reply" in nego and "uses no attempt" in nego
+    assert "only after the customer has described that situation" in nego
+    assert "that day lies INSIDE that period" in nego

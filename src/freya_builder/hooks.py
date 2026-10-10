@@ -504,7 +504,10 @@ elif _good:
     else:
         _msg = $GENERIC_NEXT
 else:
-    _msg = 'Wrong answer. You may ask that question again.'
+    _msg = 'Wrong answer; do not say it was correct.'
+    if _rem is not None:
+        _msg = _msg + ' Wrong answers left: ' + str(_rem) + '.'
+    _msg = _msg + ' You may ask that same question again.'
     if _hint:
         _msg = 'The bank returned hint ' + _hint + '; follow the brief for it. ' + _msg
 _d['what_to_do_next'] = _msg

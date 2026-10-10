@@ -263,6 +263,14 @@ def date_table(today, end, C):
         nxt = [next_occurrence(today, wd, False) for wd in range(7)]
         rule = "next <weekday> (the first such weekday after today): "
     lines.append(rule + ", ".join(_wd(x) for x in nxt))
+    for label, k in (("next week", 1), ("the week after next", 2)):
+        lines.append(
+            label
+            + " (Monday-to-Sunday week): "
+            + _wd(weekday_in_week(today, 0, k))
+            + " to "
+            + _wd(weekday_in_week(today, 6, k))
+        )
     last_bd = last_business_day_of_month(today)
     line = "end of this month = " + _wd(end_of_month(today))
     if last_bd is not None:

@@ -887,3 +887,13 @@ def test_account_marks_unused_slots_even_without_setup():
         vs[f"load_account_response.data.products.0.{key}"] = value
     exec(codegen.account_source(spec_multi()), {"vars": vs})
     assert vs["p1_id"] == "p1" and vs["p2_id"] == "none" and vs["p3_id"] == "none"
+
+
+def test_date_table_names_the_next_two_weeks():
+    # PUB-07 (pieces) / PUB-04 (talkative): "the week after next" then "Monday the 26th".
+    vs = run(codegen.setup_source(spec_a()), {"now": "2026-10-14T11:00"})
+    assert "next week (Monday-to-Sunday week): Mon 2026-10-19 to Sun 2026-10-25" in vs["date_table"]
+    assert (
+        "the week after next (Monday-to-Sunday week): Mon 2026-10-26 to Sun 2026-11-01"
+        in vs["date_table"]
+    )
