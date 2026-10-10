@@ -7,7 +7,7 @@ BRIEF ?= A
 REPS ?= 1
 CASE ?= PUB-01
 
-.PHONY: help setup check test lint fmt credits cases show call chat baseline
+.PHONY: help setup check test lint verify fmt credits cases show call chat baseline
 
 help:  ## list targets
 	@grep -E '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -23,6 +23,9 @@ test:  ## unit + smoke tests
 
 lint:  ## ruff lint + format check
 	uv run ruff check . && uv run ruff format --check .
+
+verify:  ## format, lint and test; must pass before every commit
+	uv run ruff format . && uv run ruff check . && uv run pytest -q
 
 fmt:  ## ruff format
 	uv run ruff format .

@@ -63,9 +63,9 @@ def conversation(
         "node_type": "conversation",
         "task_message": task_message,
         "transitions": transitions,
-        "max_node_turns": max_turns,
     }
-    if max_turn_target:
+    if max_turn_target:  # a cap without a target does nothing (kit: workflow-format.md, Limits)
+        node["max_node_turns"] = max_turns
         node["max_turn_transition"] = max_turn_target
     if tools:
         node["tools"] = tools
