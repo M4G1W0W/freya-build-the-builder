@@ -113,3 +113,21 @@ def _unreachable_end(nodes: dict) -> list[str]:
     return [
         f"node {k}: no path from here reaches an end_call node" for k in nodes if k not in can_end
     ]
+
+
+def unsent_required(wf: dict, tools: list) -> list[str]:
+    """Engine-run calls (fixed bodies, nobody fills a field later) that omit a field the tool API
+    marks required (audit F57). A warning for the trace, not a validation problem."""
+    by_url = {t.url: t for t in tools}
+    out = []
+    for name, node in (wf.get("nodes") or {}).items():
+        for action in node.get("pre_actions") or []:
+            params = (action.get("function") or {}).get("parameters", {}).get("properties", {})
+            tool = by_url.get((params.get("url") or {}).get("default", ""))
+            if not tool:
+                continue
+            sent = set((params.get("body") or {}).get("properties", {}))
+            missing = sorted(f.name for f in tool.request if f.required and f.name not in sent)
+            if missing:
+                out.append(f"{name}: {tool.name} is sent without required field(s) {missing}")
+    return sorted(set(out))

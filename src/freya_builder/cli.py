@@ -17,7 +17,7 @@ from pathlib import Path
 from . import platform
 from .toolapi import Tool, load_tool_api
 from .trace import Trace
-from .validate import validate
+from .validate import unsent_required, validate
 
 # The two design-dependent stages. Set by the pipeline module (see pipeline.py).
 Extract = Callable[[Trace, str, list[Tool]], dict]
@@ -108,6 +108,8 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         for p in problems:
             trace.warn(f"validation: {p}")
         trace.test("local workflow validation", not problems, f"{len(problems)} problem(s)")
+        for w in unsent_required(workflow, tools):
+            trace.warn(f"engine call: {w}")
         if problems:
             return 2
         steps = len(workflow.get("nodes") or {})

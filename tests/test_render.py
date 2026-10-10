@@ -368,3 +368,23 @@ def test_prompts_handle_customer_speech_styles():
     assert "a cut-off message is no reply" in nego and "uses no attempt" in nego
     assert "only after the customer has described that situation" in nego
     assert "that day lies INSIDE that period" in nego
+
+
+def test_engine_calls_missing_a_required_field_are_reported(tmp_path):
+    # audit F57: a hidden API adding a required field to close_call would be silently omitted.
+    from freya_builder.validate import unsent_required
+
+    assert unsent_required(render(SPEC_A, TOOLS, BRIEF), TOOLS) == []
+    api = json.loads((ROOT / "kit" / "tools" / "openapi.json").read_text())
+    body = api["paths"]["/close_call"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    body["properties"]["summary"] = {"type": "string"}
+    body["required"] = [*body.get("required", []), "summary"]
+    path = tmp_path / "api.json"
+    path.write_text(json.dumps(api))
+    tools = load_tool_api(path)
+    found = unsent_required(render(SPEC_A, tools, BRIEF), tools)
+    assert found and all(
+        "close_call is sent without required field(s) ['summary']" in w for w in found
+    )
