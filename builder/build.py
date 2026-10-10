@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 if __name__ == "__main__":
+    if sys.version_info < (3, 10):  # noqa: UP036 - guards interpreters older than the project target
+        sys.exit(f"builder needs Python 3.10+ (like the kit); this is {sys.version.split()[0]}")
     from freya_builder.cli import main
 
     sys.exit(main())
