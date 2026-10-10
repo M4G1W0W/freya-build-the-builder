@@ -21,6 +21,8 @@ Variants:
   the spoken weekday that matches the customer's weekday;
 - echodate (on F1, 15bcbad; the example uses placeholders, no brief value): the DATES line also says to start the answer to a named date with that date
   as written in FACTS, then say what its line says (every failing call skipped naming the date);
+- offerdate (on F3, a069dd2): the ATTEMPTS line also says every offer names its amount and its date as
+  written in FACTS, and the only "today" question is the opening one (F1/F3 PUB-06: floor offered "today");
 - ctltext:<export.json>: HEAD code and FACTS, but the system prompt and negotiate task text of an
   exported workflow (the passing 52b947c agent);
 - ctlsys:<export.json> / ctltask:<export.json>: only its system prompt / only its negotiate text.
@@ -44,6 +46,11 @@ PERIOD = re.compile(r" If the customer first named a period .*?not a later one\)
 ECHO = (
     " When you answer a date the customer named, start your reply with that date as written in FACTS"
     ' (for example "<weekday> <day> <month> <year> is ..."), then say what its line in FACTS says.'
+)
+OFFER_ANCHOR = "on attempt 1's date)."
+OFFER_DATE = (
+    " Each offer of yours names its amount and its date as written in FACTS (for example"
+    ' "<amount> on <weekday> <day> <month> <year>"); the only "today" question is the opening one.'
 )
 OLD_DATES = (
     "DATES: when the customer names a date, find it in that product's \"IF THE CUSTOMER NAMES A"
@@ -89,6 +96,10 @@ def _edit(task: str, variant: str) -> str:
         return task.replace(line, new)
     if variant == "old":
         return task.replace(line, OLD_DATES)
+    if variant == "offerdate":
+        if task.count(OFFER_ANCHOR) != 1:
+            raise SystemExit("offerdate: ATTEMPTS anchor not found once")
+        return task.replace(OFFER_ANCHOR, OFFER_ANCHOR + OFFER_DATE)
     if variant == "echodate":
         anchor = " Never offer the latest date unless those lines say so."
         if anchor not in line:
@@ -117,7 +128,16 @@ def main() -> int:
     variant, argv = sys.argv[1], sys.argv[2:]
     kind, _, ctl_path = variant.partition(":")
     ctl = json.loads(Path(ctl_path).read_text())["workflow"] if kind in CTL_PARTS else None
-    known = ("noweekday", "noperiod", "old", "1slot", "echodate", *CODE_PATCHES, *COMBOS)
+    known = (
+        "noweekday",
+        "noperiod",
+        "old",
+        "1slot",
+        "echodate",
+        "offerdate",
+        *CODE_PATCHES,
+        *COMBOS,
+    )
     if not ctl and variant not in known:
         raise SystemExit(f"unknown variant {variant}")
     if variant == "1slot":
