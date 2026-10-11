@@ -396,6 +396,15 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 - 2026-10-11 14:50 (11:50 UTC) — **User: no automatic freeze and no automatic selection of an unmeasured
   candidate.** The 18:30 Istanbul (15:30 UTC) freeze is an internal target; submission closes 23:00 Istanbul
   (20:00 UTC). The evidence and the fallback options go to the user before the final selection.
+- 2026-10-11 16:50 (13:50 UTC) — **Internal simulation-call cap raised 500 -> 705 (user authorized 13:45 UTC a bounded
+  raise computed from the remaining needs; it authorizes no suite and no unlimited retries).** Cumulative usage is kept
+  (`runs/dev/r4/calls.tsv`, 333 before E4-A rep 3). 705 = 343 (used incl. rep 3) + 60 (rest of the E4 queue:
+  E4-AB-all 39, E4-AB-xb 9, E4-VE 12) + 222 (dossier §10 matched comparison T1 66, T2 60, T3 96; T4 dropped) + 30
+  (retry reserve, ~10% of planned validation: runs use maxRetries 0 and no reruns, so extra calls come only from a
+  stopped/resumed rep, conservative ledger booking or a user-approved repeat) + 50 (hidden-brief reserve: 2 regression
+  checks after a generic fix, styled-a 10 + styled-ab-all 13 each, + 2 smokes per hidden agent). Every item still
+  needs its own user go. Credits do not bind (393 USD; ~0.15-0.25 USD/call -> 55-90 USD). Applied to `qrun4.sh` and
+  this session's `run_one.sh`.
 
 ## Score log
 
@@ -466,3 +475,4 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 11-10 04:16 | **G1 83f8263** / G2 0bc83c4 / F2 bd4da7c (control) | overnight M1: `block-p06.json` (PUB-06 talkative, PUB-07 asks_back, PUB-09 talkative, PUB-03 corrects), `--reps 1` x3 per arm, interleaved | A | 3 | cases at 3/3: **G1 3/4**, G2 2/4, F2 1/4 | exp-g1-a 31f79439 / exp-g2-a efb690fd / dev-a-llm2 2485fc27 | | Per case G1/G2/F2: PUB-06 3/3, 2/3, 0/3; PUB-07 3/3, 2/3, 3/3; PUB-09 3/3, 3/3, 2/3; PUB-03 1/3, 3/3, 2/3. PUB-03 failures are the common identity defect (G1 both LEDGER: d10044ef promise after 3 wrong DOBs, d41ea98c 40-turn loop). F2 r3 PUB-06 was a customer hang-up. `runs/dev/r4/M1-*.json`, `analysis-m1.md` |
 | 11-10 04:21 | bd4da7c (F2) | overnight M2: A+B control dev-ab-llm v14 on `styled-ab-all.json`, **interrupted** | A+B | 2 of 3 | reps 12/13, 10/13 | f8f9b203 / b867b809 | | **platform**: rep-2 simulation a36c1d01 stuck `running` from 01:21:29 UTC; rep 3 never ran (sims stopped 01:53 UTC). Failures: r1 PUB-03 in_words (identity defect, ledger); r2 PUB-05 silent hang-up, PUB-12 corrects artefact (judge), PUB-13 asks_back "Why do you need that?" counted as 2nd decline (NEW identity defect, ledger). `runs/dev/r4/M2-ABv14-all.log`, `analysis-m2.md` |
 | 11-10 13:39 | **cand-eng.4 cfa4d9d** (`--spec spec-a-llm`) | E4-A-styledA (`styled-a.json`), maxRetries 0, no reruns; **stopped after rep 2** (platform error in rep 1, see Notes) | A | 2 of 3 | raw reps **4/10, 10/10**; strict 3/3 at most 4/10 (PUB-01/03/04/06/08/10 failed rep 1) | exp-eng4-a 66db0b41 / f166447e | 11 s, 28 s (control M3 G1: 4/4/8 s) | Rep 1 (sim 56096a1e): 5 silent hang-ups (PUB-01/03/04/08/10: no platform event for ~60 s after the customer's first answer in the `opening` node, customer-ended-call) + PUB-06 `extraction_error` on who_answered (model then asked DOB from the opening node, 'technical issue' x2, closed not_verified/declined). The `opening` node is byte-identical to G1's. Rep 2 (sim 5407adea): 10/10, all run verdicts, slow (5-35 s turns). Smoke 3 before it: PASS, 50 s turns. `runs/dev/r4/E4-A-styledA.{log,attempts.jsonl,meta.json}`, calls in `E4-A-styledA.calls/` |
+| 11-10 13:50 | **cand-eng.4 cfa4d9d** (`--spec spec-a-llm`) | E4-A-styledA **rep 3** (user D3 13:45: one more rep, same slot/cases; maxRetries 0, no reruns, corrected platform-error gate) | A | 1 (3rd) | **10/10**; **three-rep raw strict 3/3 = 4/10** (reps 4, 10, 10; PUB-01/03/04/06/08/10 = 2/3, failed only in rep 1) | exp-eng4-a 66db0b41 / f166447e | 7 s | Sim 51c4a5e0 13:45 UTC, 264 s, worst turn 25 s, no hang-ups; only error event = PUB-10's injected create_promise failure (excused). Credits 393.20 -> 391.96. `runs/dev/r4/E4-A-styledA-r3.{log,attempts.jsonl,meta.json}` |

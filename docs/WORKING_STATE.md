@@ -8,6 +8,19 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
 
+## UPDATE 13:52 UTC: E4-A-styledA complete (3 reps): raw strict 3/3 = 4/10 (reps 4, 10, 10); cap raised to 705
+
+- **User D3 (13:45):** run rep 3 only, same deployment/cases, maxRetries 0, no reruns, corrected gate (every platform
+  error event; only PUB-10's injected create_promise failure excused). Internal cap may be raised to a computed,
+  bounded value (done: **705**, Decision log 13:50 UTC); no other suite, no promotion, no automatic start.
+- **Rep 3 (sim 51c4a5e0, 13:45): 10/10**, median 7 s, worst 25 s, no hang-ups, no blocking platform error. Ledger
+  **cum 343 / 705**. Credits **391.96 USD**.
+- **Three-rep raw strict 3/3: 4/10** (PUB-02/05/07/09 3/3; PUB-01/03/04/06/08/10 2/3, each failed only in rep 1).
+  Failure classification is separate (workflows wf_cae6672e-5d3 = rep-1 failures + reps 1-2 audit, wf_5a767735-790 =
+  rep-3 audit; both read-only).
+- Nothing running after the audits; queue.txt/STOP untouched (E4-A-styledA line still first in queue.txt: it was run
+  outside the queue; remove it only on the user's word).
+
 ## UPDATE 13:42 UTC: E4-A-styledA STOPPED after rep 2 (platform error in rep 1); awaiting the user on rep 3
 
 - User D2 (13:25): wait for a stable bank, then start. Watcher: 5 OK checks 13:25-13:29; suite started 13:29:39.
