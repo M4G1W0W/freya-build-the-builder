@@ -1073,6 +1073,12 @@ def test_floor_as_a_percentage_of_past_due():
     p1 = block(call(spec, [CARD])["account_facts"], "P1")
     assert "- floor (30% of past due): 126.00" in p1  # CARD: 420.00 past due
     assert "floor 126.00" in p1
+    # engine-fixes item 5 (rehearsal P1): 30% of 99.95 is 29.985; float round() said 29.98
+    for past_due, floor in (("99.95", "29.99"), ("100.01", "30.00"), ("0.05", "0.02")):
+        card = CARD | {"past_due": past_due}
+        assert f"- floor (30% of past due): {floor}" in block(
+            call(spec, [card])["account_facts"], "P1"
+        )
 
 
 @pytest.mark.parametrize("mode", MODES)

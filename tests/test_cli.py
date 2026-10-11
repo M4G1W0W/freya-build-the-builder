@@ -119,3 +119,13 @@ def test_the_export_comes_before_a_failing_smoke_test(capsys, monkeypatch):
         == 3
     )
     assert events == ["export", "selftest"]
+
+
+def test_stdout_is_flushed_before_the_end_line():
+    # Engine-fixes item 5: with 2>&1 the trace END line was glued to the --dry workflow JSON.
+    import inspect
+
+    from freya_builder import cli
+
+    src = inspect.getsource(cli.run)
+    assert src.index("sys.stdout.flush()") < src.index("trace.end(ok)")

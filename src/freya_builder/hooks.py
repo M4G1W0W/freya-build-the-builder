@@ -582,7 +582,8 @@ def verify_post(spec: dict, failed_row_id: str | None = None, all_at_once: bool 
         "GATE": lit(ident["gate_field"]),
         "ANSWER_OK": lit("" if all_at_once else ident["answer_ok_field"]),
         "REMAINING": lit(ident["remaining_field"]),
-        "HINT": lit(ident["hint_field"]),
+        # with no hint values in the brief, a hint field is only error text (rehearsal P1: "error")
+        "HINT": lit(ident["hint_field"] if ident["hints"] else ""),
         "SERVICE_HEAD": lit("The answer was not checked because of a service error"),
         "SERVICE_TAIL": lit(
             ". This is not a wrong answer. Call verify_identity once more with the same answer."

@@ -998,3 +998,13 @@ def test_pre_hooks_pad_month_end_year_end_and_leap_dates(said, sent, split):
     body = {"customer_id": "c_1", "product_id": "p1", "amount": 1, "date": said}
     assert pre(PROMISE_PRE, body, split)[0]["date"] == sent
     assert pre(CALLBACK_PRE, {"date": said, "time": "11:00"}, split)[0]["date"] == sent
+
+
+def test_verify_hint_field_without_hint_values_is_not_quoted_as_a_hint(split):
+    # Engine-fixes item 5 (rehearsal P1): hint_field "error" and no hints in the brief made a wrong
+    # answer say "The bank returned hint <error text>".
+    spec = copy.deepcopy(SPEC)
+    spec["identity"].update(hint_field="error", hints=[])
+    data = {"ok": True, "verified": False, "all_verified": False, "error": "answer mismatch"}
+    msg = what(post(hooks.verify_post(spec, FAILED_ROW), envelope(data), split))
+    assert msg.startswith("Wrong answer; do not say it was correct.") and "hint" not in msg

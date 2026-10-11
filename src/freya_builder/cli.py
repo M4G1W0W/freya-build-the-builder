@@ -190,6 +190,7 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
             trace.line("ERROR", row)
         return 1
     finally:
+        sys.stdout.flush()  # the workflow or ids first: with 2>&1 the END line was glued to them
         trace.end(ok)
 
 

@@ -454,7 +454,8 @@ def _product(k, raw, today, C, vs):
     floor_field = kind.get("floor_field") or ""
     floor_pct = _num(kind.get("floor_percent")) or 0
     if floor_pct > 0 and past_due is not None:  # a share of the past-due amount (audit F15)
-        floor = round(past_due * floor_pct / 100.0, 2)
+        # in whole cents, half up: float round() gave 29.98 for 30% of 99.95 (rehearsal P1)
+        floor = int(round(past_due * 100) * floor_pct / 100.0 + 0.5 + 1e-9) / 100.0
         floor_field = (
             str(int(floor_pct) if floor_pct == int(floor_pct) else floor_pct) + "% of past due"
         )
