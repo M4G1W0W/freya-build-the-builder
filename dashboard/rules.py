@@ -22,6 +22,7 @@ CATALOG = Path(__file__).with_name("rules_catalog.json")
 ISTANBUL_OFFSET = 3 * 3600  # Turkey keeps UTC+3 all year (no DST since 2016)
 OFFICIAL_CASES = "kit/public-test-set.json"
 PAGE_CASES = "docs/reference/hackathon_practice_cases.json"
+FINAL_CASE = "docs/reference/final_case_2026-10-11.json"  # the final as announced on the page
 FIXTURE_CASES = "tests/fixtures/cases"
 OFFICIAL_BRIEFS = "kit/briefs"
 FIXTURE_BRIEFS = "tests/fixtures/briefs"
@@ -191,9 +192,10 @@ def _case_files() -> list[str]:
         for q in (D.ROOT / "kit").rglob("*.json")
         if q.name != Path(OFFICIAL_CASES).name and _looks_like_cases(q)
     )
-    known = {OFFICIAL_CASES, PAGE_CASES, *fixtures, *kit}
+    known = {OFFICIAL_CASES, PAGE_CASES, FINAL_CASE, *fixtures, *kit}
     extra = sorted(r for r in referenced if r not in known and (D.ROOT / r).exists())
-    return [OFFICIAL_CASES, *kit, PAGE_CASES, *fixtures, *extra]
+    final = [FINAL_CASE] if (D.ROOT / FINAL_CASE).exists() else []
+    return [*final, OFFICIAL_CASES, *kit, PAGE_CASES, *fixtures, *extra]
 
 
 def _looks_like_cases(path: Path) -> bool:

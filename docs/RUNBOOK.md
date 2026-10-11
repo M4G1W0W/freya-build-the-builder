@@ -24,6 +24,12 @@ The requirements come from `docs/hackathon_notes.md` → Submission (official pa
 
 ## 17:00: the hidden briefs arrive
 
+> **STALE (official page re-read 2026-10-11 ~16:00 UTC).** The steps below assume two brief files with tool API
+> files and `--slot hidden-1/2`. The final is now ONE Turkish case as a zip FOLDER (md/docx/pdf/xlsx), the command is
+> `python3 builder/build.py {case_folder} {mock_url}`, we must deploy OUR OWN mock on Cloudflare Workers first, and
+> we send `submission.json` (with `mock_url`) by e-mail. See `docs/hackathon_requirements.md` → "FINAL FORMAT,
+> 11 Oct" and `docs/WORKING_STATE.md` (top) before following anything here.
+
 **HARD RULE: write nothing from a hidden brief into the repo except `traces/` and `submission/`.** That means no
 rule, value, name, date or code in `src/`, `builder/`, `tests/`, fixtures or prompts. Only generic bug fixes, which
 must make sense for any brief.

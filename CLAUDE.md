@@ -9,6 +9,22 @@
 
 ## Competition context
 
+> **FINAL FORMAT CHANGED (official page, re-read 2026-10-11 ~16:00 UTC; verbatim in
+> `docs/reference/hackathon_page_live_2026-10-11.md`, digest in `docs/hackathon_requirements.md` → "FINAL FORMAT,
+> 11 Oct").** It overrides the "two hidden briefs" model in the bullets below:
+> - The final is **ONE case**: Freya Bank's credit card statement-debt line, **in Turkish**. It arrives Sun 17:00 UTC
+>   as **one zip with a folder** of documents in **Markdown, Word, PDF and Excel**: BRIEF.md (read first), README.md,
+>   analysis, flow drawing, announcements, service contract, test customers, Q&A, 6 example conversations.
+> - **Run command: `python3 builder/build.py {case_folder} {mock_url}`** (no brief file + tool API file any more).
+> - **We write and host the mock bank ourselves on Cloudflare Workers**, from the zip's service contract and test
+>   customers; deploy it **before** running the builder and keep it up until results. In the final the phone agent
+>   may call **only our own mock**; any other service fails the conversation.
+> - Submit **one** phone agent (`freya.export_workflow`) + that run's trace; send **`submission.json`** (team,
+>   members, repo, commit, run_command, workflow, trace, mock_url) to the address in the kit e-mail before 20:00 UTC.
+> - Test customers, success criteria and weights are **not published**; the trace is **not scored** (read for hand
+>   edits). After 17:00: bug fixes only; "fixing a crash on a file type your builder did not expect is allowed",
+>   adding the bank's announcements or field names to code or prompts is not.
+
 Official page: <https://www.freyavoice.ai/hackathon> (snapshot `docs/reference/hackathon_page.md`).
 The **kit** (downloaded from the page's Data tab into `kit/`) overrides it. The full digest is in `docs/hackathon_notes.md`.
 

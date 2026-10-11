@@ -5,6 +5,25 @@ practice cases (`docs/reference/hackathon_practice_cases.json`) on 2026-10-10. T
 **Source** columns come from the page. The **Consequence for the builder** column is **our reading [I]**,
 not an official rule. The kit and organiser emails override this file.
 
+## FINAL FORMAT, 11 Oct (official page re-read ~16:00 UTC; overrides the sections below where they differ)
+
+Source: `docs/reference/hackathon_page_live_2026-10-11.md` (all 7 tabs, each hash-checked against the live page).
+The dashboard's Rules & Cases tab carries each line below with its verbatim quote (`dashboard/rules_catalog.json`,
+extracted_by "official-page (2026-10-11 re-read)"); the final case entry is `docs/reference/final_case_2026-10-11.json`.
+
+| # | Official (page) | Consequence for us [I] |
+|---|---|---|
+| F1 | The final is ONE case: "Freya Bank's credit card statement-debt line, in Turkish. A different call from the practice." | Not two briefs. One phone agent, one trace. Slot names `hidden-1/2` and the 2 x 30 / 3-rep score model are obsolete. |
+| F2 | "It is one zip with a folder of the bank's documents in Markdown, Word, PDF and Excel." Contents: analysis, flow drawing, announcements, service contract, test customers, questions and answers, 6 example conversations. "Read BRIEF.md first; README.md says what each document is." | The builder must read a folder (.md, .docx, .pdf, .xlsx), not one brief file. A crash on an unexpected file type may be fixed after 17:00; reading these types should work before. |
+| F3 | `"run_command": "python3 builder/build.py {case_folder} {mock_url}"`; example `python3 builder/build.py FreyaBank-Ekstre-Borc/ https://your-mock.your-subdomain.workers.dev 2>&1 \| tee traces/final.log`. "The command and the paths are examples." | The frozen builder's CLI (`{brief_path} {tool_api_path}`) does not match. There is no kit-format tool API file: tools and their URL must come from the documents (service contract) and `mock_url`. |
+| F4 | "Write your mock of the bank's services on Cloudflare Workers, from the service contract and the test customers. Deploy it before you run your builder and keep it running until the results are out." "In the final it calls only your own mock. A call to any other service fails the conversation." | We need a Cloudflare account, a Worker (wrangler or API), and the mock written from the zip after 17:00. Keep mock code out of `builder/` and `src/` (the builder must hold nothing from the final case). The mock must stay up after 20:00 until results. |
+| F5 | "Practice calls are in English, the final case is in Turkish. The phone agent gets the date and time of the call as a variable, now. Every date rule uses it." | Every English hard-coding in generated prompts, goodbyes, read-backs and date wording is a risk. |
+| F6 | "Run your builder on the folder and keep everything it prints: that is your trace. You may run it more than once. Submit the phone agent of one run, with that run's trace, and do not edit it after the run." "Export the phone agent with freya.export_workflow and commit the file with the trace." | Unchanged in spirit: one run's export + its trace, committed. |
+| F7 | "Before 20:00 UTC (23:00 Istanbul), send submission.json to the address in your kit email." Fields: team, members (name, email), repo, commit, run_command, workflow, trace, mock_url. | Replaces the two-entry form. Needs the repo URL (D9 push/visibility) and the deployed mock URL. |
+| F8 | "We do not publish the test customers, the success criteria or how the parts are weighted. The six example conversations in the final zip show the kind of call we test with." "Only the final phone agent is scored. The builder's trace is not scored." | The published tie-breaks (promised amount, build time, submission time) are gone from the page. Our 3/3 practice metric is only a proxy. |
+| F9 | "After the final case opens you may fix a bug in your builder. You may not write anything from the final case into it: no rule, no value, no name. Fixing a crash on a file type your builder did not expect is allowed. Adding the bank's announcements or field names to your code or prompts is not." | Same hard rule, now naming announcements and field names explicitly. |
+| F10 | "We may rebuild the top entries ... Model output varies from run to run, so we do not expect an identical workflow." "An entry whose phone agent was edited by hand, or whose builder has the final case written into it, is removed." | Unchanged. |
+
 ## Objective (10)
 
 | # | Requirement | Source | Consequence for the builder [I] |

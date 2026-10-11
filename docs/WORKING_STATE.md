@@ -8,6 +8,31 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
 
+## UPDATE 16:08 UTC: THE FINAL FORMAT CHANGED (official page). READ THIS BEFORE ANY 17:00 STEP.
+
+The user flagged the page's Submit tab (16:00 UTC). Re-read of all 7 tabs:
+`docs/reference/hackathon_page_live_2026-10-11.md`, verbatim, each tab hash-checked against the live page. Digest:
+`docs/hackathon_requirements.md` → "FINAL FORMAT, 11 Oct" (F1-F10). Dashboard Rules & Cases now carries it (39 items,
+7 superseded conflicts, deadlines renamed; the final case is the first case set, `docs/reference/final_case_2026-10-11.json`;
+the user's 14:48 "new case" report is resolved).
+
+- **ONE case, in Turkish**: Freya Bank's credit card statement-debt line. Not two hidden briefs. One phone agent.
+- **Input = a zip FOLDER** of .md/.docx/.pdf/.xlsx: BRIEF.md (read first), README.md, analysis, flow drawing,
+  announcements, service contract, test customers, Q&A, 6 example conversations.
+- **Command: `python3 builder/build.py {case_folder} {mock_url}`.** The frozen builder takes `{brief_path}
+  {tool_api_path}` (kit openapi.json): it does not match this command as it stands.
+- **We host the bank**: write a mock on **Cloudflare Workers** from the service contract + test customers, deploy it
+  BEFORE the build, keep it up until results. In the final the agent may call only our mock.
+- **Submit** one export + its trace, and e-mail `submission.json` (team, members, repo, commit, run_command, workflow,
+  trace, mock_url) before 20:00 UTC. Criteria, weights and tie-breaks are not published; the trace is not scored.
+- After 17:00 only bug fixes. Fixing a crash on an unexpected file type is allowed; adding the bank's announcements or
+  field names to code or prompts is not.
+- A read-only gap analysis (builder input, mock, Turkish, stale docs) is running from the context-restore session;
+  its result will be appended here. **Open user decisions:**
+  - whether to change the builder's input layer before 17:00 (generic folder + mock_url support);
+  - the Cloudflare account and credentials;
+  - D8/D9 (key, remote/push), now needed for `submission.json` `repo`.
+
 ## UPDATE 15:59 UTC: FROZEN. `freeze-final` = b9756fe (cand-eng.9 + main). Nothing running.
 
 - eng.9g failed its rule (HU-PRE regression: end_call after close_call + double goodbye); not adopted. Driver stopped

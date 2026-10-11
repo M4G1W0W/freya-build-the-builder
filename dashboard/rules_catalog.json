@@ -325,6 +325,18 @@
    "file": "tests/test_fixtures.py",
    "label": "internal",
    "kind": "Team-written document or code (decisions, plans, notes): not organizer rules"
+  },
+  {
+   "file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "label": "official",
+   "kind": "Official hackathon page, all 7 tabs, live re-read with the final-case announcement (header lines are team-written, the rest is the browser's innerText per tab)",
+   "link": "https://www.freyavoice.ai/hackathon",
+   "captured": "re-read 2026-10-11 about 16:00 UTC (header); each tab hash-checked against the live page"
+  },
+  {
+   "file": "docs/reference/final_case_2026-10-11.json",
+   "label": "locally derived",
+   "kind": "Team-made case entry for the final, built only from the 2026-10-11 page capture (no content from the final zip)"
   }
  ],
  "items": [
@@ -352,7 +364,7 @@
    "topic": "Earlier snapshot capture time",
    "summary": "Team-written header: the earlier snapshot was fetched on 2026-10-10, described as before kickoff, as text extracted from the HTML.",
    "source_file": "docs/reference/hackathon_page.md",
-   "quote": "Source: https://www.freyavoice.ai/hackathon — fetched 2026-10-10 (before kickoff). Text extracted from HTML;",
+   "quote": "Source: https://www.freyavoice.ai/hackathon \u2014 fetched 2026-10-10 (before kickoff). Text extracted from HTML;",
    "notes": "Team-written header with no time of day. docs/reference/README.md says this page was fetched at 13:38 Istanbul, after the start (see conflicts).",
    "extracted_by": "official-page"
   },
@@ -460,7 +472,7 @@
    "topic": "Submission close",
    "summary": "Submissions close on Sunday at 20:00 UTC; results come after review.",
    "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
-   "quote": "Close Sun 20:00 UTC (submit) · Results after review.",
+   "quote": "Close Sun 20:00 UTC (submit) \u00b7 Results after review.",
    "notes": "Derived, not stated here: Sun = 2026-10-11, so 2026-10-11T20:00:00Z = 23:00 Istanbul (UTC+3). No date is given for results. This Timeline line is in the live re-read only.",
    "extracted_by": "official-page"
   },
@@ -2647,7 +2659,7 @@
    "topic": "3/3 arithmetic is the team's, not a rule",
    "summary": "The team states that the p-cubed reasoning about run-to-run consistency is its own arithmetic, not an official rule.",
    "source_file": "docs/hackathon_notes.md",
-   "quote": "**What 3/3 means.** If a run passes with probability p, the case scores p³: p = 0.90 gives 0.73 and p = 0.95 gives 0.86.\n**Run-to-run consistency matters as much as average quality.** This is our arithmetic, not a rule.",
+   "quote": "**What 3/3 means.** If a run passes with probability p, the case scores p\u00b3: p = 0.90 gives 0.73 and p = 0.95 gives 0.86.\n**Run-to-run consistency matters as much as average quality.** This is our arithmetic, not a rule.",
    "notes": "Explicitly labelled as an internal interpretation.",
    "checker": "corrected by the checker: The summary mentions the 'p-cubed reasoning', which is only on the previous line (L80). Extend the quote to include it.",
    "extracted_by": "interpretations"
@@ -2922,7 +2934,7 @@
    "topic": "RUNBOOK date (none written)",
    "summary": "The RUNBOOK's title names the Sunday 11 Oct hidden-brief window (17:00-20:00 UTC = 20:00-23:00 Istanbul); it carries no written or snapshot date.",
    "source_file": "docs/RUNBOOK.md",
-   "quote": "# RUNBOOK: Sunday 11 Oct, hidden briefs (17:00–20:00 UTC = 20:00–23:00 Istanbul)",
+   "quote": "# RUNBOOK: Sunday 11 Oct, hidden briefs (17:00\u201320:00 UTC = 20:00\u201323:00 Istanbul)",
    "notes": "Internal. No explicit written date; the title is the event day, not the writing date. Its candidate text refers to '11 Oct morning'. Last commit touching the file: 377dabb at 10:21:33 UTC on 11 Oct (git metadata).",
    "extracted_by": "internal"
   },
@@ -3636,7 +3648,7 @@
    "topic": "Credit thresholds",
    "summary": "Credits were 433.89 at 00:37 UTC at about 0.07-0.09 credits per call; below 100 optional work stops, below 60 all overnight simulations stop.",
    "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
-   "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07–0.09 credits per call. Below 100: stop optional work. Below 60: stop all",
+   "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07\u20130.09 credits per call. Below 100: stop optional work. Below 60: stop all",
    "notes": "Internal. The next line reads 'overnight simulations.' The per-call figure conflicts with WORKING_STATE's 0.22-0.26 USD/call (see conflicts).",
    "extracted_by": "internal"
   },
@@ -3683,7 +3695,7 @@
    "summary": "No new PUB-06 variants; one prompt tightening for precedence; generic conversation fixes wait for the morning.",
    "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
    "quote": "**Iterations:** no new PUB-06 variants. Precedence: 1 prompt tightening. Generic conversation fixes wait for the",
-   "notes": "Internal; next line: 'morning: at most one change, 09:00–12:00.'",
+   "notes": "Internal; next line: 'morning: at most one change, 09:00\u201312:00.'",
    "extracted_by": "internal"
   },
   {
@@ -3709,7 +3721,7 @@
    "topic": "Sunday 09:00-12:00 at most one change",
    "summary": "Between 09:00 and 12:00 on Sunday at most one change is allowed.",
    "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
-   "quote": "| 09:00–12:00 | At most one change |",
+   "quote": "| 09:00\u201312:00 | At most one change |",
    "notes": "Internal schedule; heading 'Sunday (UTC)'.",
    "extracted_by": "internal"
   },
@@ -4197,7 +4209,7 @@
    "topic": "RUNBOOK rehearsal on brief-a",
    "summary": "Rehearse steps 2-5 once on kit/briefs/brief-a.md with --slot rehearsal and traces/rehearsal.log.",
    "source_file": "docs/RUNBOOK.md",
-   "quote": "Rehearse steps 2–5 once on `kit/briefs/brief-a.md` with `--slot rehearsal` and `traces/rehearsal.log`,",
+   "quote": "Rehearse steps 2\u20135 once on `kit/briefs/brief-a.md` with `--slot rehearsal` and `traces/rehearsal.log`,",
    "notes": "Internal checklist item (unchecked in the file).",
    "extracted_by": "internal"
   },
@@ -4359,7 +4371,7 @@
    "topic": "Window (CLAUDE.md restatement)",
    "summary": "CLAUDE.md restates the window: start Sat 10 Oct 10:00 UTC (13:00 Istanbul), hidden briefs at Sun 17:00 UTC (20:00 Istanbul).",
    "source_file": "CLAUDE.md",
-   "quote": "**Window.** Sat 10 Oct 10:00 UTC (13:00 Istanbul) → hidden briefs at **Sun 17:00 UTC** (20:00 Istanbul) →",
+   "quote": "**Window.** Sat 10 Oct 10:00 UTC (13:00 Istanbul) \u2192 hidden briefs at **Sun 17:00 UTC** (20:00 Istanbul) \u2192",
    "utc": "2026-10-11T17:00:00Z",
    "notes": "Internal restatement of organizer deadlines; utc is the hidden-brief opening (date from context, Sun = 11 Oct 2026). The next line restates submission close Sun 20:00 UTC (23:00 Istanbul).",
    "extracted_by": "internal"
@@ -4414,7 +4426,7 @@
    "topic": "Simulation duration (CLAUDE.md)",
    "summary": "Only one simulation runs per workspace, at 3-11 minutes per 10 cases, so cheap local checks come first.",
    "source_file": "CLAUDE.md",
-   "quote": "Only 1 simulation can run per workspace, at 3–11 min per 10 cases, so use cheap local checks first (workflow validation,",
+   "quote": "Only 1 simulation can run per workspace, at 3\u201311 min per 10 cases, so use cheap local checks first (workflow validation,",
    "notes": "Internal. Conflicts with PROJECT_OVERVIEW's 1.5-5 min (see conflicts).",
    "extracted_by": "internal"
   },
@@ -4579,7 +4591,7 @@
    "topic": "Simulation duration (PROJECT_OVERVIEW)",
    "summary": "PROJECT_OVERVIEW says a 10-case run takes about 1.5-5 minutes.",
    "source_file": "docs/PROJECT_OVERVIEW.md",
-   "quote": "a 10-case run takes about 1.5–5 min.",
+   "quote": "a 10-case run takes about 1.5\u20135 min.",
    "notes": "Internal. Conflicts with CLAUDE.md's 3-11 min; measured runs on 11 Oct were slower under platform degradation.",
    "extracted_by": "internal"
   },
@@ -5327,6 +5339,358 @@
    "notes": "git b7fe325 2026-10-11T04:13:55+03:00. No organizer clarification on this point was found in the official page snapshots or the kit.",
    "checker": "corrected by the checker: The summary says two checks were removed, but the original quote does not say so. Including the section heading directly above it (contiguous) supports this. The case names N3 and XB-PUB-13 come from the table that follows; the commit b7fe325 says 'D3 removed 2 checks a correct agent could fail'.",
    "extracted_by": "cases"
+  },
+  {
+   "category": "source_date",
+   "topic": "Final-case re-read capture time",
+   "summary": "Team-written header: the page was read live on 2026-10-11 at about 16:00 UTC, before the final case opened.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "read in the browser on 2026-10-11 at about 16:00 UTC, before the final",
+   "notes": "Team-written header, not organizer text. Each tab's text was hash-checked against the live page.",
+   "extracted_by": "official-page (2026-10-11 re-read)",
+   "utc": "2026-10-11T16:00:00Z"
+  },
+  {
+   "category": "case_provenance",
+   "topic": "Final case: the user's 14:48 report now has organizer text",
+   "summary": "The new case the user reported at 14:48 UTC ('a new case will be coming in at 20.00 in istanbul time') is the final case. The page now describes it: one case, in Turkish, opening Sun 17:00 UTC.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "On Sunday at 17:00 UTC (20:00 Istanbul) the final case opens. It is one case: Freya Bank's credit card statement-debt line, in Turkish.",
+   "notes": "Resolves the 'reported' entry 'New case' (the user, in the Dashboard Creator chat, 2026-10-11T14:48:02Z). The case entry is in docs/reference/final_case_2026-10-11.json (page text only).",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Final = one case, in Turkish, a different call",
+   "summary": "The final is ONE case: Freya Bank's credit card statement-debt line, in Turkish, a different call from the practice. It replaces the two hidden briefs.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "It is one case: Freya Bank's credit card statement-debt line, in Turkish. A different call from the practice.",
+   "notes": "Supersedes 'two hidden briefs, 30 customers each' (see conflicts).",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Builder input: the bank's documents, one command",
+   "summary": "One command takes the bank's documents as input and outputs a phone agent; no manual edits after it runs.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "The builder must work alone. One command, the bank's documents as input, a phone agent as output. No manual edits after it runs.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Final tools call only the team's own mock",
+   "summary": "In the final, the phone agent calls only the team's own mock; any other service fails the conversation. (Practice: only the kit's tool API.)",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "On the practice cases the phone agent may call only the tool API from the kit. In the final it calls only your own mock. A call to any other service fails the conversation.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Write and deploy the mock on Cloudflare Workers",
+   "summary": "Write the bank-services mock on Cloudflare Workers from the zip's service contract and test customers; deploy it BEFORE running the builder; keep it running until results.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Write your mock of the bank's services on Cloudflare Workers, from the service contract and the test customers. Deploy it before you run your builder and keep it running until the results are out: our simulated customers reach it through your agent's tools.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Keep the mock running",
+   "summary": "The mock must stay up until the results are out.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Keep your mock running until the results are out.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Final language Turkish; 'now' variable",
+   "summary": "Practice was English; the final is Turkish. The call's date and time arrive as the variable now, and every date rule uses it.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Practice calls are in English, the final case is in Turkish. The phone agent gets the date and time of the call as a variable, now. Every date rule uses it.",
+   "notes": "Supersedes 'Calls are in English' (see conflicts).",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Phone agent model Freya LLM; builder any model",
+   "summary": "Every phone agent runs on Freya LLM; the builder may use any model or coding agent.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Every phone agent runs on the same model, Freya LLM. Your builder may use any model or coding agent you like.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "organizer_rule",
+   "topic": "Read BRIEF.md first",
+   "summary": "Download the zip at 17:00 UTC (link on the Submit tab or e-mail); read BRIEF.md first, README.md says what each document is.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Download the zip at 17:00 UTC (20:00 Istanbul), from the link above or the e-mail. Read BRIEF.md first; README.md says what each document is.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "after_hidden_briefs",
+   "topic": "After the final opens: bug fixes only, nothing from the case",
+   "summary": "After 17:00 UTC: fix bugs only. No rule, value or name from the final case in the builder. A crash fix on an unexpected file type is allowed; adding the bank's announcements or field names to code or prompts is not.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "After the final case opens you may fix a bug in your builder. You may not write anything from the final case into it: no rule, no value, no name. Fixing a crash on a file type your builder did not expect is allowed. Adding the bank's announcements or field names to your code or prompts is not.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "after_hidden_briefs",
+   "topic": "The three hours are for running and fixing, not tuning",
+   "summary": "17:00-20:00 UTC is for running the builder on the final case and fixing bugs, not tuning it to that case.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "The three hours in orange are for running your builder on the final case and fixing bugs, not for tuning it to that case.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "after_hidden_briefs",
+   "topic": "A reviewer checks the commit",
+   "summary": "Nothing from the final case may be written into the builder; a reviewer checks the commit.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "You may fix bugs in your builder after the final case opens. Nothing from the final case may be written into it. A reviewer checks the commit for that.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Run command: {case_folder} {mock_url}",
+   "summary": "The run_command takes the case folder and the mock URL: python3 builder/build.py {case_folder} {mock_url}.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "\"run_command\": \"python3 builder/build.py {case_folder} {mock_url}\",",
+   "notes": "Supersedes {brief_path} {tool_api_path} (see conflicts). The page says the command and paths are examples.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "submission.json by e-mail before 20:00 UTC",
+   "summary": "Before 20:00 UTC, send submission.json to the address in the kit e-mail.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Before 20:00 UTC (23:00 Istanbul), send submission.json to the address in your kit email.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "submission.json fields",
+   "summary": "Fields: team, members (name, email; solo = one member), repo, commit, run_command, workflow (one file), trace (one file), mock_url.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "\"workflow\": \"submission/final.workflow.json\",\n  \"trace\": \"traces/final.log\",\n  \"mock_url\": \"https://your-mock.your-subdomain.workers.dev\"",
+   "notes": "Supersedes the two-entry 'workflows'/'traces' maps. New fields: members, mock_url.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Command and paths are examples",
+   "summary": "The example command and paths are examples; teams use their own.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Solo teams list one member. The command and the paths are examples: use your own.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "One run's agent with that run's trace; may run more than once",
+   "summary": "Run the builder on the folder (more than once allowed); submit the phone agent of ONE run with that run's trace; no edits after the run.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Run your builder on the folder and keep everything it prints: that is your trace. You may run it more than once. Submit the phone agent of one run, with that run's trace, and do not edit it after the run.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Export with freya.export_workflow and commit",
+   "summary": "Export the phone agent with freya.export_workflow and commit it with the trace; the organizers load exactly that file.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Export the phone agent with freya.export_workflow and commit the file with the trace. We load it into our own workspace, so what you export is what we test.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Example run command from the page",
+   "summary": "Example: python3 builder/build.py <case folder>/ <workers.dev mock URL> 2>&1 | tee traces/final.log.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "$ python3 builder/build.py FreyaBank-Ekstre-Borc/ https://your-mock.your-subdomain.workers.dev 2>&1 | tee traces/final.log",
+   "notes": "Page text kept for reference only. The folder name is the page's example; nothing from it goes into the builder.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Trace contents (not scored)",
+   "summary": "Trace: start and end time, every model call (model + one-line ask), what was created on Freya (workflow id, agent id, steps, tools), any self-test with its result. Remove API keys.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "The trace is the record of the run that made your final phone agent. It is not scored. Plain text is fine; remove API keys before you commit. It should show:",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Removal conditions",
+   "summary": "An entry is removed if its phone agent was edited by hand or its builder has the final case written into it.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "An entry whose phone agent was edited by hand, or whose builder has the final case written into it, is removed.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "submission",
+   "topic": "Optional coding-agent session logs",
+   "summary": "Optional: share Claude Code / Codex session logs; the top three talk their approach through.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Optional: if you built your builder with a coding agent such as Claude Code or Codex, share those session logs too. The top three teams talk their approach through with us.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "scoring",
+   "topic": "Final evaluation: hidden customers, workflow review, tools call our mock",
+   "summary": "The organizers load the submitted workflow JSON into their workspace, test it with hidden simulated customers and review the workflow; its tools call the team's mock.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "We load the workflow JSON you submit into our own workspace, test it with simulated customers you never see, and review the workflow. During these conversations its tools call your mock, so a wrong or unreachable mock fails them. Keep it running until the results are out.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "scoring",
+   "topic": "Final criteria and weights not published",
+   "summary": "Test customers, success criteria and weights are not published; the zip's six example conversations show the kind of call tested.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "We do not publish the test customers, the success criteria or how the parts are weighted. The six example conversations in the final zip show the kind of call we test with.",
+   "notes": "Supersedes the published final benchmark table (2 briefs, 30 customers, 3 reps, cases passed / 60, tie-breaks).",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "scoring",
+   "topic": "Only the final phone agent is scored",
+   "summary": "Only the final phone agent is scored; the trace is read to check for hand edits, not scored.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Only the final phone agent is scored. The builder's trace is not scored. We read it to check that nobody edited the phone agent by hand.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "scoring",
+   "topic": "Score from the submitted agent; top entries rebuilt",
+   "summary": "The score comes from the exported, submitted phone agent; top entries may be rebuilt to check provenance, without expecting an identical workflow.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "From the phone agent you export and submit. We may rebuild the top entries, to check that the submitted phone agent really came out of your builder. Model output varies from run to run, so we do not expect an identical workflow.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "limit",
+   "topic": "Mock hosting limit",
+   "summary": "The mock runs on Cloudflare Workers until results; if it is down, conversations that reach it fail.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Your mock\tOn Cloudflare Workers, up until the results are out. If it is down, the conversations that reach it fail.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "limit",
+   "topic": "One phone agent submitted",
+   "summary": "One phone agent, with the trace of the run that made it.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Phone agents you submit\t1, with the trace of the run that made it",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "limit",
+   "topic": "Builder models: any, paid by the team",
+   "summary": "The builder may use any model; the team pays for its calls.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "Models the builder may use\tAny. You pay for your builder's own model calls.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "The final case is a folder of md/docx/pdf/xlsx",
+   "summary": "The final is one zip with a folder of documents in Markdown, Word, PDF and Excel; {case_folder} is that folder.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "No. It is one zip with a folder of the bank's documents in Markdown, Word, PDF and Excel. In your run command, {case_folder} is that folder.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "Organizers do not host the bank for the final",
+   "summary": "No organizer-hosted bank in the final: the team writes the mock on Cloudflare Workers from the zip and sends its address as mock_url.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "No. You write the mock on Cloudflare Workers, from the service contract and the test customers in the zip, and send its address as mock_url.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "No practice cases for the final",
+   "summary": "The zip has test customers (for the mock) and six example conversations, no scorer cases; the evaluation customers stay hidden.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "No. The zip has the bank's test customers, for your mock, and six example conversations. The customers we test with stay hidden.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "One case in the final",
+   "summary": "One case, in Turkish; one phone agent submitted.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "One: Freya Bank's credit card statement-debt line, in Turkish. You submit one phone agent.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "No new builder needed",
+   "summary": "Use the practice builder on the final zip; bug fixes only during the three hours.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "No. Give the final zip to the builder you built on the practice. During the three hours you may fix bugs in it, not write the final case into it.",
+   "notes": "",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "clarification",
+   "topic": "Zip contents (Submit tab diagram)",
+   "summary": "The zip holds: analysis, flow drawing, announcements, service contract, test customers, questions and answers, 6 example conversations.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "analysis\nflow drawing\nannouncements\nservice contract\ntest customers\nquestions and answers\n6 example\nconversations",
+   "notes": "Diagram labels on the Submit tab, in that order.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "interpretation",
+   "topic": "Tools and base URL must come from the documents and mock_url",
+   "summary": "TEAM READING: the final ships no kit-format tool API file; the builder must take tool definitions from the documents (the service contract) and point every tool at mock_url.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "In your run command, {case_folder} is that folder.",
+   "notes": "Interpretation, not organizer text. The frozen builder (freeze-final) takes {brief_path} {tool_api_path}; see docs/WORKING_STATE.md for the gap analysis.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "interpretation",
+   "topic": "The mock is a separate deliverable from the builder",
+   "summary": "TEAM READING: the mock is written from the zip after 17:00, so keep it outside builder/ and src/ (no final-case content in the builder). Not stated by the organizers.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "We give the evidence. Your builder does the construction, against your own mock. We run the evaluation.",
+   "notes": "Interpretation. The page lists the mock under 'your side' next to the builder; where its code lives is not stated.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "category": "interpretation",
+   "topic": "Practice 3/3 metric is only a proxy for the final",
+   "summary": "TEAM READING: the final's criteria, weights and repetitions are unpublished, so our strict 3/3 practice score is a proxy; the six example conversations are the only official sample of the call.",
+   "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+   "quote": "We do not publish the test customers, the success criteria or how the parts are weighted.",
+   "notes": "Interpretation, not organizer text.",
+   "extracted_by": "official-page (2026-10-11 re-read)"
   }
  ],
  "conflicts": [
@@ -5377,7 +5741,7 @@
    "sides": [
     {
      "source_file": "docs/reference/hackathon_page.md",
-     "quote": "Source: https://www.freyavoice.ai/hackathon — fetched 2026-10-10 (before kickoff). Text extracted from HTML;"
+     "quote": "Source: https://www.freyavoice.ai/hackathon \u2014 fetched 2026-10-10 (before kickoff). Text extracted from HTML;"
     },
     {
      "source_file": "docs/reference/README.md",
@@ -5925,7 +6289,7 @@
    "sides": [
     {
      "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
-     "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07–0.09 credits per call. Below 100: stop optional work. Below 60: stop all"
+     "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07\u20130.09 credits per call. Below 100: stop optional work. Below 60: stop all"
     },
     {
      "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
@@ -5953,7 +6317,7 @@
    "sides": [
     {
      "source_file": "docs/plans/2026-10-11-overnight-plan-v2.md",
-     "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07–0.09 credits per call. Below 100: stop optional work. Below 60: stop all"
+     "quote": "- **Credits:** 433.89 at 00:37 UTC; about 0.07\u20130.09 credits per call. Below 100: stop optional work. Below 60: stop all"
     },
     {
      "source_file": "docs/plans/2026-10-11-overnight-report.md",
@@ -6253,11 +6617,11 @@
    "sides": [
     {
      "source_file": "CLAUDE.md",
-     "quote": "Only 1 simulation can run per workspace, at 3–11 min per 10 cases, so use cheap local checks first (workflow validation,"
+     "quote": "Only 1 simulation can run per workspace, at 3\u201311 min per 10 cases, so use cheap local checks first (workflow validation,"
     },
     {
      "source_file": "docs/PROJECT_OVERVIEW.md",
-     "quote": "a 10-case run takes about 1.5–5 min."
+     "quote": "a 10-case run takes about 1.5\u20135 min."
     },
     {
      "source_file": "docs/WORKING_STATE.md",
@@ -6273,7 +6637,7 @@
    "sides": [
     {
      "source_file": "CLAUDE.md",
-     "quote": "- Practice scoring: `python3 tools/run_cases.py <agent_id> --brief A [--reps 3]` (3–11 min per 10 cases)."
+     "quote": "- Practice scoring: `python3 tools/run_cases.py <agent_id> --brief A [--reps 3]` (3\u201311 min per 10 cases)."
     },
     {
      "source_file": "CLAUDE.md",
@@ -6497,7 +6861,7 @@
    "sides": [
     {
      "source_file": "docs/reference/hackathon_page.md",
-     "quote": "Source: https://www.freyavoice.ai/hackathon — fetched 2026-10-10 (before kickoff). Text extracted from HTML;"
+     "quote": "Source: https://www.freyavoice.ai/hackathon \u2014 fetched 2026-10-10 (before kickoff). Text extracted from HTML;"
     },
     {
      "source_file": "docs/reference/README.md",
@@ -6621,6 +6985,134 @@
     }
    ],
    "extracted_by": "cases"
+  },
+  {
+   "topic": "Final format: two hidden briefs -> one Turkish case",
+   "kind": "superseded",
+   "explanation": "The 2026-10-10 page announced two hidden briefs (one clean, one raw material), 30 customers each. The 2026-10-11 page: ONE case, in Turkish, as a zip folder. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "On Sunday at 17:00 UTC we send two hidden briefs to every team."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "| Hidden briefs | 2. One is a clean specification. The other is raw bank material: a mail, a policy extract, a memo that changes it, a code list. |"
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "The final is one case. In three hours you turn the bank's documents into a phone agent, with the builder you already built."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Run command: {brief_path} {tool_api_path} -> {case_folder} {mock_url}",
+   "kind": "superseded",
+   "explanation": "The builder's command line changed: a folder of documents and the team's mock URL replace a brief file and a tool API file. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "\"run_command\": \"python3 builder/build.py {brief_path} {tool_api_path}\","
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "\"run_command\": \"python3 builder/build.py {case_folder} {mock_url}\","
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Who hosts the bank in the final: organizers -> the team's own Cloudflare Worker",
+   "kind": "superseded",
+   "explanation": "Practice uses the organizers' mock bank. In the final the team writes and hosts the mock; the phone agent's tools must call it. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "Each comes with its own tool API file."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Do we host the bank's services for the final?\nNo. You write the mock on Cloudflare Workers, from the service contract and the test customers in the zip, and send its address as mock_url."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Language: English -> Turkish",
+   "kind": "superseded",
+   "explanation": "The earlier page said calls are in English; the final case is in Turkish. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "Calls are in English. The phone agent gets the date and time of the call as a variable, now."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Practice calls are in English, the final case is in Turkish."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Scoring and tie-breaks: published table -> not published",
+   "kind": "superseded",
+   "explanation": "The earlier page published the final benchmark (3 reps, cases passed / 60, tie-breaks by promised amount, build time, submission time). The new page says criteria and weights are not published and the trace is not scored. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "| Score | cases passed / 60 |"
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "| Second tie-break | Shorter total build time, read from the builder's traces |"
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "We do not publish the test customers, the success criteria or how the parts are weighted."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Only the final phone agent is scored. The builder's trace is not scored."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Submission: two agents + traces -> one agent, one trace, submission.json with mock_url",
+   "kind": "superseded",
+   "explanation": "The earlier form had 'workflows' and 'traces' maps for hidden-1/hidden-2. The new submission.json has one workflow, one trace, members and mock_url. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "Two phone agents, one commit and the builder's trace."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Phone agents you submit\t1, with the trace of the run that made it"
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Before 20:00 UTC (23:00 Istanbul), send submission.json to the address in your kit email."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
+  },
+  {
+   "topic": "Final-case file count: one brief file -> a folder of md/docx/pdf/xlsx",
+   "kind": "superseded",
+   "explanation": "The earlier FAQ said each hidden brief is one file. The new FAQ: one zip with a folder in Markdown, Word, PDF and Excel. The 2026-10-11 re-read (about 16:00 UTC) is the later capture and replaces the 2026-10-10 text.",
+   "sides": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
+     "quote": "{brief_path} is that one file."
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "It is one zip with a folder of the bank's documents in Markdown, Word, PDF and Excel."
+    }
+   ],
+   "extracted_by": "official-page (2026-10-11 re-read)"
   }
  ],
  "missing": [
@@ -6687,7 +7179,7 @@
   "[interpretations checker] INTERNAL PRECEDENCE ASSUMPTION, not labelled as one: 'the kit overrides the page' comes from CLAUDE.md ('The **kit** ... overrides it') and docs/hackathon_notes.md L5 ('The kit (emailed at the start) supersedes both.'). Neither the live page nor kit/README.md states which source wins. Also STALE: notes L5 says the kit was 'emailed', while notes L8-9 and the live page L91 say it is downloaded from the Data tab.",
   "[interpretations checker] STALE INTERNAL INFO: docs/RUNBOOK.md L9-10 says 'on 11 Oct morning the candidate is branch `cand-final`, ca80d52'. The docs/hackathon_notes.md Decision log entry for 2026-10-11 14:30 (11:30 UTC) records that the user picked `cand-eng.4` (cfa4d9d) to deploy and measure first, 'not a final selection'.",
   "[interpretations checker] INTERNAL TARGETS/BUDGETS not catalogued as items: docs/RUNBOOK.md L101 'Aim for 18:30 to leave a margin.' (RUNBOOK times are UTC per L3), and L111 'Model calls stop after 25 min (the page allows 30 per brief).' The second appears only inside the note on item 37. Original source of the 12:00 / 14:30 / 15:30 internal cutoffs: docs/plans/2026-10-11-overnight-plan-v2.md:299-303 (cited by the engine-fixes log L341).",
-  "[interpretations checker] DERIVED-vs-OFFICIAL label for cases: docs/hackathon_requirements.md L158, section 'Practice-case behaviours (observations, NOT bank policy — the brief is the authority) (31)'. Rows #86-#116 are locally derived observations from the practice cases and must not be shown as official rules.",
+  "[interpretations checker] DERIVED-vs-OFFICIAL label for cases: docs/hackathon_requirements.md L158, section 'Practice-case behaviours (observations, NOT bank policy \u2014 the brief is the authority) (31)'. Rows #86-#116 are locally derived observations from the practice cases and must not be shown as official rules.",
   "[interpretations checker] STALE OPEN QUESTION not listed: docs/hackathon_notes.md L167 '- [ ] Exact kit `docs/` contents: the workflow JSON format, code-node language and runtime, and how routes and conditions are expressed.' It is still unticked but now answered by kit/docs/workflow-format.md and kit/docs/tools-and-code.md (code steps are Python).",
   "[internal] No explicit written or snapshot date in docs/RUNBOOK.md or docs/PROJECT_OVERVIEW.md, and CLAUDE.md dates only its kit-facts section (2026-10-10). The git commit times in the notes are git metadata, not quotes.",
   "[internal] No final candidate selection is recorded. cand-eng.4 is only the comparison candidate (user, 12:00 UTC), and the user makes the final selection.",
@@ -6713,8 +7205,8 @@
   "[internal checker] Approvals granted in docs/plans/2026-10-11-overnight-plan-v2.md:284-290 ('Approvals' -> 'Granted'). They cover git tags, branches and worktrees; deploys to new exp slots only; read-only GETs; the new case files and tests; the budgets above; and the precedence correction on an isolated branch. Only the 'Not granted' list was extracted.",
   "[internal checker] User authorization in docs/plans/2026-10-11-overnight-report.md:61: 'Coordinator session: autonomous under the user's final authorization (00:50 UTC).'",
   "[internal checker] Submission impact in docs/plans/2026-10-11-overnight-report.md:9 (MORNING HANDOFF): 'It does not block the submission itself: the builder's self-test uses the chat API, not simulations.'",
-  "[internal checker] Submission form in docs/RUNBOOK.md:33 and 94-100 (steps 2 and 6): the run_command 'python3 builder/build.py {brief_path} {tool_api_path}' and the form fields team/repo/commit/run_command/workflows/traces. The organizer source ('the kit email') was not found in the files read, so the source is missing. RUNBOOK.md:3 also states its own provenance: 'The requirements come from `docs/hackathon_notes.md` → Submission (official page + kit README). Times are UTC.' This makes RUNBOOK derived from the team digest, not taken directly from official files.",
-  "[internal checker] Stale result in a file labelled stable: docs/PROJECT_OVERVIEW.md:130 ('7. Evidence so far'), 'At 3 reps it has scored 8–9/10 on A.' Later strict measurements (M3 G1 10/10, M4 8/10) are in WORKING_STATE.md:177-178.",
+  "[internal checker] Submission form in docs/RUNBOOK.md:33 and 94-100 (steps 2 and 6): the run_command 'python3 builder/build.py {brief_path} {tool_api_path}' and the form fields team/repo/commit/run_command/workflows/traces. The organizer source ('the kit email') was not found in the files read, so the source is missing. RUNBOOK.md:3 also states its own provenance: 'The requirements come from `docs/hackathon_notes.md` \u2192 Submission (official page + kit README). Times are UTC.' This makes RUNBOOK derived from the team digest, not taken directly from official files.",
+  "[internal checker] Stale result in a file labelled stable: docs/PROJECT_OVERVIEW.md:130 ('7. Evidence so far'), 'At 3 reps it has scored 8\u20139/10 on A.' Later strict measurements (M3 G1 10/10, M4 8/10) are in WORKING_STATE.md:177-178.",
   "[internal checker] Official counterpart for RUNBOOK's re-run policy: kit/README.md:89, 'You may run it more than once and submit the phone agent of one run, with that run's trace.' (also docs/reference/hackathon_page.md:197).",
   "[internal checker] Unresolved interpretations not covered by this group, in case no other group reads them. docs/hackathon_requirements.md:194 onward ('Open questions the page leaves unanswered') covers the re-run LLM key, public vs private repo, 30-minute enforcement and the tie-break details. docs/hackathon_notes.md:158-159 says the repo must be cloneable and 'a decision is needed before Sunday'. No organizer clarification on the OpenAI key for the top-10 re-run is recorded in any file read.",
   "[cases] No organizer source gives a timezone for the practice-case time ('Wednesday 14 October 2026 at 11:00'; variables.now \"2026-10-14T11:00\").",
@@ -6759,10 +7251,18 @@
    ]
   },
   {
-   "what": "Hidden briefs open (two briefs, each with its own tool API file)",
+   "what": "Final case opens (one case, Turkish zip of the bank's documents; was: two hidden briefs)",
    "utc": "2026-10-11T17:00:00Z",
    "derivation": "The organizer text gives a weekday and a UTC time, no calendar date. The page's event dates (October 10 and 11) and the kit's date (10 October 2026) make Sunday 2026-10-11. Istanbul is computed at UTC+3; the organizers state no Istanbul time.",
    "basis": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Final case opens\nSun 17:00 UTC (20:00 Istanbul)\ndownload the zip"
+    },
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "The final case's download link appears here on Sunday at 17:00 UTC (20:00 Istanbul). We send it by e-mail at the same time."
+    },
     {
      "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
      "quote": "Hidden briefs open Sun 17:00 UTC"
@@ -6782,10 +7282,14 @@
    ]
   },
   {
-   "what": "Submission closes (send the form before 20:00 UTC)",
+   "what": "Submission closes (send submission.json before 20:00 UTC)",
    "utc": "2026-10-11T20:00:00Z",
    "derivation": "The organizer text gives a weekday and a UTC time, no calendar date. The page's event dates (October 10 and 11) and the kit's date (10 October 2026) make Sunday 2026-10-11. Istanbul is computed at UTC+3; the organizers state no Istanbul time.",
    "basis": [
+    {
+     "source_file": "docs/reference/hackathon_page_live_2026-10-11.md",
+     "quote": "Before 20:00 UTC (23:00 Istanbul), send submission.json to the address in your kit email."
+    },
     {
      "source_file": "docs/reference/hackathon_page_live_2026-10-10.md",
      "quote": "Close Sun 20:00 UTC (submit)"
@@ -6805,7 +7309,8 @@
    ]
   }
  ],
- "reported": [
+ "reported": [],
+ "resolved_reports": [
   {
    "what": "New case",
    "report": "Just reported, a new case will be coming in at 20.00 in istanbul time, add it to cases",
@@ -6814,7 +7319,9 @@
    "stated_time": "20:00 Istanbul",
    "utc": "2026-10-11T17:00:00Z",
    "label": "user report (not yet in project files)",
-   "notes": "No organizer text for this announcement is in the project files; who reported it and how the case will be delivered are not recorded. 20:00 Istanbul is 17:00 UTC (UTC+3), the same time the official page gives for the hidden briefs to open; whether they are the same thing is not stated."
+   "notes": "No organizer text for this announcement is in the project files; who reported it and how the case will be delivered are not recorded. 20:00 Istanbul is 17:00 UTC (UTC+3), the same time the official page gives for the hidden briefs to open; whether they are the same thing is not stated.",
+   "resolved_at": "2026-10-11T16:00:00Z",
+   "resolution": "Organizer text captured in docs/reference/hackathon_page_live_2026-10-11.md; case entry in docs/reference/final_case_2026-10-11.json."
   }
  ]
 }

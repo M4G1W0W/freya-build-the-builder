@@ -16,6 +16,8 @@ Official hackathon page (fetched 2026-10-10 13:38 Istanbul, i.e. after the start
 |---|---|
 | `hackathon_page.md` | <https://www.freyavoice.ai/hackathon>: text extracted from the HTML (diagrams omitted) |
 | `hackathon_practice_cases.json` | The 13 practice cases embedded in that page (`<script id="cases-json">`) |
+| `hackathon_page_live_2026-10-11.md` | All 7 tabs re-read 2026-10-11 ~16:00 UTC: **the final-case announcement** (one Turkish case as a zip folder, our own mock on Cloudflare Workers, `{case_folder} {mock_url}`, `submission.json`). Each tab hash-checked against the live page. |
+| `final_case_2026-10-11.json` | Team-made case entry for the final, quoting only that page (no zip content, ever). Shown first under Case sets on the dashboard. |
 
 **Not saved on purpose:** <https://docs.freyavoice.ai/api-reference/openapi.json> is a *stale*
 OpenAPI 3.0.0 spec (58 paths, still has `/problems` and `/solutions`, missing Chat, Simulations,

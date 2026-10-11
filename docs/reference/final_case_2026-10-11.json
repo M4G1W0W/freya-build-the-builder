@@ -1,0 +1,27 @@
+{
+ "about": "The final case as ANNOUNCED on the official page (captured 2026-10-11 about 16:00 UTC, before it opened): docs/reference/hackathon_page_live_2026-10-11.md. Team-made entry: every value below quotes that page. It holds NO content from the final zip and must never get any: after 17:00 UTC nothing from the final case may enter the repo except traces/ and submission/.",
+ "cases": [
+  {
+   "id": "FINAL",
+   "brief": "final case folder ({case_folder}), opens Sun 17:00 UTC (20:00 Istanbul)",
+   "family": "credit card statement-debt line",
+   "level": "hidden customers",
+   "title": "Freya Bank's credit card statement-debt line, in Turkish",
+   "script": "Not published. \"The customers we test with stay hidden.\" \"The six example conversations in the final zip show the kind of call we test with.\"",
+   "expected": "Not published. \"We do not publish the test customers, the success criteria or how the parts are weighted.\"",
+   "checks": [
+    "It is one case: Freya Bank's credit card statement-debt line, in Turkish. A different call from the practice.",
+    "It is one zip with a folder of the bank's documents in Markdown, Word, PDF and Excel. In your run command, {case_folder} is that folder.",
+    "Zip contents (Submit tab): analysis, flow drawing, announcements, service contract, test customers, questions and answers, 6 example conversations. Read BRIEF.md first; README.md says what each document is.",
+    "Write your mock of the bank's services on Cloudflare Workers, from the service contract and the test customers. Deploy it before you run your builder and keep it running until the results are out.",
+    "In the final it calls only your own mock. A call to any other service fails the conversation.",
+    "Its tools call your mock, so a wrong or unreachable mock fails those conversations.",
+    "The phone agent gets the date and time of the call as a variable, now. Every date rule uses it.",
+    "run_command: python3 builder/build.py {case_folder} {mock_url}",
+    "Before 20:00 UTC (23:00 Istanbul), send submission.json to the address in your kit email.",
+    "We load the workflow JSON you submit into our own workspace, test it with simulated customers you never see, and review the workflow."
+   ],
+   "source": "docs/reference/hackathon_page_live_2026-10-11.md"
+  }
+ ]
+}
