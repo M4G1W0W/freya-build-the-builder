@@ -5,6 +5,7 @@
 The kit client has no retry: one 503 while polling a simulation ("API key validation is temporarily
 unavailable", 10 Oct 19:53 UTC) ended a 3-rep run after rep 1 and left its simulation running.
 Only GETs are retried (POST/PUT are not idempotent), on 5xx and on network errors; 4xx errors never are.
+Before starting, it waits (up to 30 min) until the platform answers a GET.
 
 It also frees a simulation stuck in "running". On 10 Oct (21:17-21:55 UTC) and 11 Oct (01:21-08:12 UTC) a
 simulation stayed "running" after all its calls had ended and its iteration had completed; it blocked every new
@@ -34,7 +35,17 @@ from datetime import datetime
 from _kit import KIT, freya
 
 log = logging.getLogger("run_cases_retry")
-DELAYS = (5, 15, 30, 60, 120)
+DELAYS = (
+    5,
+    15,
+    30,
+    60,
+    120,
+    180,
+    300,
+    300,
+)  # ~17 min: 11 Oct 09:38-09:50 UTC polls got 504 for >10 min
+HEALTH_WAIT_S = 1800  # before starting: wait this long at most for the platform to answer a GET
 NETWORK_ERRORS = (
     urllib.error.URLError,
     TimeoutError,
@@ -227,8 +238,26 @@ def repeat_unjudged(run_once):
     return checked
 
 
+def wait_until_healthy(api=None, limit_s=HEALTH_WAIT_S) -> None:
+    """Start no simulation into a platform that cannot answer a GET (its results could not be collected)."""
+    api = api or api_with_retry
+    t0 = time.time()
+    while True:
+        try:
+            api("GET", "/api/v2/simulations", limit=1, offset=0)
+            return
+        except (RuntimeError, *NETWORK_ERRORS) as e:
+            if time.time() - t0 >= limit_s:
+                raise
+            print(
+                f"platform not answering ({str(e)[:80]}); waiting 60 s before starting", flush=True
+            )
+            time.sleep(60)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    wait_until_healthy()
     freya.api = api_watched
     sys.argv = [str(KIT / "tools" / "run_cases.py"), *sys.argv[1:]]
     import run_cases  # kit/tools is on sys.path (scripts/_kit.py); imported, not run

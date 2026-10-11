@@ -264,3 +264,28 @@ def test_unjudged_reads_only_missing_verdicts():
         {"id": "C", "failed": []},
     ]
     assert rcr.unjudged(rows) == ["A"]
+
+
+def test_waits_for_a_healthy_platform_before_starting(monkeypatch, capsys):
+    tries = []
+
+    def api(method, path, body=None, **params):
+        tries.append(path)
+        if len(tries) < 3:
+            raise RuntimeError("GET /api/v2/simulations -> 504: error code: 504")
+        return {"simulations": []}
+
+    monkeypatch.setattr(rcr.time, "sleep", lambda s: None)
+    rcr.wait_until_healthy(api, limit_s=10_000)
+    assert len(tries) == 3 and capsys.readouterr().out.count("platform not answering") == 2
+
+
+def test_gives_up_waiting_after_the_limit(monkeypatch):
+    def down(method, path, body=None, **params):
+        raise RuntimeError("GET /api/v2/simulations -> 504: error code: 504")
+
+    clock = iter(range(0, 100_000, 100))
+    monkeypatch.setattr(rcr.time, "time", lambda: next(clock))
+    monkeypatch.setattr(rcr.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError):
+        rcr.wait_until_healthy(down, limit_s=300)
