@@ -323,15 +323,15 @@ def _identity_task(spec: dict, t: Tool) -> str:
     if kinds & {"date", "year"}:
         blocks.append(
             "A full year has four digits: in figures, said one digit at a time, or in words that "
-            'include the century ("nineteen ninety-one", "two thousand and four"). Join the parts '
-            'first: a year that still has only its last two digits ("ninety-one.", "\'91", with '
+            'include the century ("nineteen seventy-six", "two thousand and four"). Join the parts '
+            'first: a year that still has only its last two digits ("seventy-six.", "\'76", with '
             "no century said before them) is never a full year: do not send such an answer; ask at "
             'once "Just the year, all four digits, please." (that ask is not counted under CUT-OFF '
             "and does not restart it; a year in figures that breaks off before its fourth digit, "
             'such as "19" or "199" at the end of a message, is a part under CUT-OFF; if the BANK '
             "BRIEF says more about it, follow that). A year in words is complete when a full "
             "stop or other words follow it, or when it ends on a number word from one to nineteen "
-            'after its century ("nineteen ninety-one", "twenty fifteen"); at the very end of a '
+            'after its century ("nineteen seventy-six", "twenty fifteen"); at the very end of a '
             'message, a year in words that ends on its century, on a tens word ("ninety") or on '
             '"thousand" or "and" may still go on.'
         )
