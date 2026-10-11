@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from freya_builder import pipeline
+from freya_builder import llm, pipeline
 from freya_builder.toolapi import load_tool_api
 from freya_builder.trace import Trace
 
@@ -75,6 +75,12 @@ class _FakeFreya:
             "response": "I am a digital assistant. Am I speaking with Mr Reyes?",
             "callId": "c1",
         }
+
+
+@pytest.fixture(autouse=True)
+def _no_build_budget(monkeypatch):
+    # test_cli starts the real 25-minute budget; the smoke tests must not depend on what is left of it.
+    monkeypatch.setattr(llm, "_deadline", None)
 
 
 def test_smoke_test_retries_a_transient_5xx(monkeypatch):
