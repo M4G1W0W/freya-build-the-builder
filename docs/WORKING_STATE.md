@@ -12,6 +12,9 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 The live log and morning handoff is `docs/plans/2026-10-11-overnight-report.md`. A coordinator session runs the plan under
 the user's final authorization (00:50 UTC). Only that coordinator launches simulations (queue runner in its
 scratchpad, see the report). G1 = cand-g1 83f8263, G2 = cand-g2 0bc83c4, case files on main 322dfc9.
+**01:53 UTC: simulations STOPPED for the night** (platform simulation a36c1d01 stuck "running" since 01:21:29; per the
+user's rule no PUT/pause/stop). If it is cleared (user decision), the remaining queue is in the report: M2 rep 3 +
+extra-B, M3, M4, M5, O4 (slots exp-raw-w, exp-ab1-w, exp-raw-wp, exp-ab1-wp are already built), O1. W = G1.
 
 ## TONIGHT: execute the APPROVED overnight plan v2 (start here)
 
