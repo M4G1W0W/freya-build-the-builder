@@ -18,6 +18,14 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - **Three-rep raw strict 3/3: 4/10** (PUB-02/05/07/09 3/3; PUB-01/03/04/06/08/10 2/3, each failed only in rep 1).
   Failure classification is separate (workflows wf_cae6672e-5d3 = rep-1 failures + reps 1-2 audit, wf_5a767735-790 =
   rep-3 audit; both read-only).
+- **Classification (analysis `runs/dev/r4/analysis-e4a.md`, skeptic-checked):** rep-1 PUB-01/03/04/08/10 = platform
+  (opening who_answered extraction request hung; 60.3 s silence; same node as G1; agent contribution none);
+  PUB-06 = mixed (platform extraction_error, then our opening design: latest-message extraction, no tools, model
+  improvised, closed not_verified/declined untruthfully). Control M3 G1 used no platform retries (30/30 runs attempt 0).
+- **Latent (judge-unchecked) findings, shared with G1 unless noted:** transfer endings skip rule 47 goodbye (PUB-09
+  6/6 calls); read-back without product when the customer names the date (PUB-10, rule 34); eng.4 r1 PUB-07 false
+  "Monday 27 October 2026 is a business day" (G1 comparison undetermined); kit slowest-turn metric undercounts.
+  Not fixed (no candidate changes authorized).
 - Nothing running after the audits; queue.txt/STOP untouched (E4-A-styledA line still first in queue.txt: it was run
   outside the queue; remove it only on the user's word).
 
