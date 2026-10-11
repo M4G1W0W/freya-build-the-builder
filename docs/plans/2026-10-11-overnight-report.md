@@ -45,7 +45,8 @@ stays isolated (gate 4 not run).
 **Calls and credits:** 62 simulation calls of the 340 cap (M1 36, M2 26); credits 433.89 at 00:37 -> 428.93 at 02:04
 UTC (~0.08 per call incl. builder smoke tests). Sunday reserve (155 calls) untouched.
 
-**Running now:** no simulation of ours (only the stuck platform one). The read-only watcher stopped at its 2-hour
+**Running now (08:12 UTC, after your instruction):** the stuck simulation is paused and the resume queue is running.
+**Before that:** no simulation of ours (only the stuck platform one). The read-only watcher stopped at its 2-hour
 background limit (03:54 UTC); a manual GET at 03:54 still showed `running` (updatedAt 01:21:29). Nothing watches it now. Offline review agents may be finishing (see the log below).
 
 ### Resume (once the simulation is freed; all slots built and provenance recorded in `<scratchpad>/sim/slots.tsv`)
@@ -82,6 +83,7 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 01:21 | **PLATFORM: M2 rep-2 simulation a36c1d01 stuck in "running"** (all 13 calls ended by 01:21:07, iteration completed, status not updated since 01:21:29). M2 rep 3 waits ("another simulation is running"). Per the user's rule: report only, no PUT/pause/stop; if still blocked at 01:52 UTC (30 min) simulations stop for the night |
 | 01:15-01:21 | M2 A+B control (dev-ab-llm v14) styled-ab-all: rep 1 12/13 (PUB-03 identity), rep 2 10/13 (PUB-05 no tool calls, PUB-12 judge, PUB-13 asks_back declined). Analysis running |
 | 01:53 | **STOP CONDITION: simulations stopped for the night.** a36c1d01 still "running" at the 30-minute mark (01:52:40). No PUT/pause/stop of the simulation (user rule). Local queue stopped (STOP flag) and the waiting M2 rep-3 client killed (it had launched nothing). Calls used: **62** (M1 36 + M2 reps 1-2 26). Not run: M2 rep 3 + M2 extra-B, M3, M4, M5 sims, O4 sims, O1. One push notification sent to the user. Offline work continues |
+| 08:12 | **User instruction: pause the stuck simulation and resume.** `PUT /api/v2/simulations/a36c1d01… {"status":"paused"}` -> status paused (updatedAt 08:12:00); no other simulation running. STOP removed, queue resumed (244 calls queued; ledger 62) |
 | 02:00 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
 | 02:02 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
 | 02:04-02:23 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
