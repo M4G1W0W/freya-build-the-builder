@@ -291,7 +291,7 @@ def _engine_field_problems(spec: dict, tools: list[Tool]) -> list[str]:
 
 
 def _ending_wins_problems(
-    i: int, c: dict, rows: dict, note_reasons: tuple[str, ...], precedence: list[dict]
+    i: int, c: dict, rows: dict, note_reasons: tuple[str, ...], spec: dict
 ) -> list[str]:
     """Review gap 7: an ending the brief keeps even after a recorded promise. finalize closes with
     its row when the agent took that ending or a note carries `note_reason`."""
@@ -302,6 +302,18 @@ def _ending_wins_problems(
     row = rows.get(c["row"])
     if row and ("negotiate" not in row["phases"] or row["queue"]):
         p.append(f"{where}: row {c['row']!r} must be a negotiate-phase ending without a queue")
+    precedence = spec["close_precedence"]
+    if c["row"] == spec["default_rows"]["negotiate"]:
+        # notes-done and the turn caps end through the default row: every promise call closing
+        # that way would take this row instead of the promise outcome (precedence review C1)
+        p.append(
+            f"{where}: row {c['row']!r} is default_rows.negotiate; calls that end without an "
+            f"explicit ending close through it, so it must not win over a recorded promise"
+        )
+    later = [j for j, d in enumerate(precedence) if j > i and d["when"] == "transferred"]
+    if later:
+        # a transfer the agent announced must still happen (precedence review C2)
+        p.append(f"{where}: must come after the 'transferred' entry at index {later[0]}")
     nr = c["note_reason"]
     taken = {
         d["note_reason"]
@@ -367,7 +379,7 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         if c["then"] == "row" and c["row"] not in rows:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
         if c["when"] == "ending_wins":
-            p += _ending_wins_problems(i, c, rows, note_reasons, spec["close_precedence"])
+            p += _ending_wins_problems(i, c, rows, note_reasons, spec)
         if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
             p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
         if c["then"] == "first_note_reason_not" and spec["notes"]["used"] and "add_note" in by:

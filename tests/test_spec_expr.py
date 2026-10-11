@@ -157,6 +157,9 @@ def test_ending_wins_entry_is_accepted():
         ({"row": "not_verified_failed"}, "negotiate-phase"),
         ({"note_reason": "bankrupt"}, "not an add_note reason"),
         ({"note_reason": "already_paid"}, "already used by"),
+        # review C1: the default negotiate row closes notes-done and turn-cap calls, so it would
+        # flip every such promise call (variant-c's default negotiate row is refused)
+        ({"row": "no_commitment_refused"}, "is default_rows.negotiate"),
     ],
 )
 def test_ending_wins_guards(entry, needle):
@@ -164,10 +167,24 @@ def test_ending_wins_guards(entry, needle):
     assert any(needle in p for p in problems), problems
 
 
+def test_ending_wins_must_follow_every_transfer():
+    # review C2: before the "transferred" entry it would cancel a transfer the agent announced
+    spec = with_ending_wins()
+    rules = spec["close_precedence"]
+    rule = rules.pop(next(i for i, c in enumerate(rules) if c["when"] == "ending_wins"))
+    rules.insert(0, rule)
+    problems = check_spec(spec, TOOLS_C)
+    assert problems == [
+        "close_precedence[0] ending_wins: must come after the 'transferred' entry at index 1"
+    ]
+    rules.insert(2, rules.pop(0))  # right after the transfer, still before promise_recorded
+    assert check_spec(spec, TOOLS_C) == []
+
+
 def test_ending_wins_note_reason_needs_notes():
     spec = copy.deepcopy(SPEC_A)  # Brief A uses no add_note
     rule = {"when": "ending_wins", "note_reason": "hardship", "then": "row"}
-    spec["close_precedence"].insert(0, rule | {"row": "no_promise_hardship", "outcome": ""})
+    spec["close_precedence"].insert(1, rule | {"row": "no_promise_hardship", "outcome": ""})
     assert any("notes are not used" in p for p in check_spec(spec, TOOLS))
-    spec["close_precedence"][0]["note_reason"] = ""
+    spec["close_precedence"][1]["note_reason"] = ""
     assert check_spec(spec, TOOLS) == []
