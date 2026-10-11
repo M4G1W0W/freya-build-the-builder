@@ -8,6 +8,52 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
 
+## UPDATE 13:42 UTC: E4-A-styledA STOPPED after rep 2 (platform error in rep 1); awaiting the user on rep 3
+
+- User D2 (13:25): wait for a stable bank, then start. Watcher: 5 OK checks 13:25-13:29; suite started 13:29:39.
+- **Rep 1 (sim 56096a1e): 4/10.** 5 silent hang-ups (PUB-01/03/04/08/10: after the customer's first answer in the
+  `opening` node the platform logged NO event for ~60 s, then customer-ended-call) + PUB-06 `extraction_error`
+  (who_answered) -> model improvised DOB questions from the opening node, said 'technical issue' twice, closed
+  not_verified/declined. The `opening` node is byte-identical to G1's (export diff: only setup, identity,
+  account_facts, negotiate, finalize differ). **Rep 2 (sim 5407adea): 10/10**, run verdicts, slow (median 28 s);
+  PUB-10's function_call_error is the case's designed 'service unavailable'.
+- **My stop gate missed rep 1's platform error** (it scanned only tool-completion events, not `extraction_error`),
+  so rep 2 ran; I stopped the client right after rep 2 was recorded (13:39:07), before rep 3's POST. Only 2
+  simulations exist. Ledger: run_one booked 30, corrected -10 -> **cum 333**. Credits 396.26 -> 393.20.
+- Raw strict 3/3 can be at most 4/10 for this suite (6 cases failed rep 1). Analysis workflow wf_cae6672e-5d3
+  (read-only) classifies rep-1 failures with skeptics and audits the 14 passing calls.
+- Control M3 G1 on the same set: 10/10, medians 4/4/8 s, 64-135 s per rep (much faster platform).
+
+## UPDATE 13:10 UTC: smoke 3 judged PASS but SLOW; E4-A-styledA NOT started (latency gate)
+
+- **User go (~13:00 UTC, organisers confirmed Freya is back):** one bounded eng.4 smoke with no automatic retries; if
+  it passes with normal latency, run E4-A-styledA (10 x 3) and stop before the next queue item. Strict raw 3/3, every
+  attempt preserved, within the 500 cap. Smoke + first suite only; D1-D11 stay deferred; no candidate change/freeze.
+- **SMOKE3** (`runs/dev/r4/SMOKE3-e4a.{log,json}`, call record `runs/dev/r4/SMOKE3-e4a.calls/`): simulation
+  f1f21b08 (maxAttempts 1 confirmed), call 299f78ae, exp-eng4-a, PUB-01 talkative. **Judged PASS (run level), ledger
+  right** (verify > verify > get_account > promise > close_call). **Slowest agent turn 50 s** (kit: median > 10 s =
+  slow run; the organisers' runner discards such runs): the model took 49.3 s (DOB -> verify_identity), 25.6 s (phone
+  -> verify_identity) and 26.1 s (confirm -> create_promise) to emit tool calls; bank tools 0.05-0.6 s, code nodes
+  0.2-0.4 s. Same pattern as smoke 2 (54 s, 12:37); the same workflow had 0-1.5 s turns at 12:10. **Gate not met:
+  E4-A-styledA not started.** Ledger cum **313**. Credits 396.69 before / 396.26 after (they had risen from 391.06 at
+  12:29: apparently an outage refund).
+- **User 13:15 UTC: slow latency alone is acceptable; run E4-A-styledA x3, no reruns because of latency; stop for
+  missing verdicts, platform errors, budget or another concrete blocker.** Attempt 2 (13:20:20) crashed BEFORE its
+  simulation: mock-bank `POST /v1/practice/sessions` returned a non-JSON error (kit `score.http` JSONDecodeError). No
+  simulation created (GET confirms newest f1f21b08); ledger corrected -10 (cum 313); files
+  `runs/dev/r4/E4-A-styledA.attempt2-bank-nonjson.*`. Bank probes: 13:20:44 POST 200; 13:21:43 ledger GET **500
+  `error code: 1101`** (Cloudflare worker exception); 13:21:51 and 13:22:05 200 => the bank is FLAPPING. Stopped per the
+  user rule; asked the user. `suite_once.py` now retries the kit's bank helper on non-JSON/network errors (~2 min).
+- Smoke 3 evidence check (read-only workflow wf_d1cd9ea9-206): latency = platform model latency (same workflow and
+  persona, identical turns <= 1 s at 12:10, 25-54 s at 12:37/13:05; call tags llm TimeoutErrors, llm_ttfb_p95 21.5 s);
+  the kit's slowest-turn metric undercounts (real waits 55.7 s / 47.6 s from messageId delivery stamps, inferred).
+  Independent policy audit: policy followed, honest, ledger right; risk: the confirming yes came 4 turns after the
+  read-back (after cut-off fragments) with no repeated read-back.
+- Ready for the suite (scratch, this session): `run_one.sh` + `suite_once.py` in
+  `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/6099f72d-6345-4df7-a171-465da9b25d18/scratchpad/`
+  (one item, no queue pop, STOP untouched, POST maxRetries 0, `--rerun-if-slow 1`, every simulation recorded in
+  `runs/dev/r4/<name>.attempts.jsonl`; worst case 120 calls -> 433 <= 500).
+
 ## SIMULATION CHAT HANDOFF (11 Oct 12:57 UTC; READ THIS FIRST after a context clear; supersedes the sections below)
 
 **Roles.** This chat (Simulation Developer) owns ALL deployments and simulations. Methodology Developer (engine chat)
