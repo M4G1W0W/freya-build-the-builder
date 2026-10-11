@@ -487,7 +487,9 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
             kind = guess_kind(x["rel"], meta.get("title"), purposes.get(x["rel"]))
             versions = e["versions"]
             first = e["first_seen"]
-            since = min(first, x["landed"])  # creation dates can be the sender's, not arrival
+            # earliest plausible arrival, never before the case opened (the page named BRIEF.md and
+            # README.md earlier); creation dates can be the sender's, and change times move later
+            since = max(D.parse_utc(OPENS_UTC), min(first, x["landed"], x["mtime"]))
             rec = reviews.get(x["rel"]) or reviews.get(Path(x["rel"]).name) or {}
             stem = Path(x["rel"]).stem
             needles = [Path(x["rel"]).name] + ([stem] if len(stem) >= 6 else [])
