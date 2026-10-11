@@ -32,6 +32,23 @@ def test_post_or_4xx_is_never_retried(monkeypatch, method, status):
     assert calls == [method]
 
 
+@pytest.mark.parametrize("exc", [TimeoutError("timed out"), ConnectionResetError("reset")])
+def test_a_network_error_on_get_is_retried_but_not_on_post(monkeypatch, exc):
+    calls = []
+
+    def api(method, path, body=None, **params):
+        calls.append(method)
+        if len(calls) == 1 or method == "POST":
+            raise exc
+        return {"ok": True}
+
+    monkeypatch.setattr(rcr, "_api", api)
+    monkeypatch.setattr(rcr.time, "sleep", lambda s: None)
+    assert rcr.api_with_retry("GET", "/api/v2/simulations/x") == {"ok": True}
+    with pytest.raises(type(exc)):
+        rcr.api_with_retry("POST", "/api/v2/simulations")
+
+
 def test_retries_are_bounded(monkeypatch):
     api, calls = _fake([503] * 20)
     monkeypatch.setattr(rcr, "_api", api)
@@ -68,10 +85,16 @@ def _platform(ended=(True, True, True), judged=True, running=(SIM,)):
     return api, calls, puts
 
 
-def test_a_run_stuck_after_all_calls_ended_and_judged_is_paused_once(monkeypatch, capsys):
+@pytest.fixture(autouse=True)
+def _fresh_state(monkeypatch):
+    monkeypatch.setattr(rcr, "_watch", {})
+    monkeypatch.setattr(rcr, "_pauses", {})
+    monkeypatch.setattr(rcr, "_last_workspace_check", 0.0)
+
+
+def test_a_run_stuck_after_all_calls_ended_and_judged_is_paused(monkeypatch, capsys):
     # 10 Oct 21:17-21:55 and 11 Oct 01:21-08:12 UTC: a simulation stayed "running" after its calls ended
     # and its iteration completed, and blocked every new simulation; the kit polls with no timeout.
-    monkeypatch.setattr(rcr, "_watch", {})
     api, _, puts = _platform()
     assert rcr.check_stuck(SIM, "running", T_END - 200, api) is None  # first poll: just remembered
     assert rcr.check_stuck(SIM, "running", T_END + rcr.STUCK_AFTER_S - 1, api) is None
@@ -79,20 +102,44 @@ def test_a_run_stuck_after_all_calls_ended_and_judged_is_paused_once(monkeypatch
     assert msg and msg.startswith("UNSTUCK") and SIM in msg
     assert puts == [(f"/api/v2/simulations/{SIM}", {"status": "paused"})]
     assert "UNSTUCK" in capsys.readouterr().out
-    assert rcr.check_stuck(SIM, "running", T_END + 10 * rcr.STUCK_AFTER_S, api) is None
+
+
+def test_pauses_are_capped_per_simulation(capsys):
+    api, _, puts = _platform()
+    t = T_END + rcr.STUCK_AFTER_S
+    rcr.check_stuck(SIM, "running", T_END - 200, api)
+    for k in range(1, 6):  # it stays "running": pause, pause, then give up once, loudly
+        rcr.check_stuck(SIM, "running", t + k * rcr.CHECK_EVERY_S, api)
+    assert len(puts) == rcr.MAX_PAUSES
+    assert capsys.readouterr().out.count("UNSTUCK FAILED") == 1
+
+
+def test_a_failed_pause_is_tried_again_at_the_next_check(caplog):
+    api, _, puts = _platform()
+    tries = []
+
+    def flaky(method, path, body=None, **params):
+        if method == "PUT" and not tries:
+            tries.append(1)
+            raise RuntimeError("PUT -> 500: down")
+        return api(method, path, body, **params)
+
+    t = T_END + rcr.STUCK_AFTER_S
+    rcr.check_stuck(SIM, "running", T_END - 200, flaky)
+    with pytest.raises(RuntimeError):
+        rcr.check_stuck(SIM, "running", t + rcr.CHECK_EVERY_S, flaky)
+    assert rcr.check_stuck(SIM, "running", t + 2 * rcr.CHECK_EVERY_S, flaky)
     assert len(puts) == 1
 
 
-def test_never_paused_while_a_call_is_still_going(monkeypatch):
-    monkeypatch.setattr(rcr, "_watch", {})
+def test_never_paused_while_a_call_is_still_going():
     api, _, puts = _platform(ended=(True, False, True))
     rcr.check_stuck(SIM, "running", T_END - 1000, api)
     assert rcr.check_stuck(SIM, "running", T_END + 3600, api) is None
     assert puts == []
 
 
-def test_unjudged_runs_wait_longer_before_a_pause(monkeypatch):
-    monkeypatch.setattr(rcr, "_watch", {})
+def test_unjudged_runs_wait_longer_before_a_pause():
     api, _, puts = _platform(judged=False)
     rcr.check_stuck(SIM, "running", T_END - 1000, api)
     assert rcr.check_stuck(SIM, "running", T_END + rcr.STUCK_AFTER_S + 1, api) is None
@@ -100,8 +147,7 @@ def test_unjudged_runs_wait_longer_before_a_pause(monkeypatch):
     assert msg and "never completed" in msg and len(puts) == 1
 
 
-def test_a_simulation_older_than_the_hard_limit_is_paused_even_mid_call(monkeypatch):
-    monkeypatch.setattr(rcr, "_watch", {})
+def test_a_simulation_older_than_the_hard_limit_is_paused_even_mid_call():
     api, _, puts = _platform(ended=(True, False))
     created = T_END - rcr.HARD_AFTER_S
     rcr.check_stuck(SIM, "running", T_END - 1000, api, created)
@@ -109,8 +155,7 @@ def test_a_simulation_older_than_the_hard_limit_is_paused_even_mid_call(monkeypa
     assert len(puts) == 1
 
 
-def test_no_platform_reads_before_the_first_check_or_between_checks(monkeypatch):
-    monkeypatch.setattr(rcr, "_watch", {})
+def test_no_platform_reads_before_the_first_check_or_between_checks():
     api, calls, _ = _platform(ended=(True, False))
     t0 = T_END
     rcr.check_stuck(SIM, "running", t0, api)
@@ -123,8 +168,7 @@ def test_no_platform_reads_before_the_first_check_or_between_checks(monkeypatch)
     assert len(calls) == n
 
 
-def test_a_finished_run_is_forgotten(monkeypatch):
-    monkeypatch.setattr(rcr, "_watch", {})
+def test_a_finished_run_is_forgotten():
     api, calls, _ = _platform()
     rcr.check_stuck(SIM, "running", T_END, api)
     assert rcr.check_stuck(SIM, "completed", T_END + 5000, api) is None
@@ -134,7 +178,6 @@ def test_a_finished_run_is_forgotten(monkeypatch):
 def test_a_refused_start_pauses_the_stuck_simulation_that_blocks_it(monkeypatch):
     # 11 Oct 01:21 UTC: rep 2's simulation went back to "running" after the client had scored it, so
     # rep 3's POST was refused ("concurrent simulations") for 30 minutes.
-    monkeypatch.setattr(rcr, "_last_workspace_check", 0.0)
     api, _, puts = _platform(running=(OTHER,))
 
     def refused(method, path, body=None, **params):
@@ -152,8 +195,7 @@ def test_a_refused_start_pauses_the_stuck_simulation_that_blocks_it(monkeypatch)
     assert len(puts) == 1
 
 
-def test_a_refused_start_leaves_a_working_simulation_alone(monkeypatch):
-    monkeypatch.setattr(rcr, "_last_workspace_check", 0.0)
+def test_a_refused_start_leaves_a_working_simulation_alone():
     api, _, puts = _platform(ended=(True, False), running=(OTHER,))
     assert rcr.unstick_workspace(T_END + 3600, api) == []
     assert puts == []
@@ -165,7 +207,7 @@ def test_the_watcher_never_ends_the_run_it_watches(monkeypatch, caplog):
             raise RuntimeError("GET iterations -> 500: down")
         return {"simulation": {"status": "running"}}
 
-    monkeypatch.setattr(rcr, "_watch", {SIM: {"first": 0.0, "checked": 0.0, "reported": False}})
+    monkeypatch.setattr(rcr, "_watch", {SIM: {"first": 0.0, "checked": 0.0}})
     monkeypatch.setattr(rcr, "api_with_retry", broken)
     out = rcr.api_watched("GET", f"/api/v2/simulations/{SIM}")
     assert out == {"simulation": {"status": "running"}}
@@ -173,7 +215,6 @@ def test_the_watcher_never_ends_the_run_it_watches(monkeypatch, caplog):
 
 
 def test_a_broken_workspace_check_keeps_the_original_refusal(monkeypatch, caplog):
-    monkeypatch.setattr(rcr, "_last_workspace_check", 0.0)
 
     def broken(method, path, body=None, **params):
         if method == "POST":
@@ -184,3 +225,42 @@ def test_a_broken_workspace_check_keeps_the_original_refusal(monkeypatch, caplog
     with pytest.raises(RuntimeError, match="concurrent simulations"):
         rcr.api_watched("POST", "/api/v2/simulations", {})
     assert "workspace stuck check failed" in caplog.text
+
+
+def test_a_rep_without_judge_verdicts_is_repeated_once(capsys):
+    # 11 Oct 08:22 UTC, M2 extra-B rep 2: "Call ended but analysis never arrived (300s)" on all 3 calls.
+    unjudged = {
+        "id": "PUB-11",
+        "pass": False,
+        "failed": ["conversation: Call ended but analysis never arrived (300s)"],
+    }
+    judged = {
+        "id": "PUB-11",
+        "pass": False,
+        "failed": ["conversation: the floor was offered twice"],
+    }
+    reps = [
+        ([unjudged], "s1", "i1", "completed", 60, 2),
+        ([judged], "s2", "i2", "completed", 60, 2),
+    ]
+    calls = []
+
+    def run_once(agent_id, cases, ids):
+        calls.append(1)
+        return reps[len(calls) - 1]
+
+    out = rcr.repeat_unjudged(run_once)("a", [], {})
+    assert out[1] == "s2" and len(calls) == 2
+    assert "-- run discarded: no judge verdict for PUB-11" in capsys.readouterr().out
+    calls.clear()
+    reps[0] = reps[1]
+    assert rcr.repeat_unjudged(run_once)("a", [], {})[1] == "s2" and len(calls) == 1
+
+
+def test_unjudged_reads_only_missing_verdicts():
+    rows = [
+        {"id": "A", "failed": ["conversation: no verdict"]},
+        {"id": "B", "failed": ["outcome (None, None), expected ('promise', None)"]},
+        {"id": "C", "failed": []},
+    ]
+    assert rcr.unjudged(rows) == ["A"]
