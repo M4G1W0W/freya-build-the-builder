@@ -7,6 +7,7 @@ every tool's URL is the mock URL plus the contract's path.
 """
 
 import json
+from urllib.parse import urlsplit
 
 from . import casefolder, llm
 from .toolapi import Field, Tool, parse_tool_api
@@ -132,15 +133,25 @@ def on_mock(doc: dict, mock_url: str) -> list[Tool]:
     return parse_tool_api({**doc, "servers": [{"url": mock_url.rstrip("/")}]})
 
 
-def tools_from_operations(operations: list[dict], mock_url: str) -> list[Tool]:
+def join_mock(mock_url: str, path: str) -> str:
+    """mock_url + the contract path, without repeating the mock's own path: a model reading may
+    give '/op' or '/x/v1/op' for the same operation; with mock .../x/v1 both give .../x/v1/op."""
     base = mock_url.rstrip("/")
+    p = "/" + str(path).strip().lstrip("/")
+    prefix = urlsplit(base).path.rstrip("/")
+    if prefix and p.startswith(prefix + "/"):  # segment-aligned: '/x/v10' keeps its prefix
+        p = p[len(prefix) :]
+    return base + p
+
+
+def tools_from_operations(operations: list[dict], mock_url: str) -> list[Tool]:
     tools, seen = [], set()
     for op in operations:
         name = str(op.get("name") or "").strip()
         if not name or name in seen:
             continue
         seen.add(name)
-        path = "/" + str(op.get("path") or name).strip().lstrip("/")
+        path = op.get("path") or name
         request = tuple(
             Field(
                 name=str(f["name"]),
@@ -175,7 +186,7 @@ def tools_from_operations(operations: list[dict], mock_url: str) -> list[Tool]:
         tools.append(
             Tool(
                 name=name,
-                url=base + path,
+                url=join_mock(mock_url, path),
                 method=str(op.get("method") or "POST").upper(),
                 summary=str(op.get("summary") or ""),
                 request=request,
