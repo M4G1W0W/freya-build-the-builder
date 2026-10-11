@@ -7,6 +7,12 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
+## OVERNIGHT EXECUTION IN PROGRESS (autonomous, user asleep; read this first)
+
+The live log and morning handoff is `docs/plans/2026-10-11-overnight-report.md`. A coordinator session runs the plan under
+the user's final authorization (00:50 UTC). Only that coordinator launches simulations (queue runner in its
+scratchpad, see the report). G1 = cand-g1 83f8263, G2 = cand-g2 0bc83c4, case files on main 322dfc9.
+
 ## TONIGHT: execute the APPROVED overnight plan v2 (start here)
 
 **`docs/plans/2026-10-11-overnight-plan-v2.md` is the plan the user approved** (about 00:35 UTC). It carries the
