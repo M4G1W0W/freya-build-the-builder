@@ -26,7 +26,7 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
-## UPDATE 16:52 UTC: cand-final.2 REVIEW + Turkish --dry + pdftotext (simulation chat)
+## UPDATE 16:48 UTC: cand-final.2 REVIEW + Turkish --dry + pdftotext (simulation chat)
 
 - **Review** (workflow wf_266727cb-c3f, 30 agents, read-only, offline repro + 1 skeptic per medium+ finding): **no
   blocker**; 24 confirmed (~8 distinct issues), 1 refuted, 12 unverified lows. Summary:
