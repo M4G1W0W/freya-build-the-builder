@@ -12,8 +12,10 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 
 **Roles.** This chat (Simulation Developer) owns ALL deployments and simulations. Methodology Developer (engine chat)
 fixes the builder on its own branches/tags (log `docs/plans/2026-10-11-engine-fixes-log.md`, READ FIRST at its top;
-its handoff `docs/plans/2026-10-11-engine-fixes-handoff.md`). **Service Check** (peer session, read-only GETs) watches
-platform health and our simulations; coordinate via SendMessage instead of polling in parallel.
+its handoff `docs/plans/2026-10-11-engine-fixes-handoff.md`). **Service Check** (peer session, read-only GETs) watched
+platform health and our simulations; **it STOPPED its checks at 12:56 UTC at the user's request: the organisers
+confirmed services are up** (last check: API 200 in 0.31 s, bank up, nothing running). Agent-turn latency was not
+re-measured after smoke 2 (12:40: 54 s turns). If Service Check is asked to watch again, coordinate via SendMessage.
 
 **State now: NOTHING running. Queue PAUSED by the user (12:45: no simulations, no latency probes until the user says
 so).** `sim/STOP` is set. The last simulations (6d0c9464 M5r2 restart, 94c9e350 smoke 1, 188b9156 smoke 2) are all
