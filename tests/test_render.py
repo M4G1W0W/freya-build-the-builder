@@ -152,6 +152,7 @@ def test_negotiate_has_no_attempt_procedure_without_an_attempt_plan():
     s["attempts"] = []
     task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "ATTEMPTS:" not in task
+    assert "WAITING:" in task  # offers exist without attempts
 
 
 def test_notes_come_before_the_goodbye():
@@ -392,6 +393,13 @@ def test_prompts_handle_customer_speech_styles():
     nego = wf["nodes"]["negotiate"]["task_message"]
     assert "a cut-off message that holds no yes, no, date or amount is no reply" in nego
     assert "uses no attempt" in nego
+    # M4 r3 PUB-06 talkative (3f5a442c) and bfe80eb8, e5d24c34, 704c184a: after the floor offer, a
+    # 2nd small-talk or fragment message got the offer again; brief A rule 26 offers it once.
+    assert "a first reply to an offer" not in nego
+    assert 'However many such messages come in a row, reply only "I see. Please go on."' in nego
+    assert "never repeat the offer, its amount or its date" in nego
+    assert "If the customer asks what you offered" in nego
+    assert "WAITING" not in ident
     assert "only after the customer has described that situation" in nego
     # Voice test 577a2cd4: "can we make it in instalments" got "would you like me to connect you
     # with restructuring?" and a "not right now"; brief A rule 41 says to transfer.
@@ -399,6 +407,14 @@ def test_prompts_handle_customer_speech_styles():
     assert "ask first only when the rule itself says to offer it or to ask" in nego
     assert "that day lies INSIDE that period, not in a later week" in nego
     assert "period's row" not in nego  # the DATE TABLE has no period rows (exp07, c45758f)
+
+
+def test_unknown_information_answers_questions_only():
+    # 3f5a442c: "My cousin's wedding is on the 30th" got "I don't have any information about your
+    # cousin's wedding" plus the offer again; the rule is for questions, not remarks.
+    system = render(SPEC_A, TOOLS, BRIEF)["system_prompt"]
+    assert "Never say it to a remark that asks for nothing" in system
+    assert "If you are asked something" not in system
 
 
 def test_engine_calls_missing_a_required_field_are_reported(tmp_path):
