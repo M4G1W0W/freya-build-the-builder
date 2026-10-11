@@ -81,3 +81,9 @@ case or PUB-09 call fails for an agent cause that passed on the base arm; (3) ev
 reads "every transfer call ends with a thanks + goodbye as the agent's last message"; an end-node farewell spoken at
 hang-up counts although it logs after `close_call` (Methodology's design: the kit's end-node farewell pattern, already
 used on the notes path); the judge verdicts in (2) decide whether that order matters. Otherwise the selected candidate ships without it.
+
+**Amendment 15:12 UTC (user, before any goodbye-fix data): run the evaluation on BOTH bases (36 calls).**
+cand-eng.4g from `runs/dev/r4/spec-eng4-fr.json` / `spec-eng4-fab.json` -> slots exp-e4g-fr / exp-e4g-fab; cand-eng.9g
+from `spec-ch-fr.json` / `spec-ch-fab.json` -> exp-e9g-fr / exp-e9g-fab (`--spec`, no extraction). Per base: `e1-a.json` x3
+and `runs/cases/pub09-styled-a.json` x3 on the A agent, `e1-ab.json` x3 on the A+B agent (18 calls). Bases interleaved per
+rep, after the core rounds. Each fix tag is judged against its own base arm with rules (1)-(3) above.
