@@ -26,6 +26,17 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 18:33 UTC: USER D12 = round-3 build (cand-final.8) is the SUBMISSION CANDIDATE; committed locally, not pushed
+
+- Merge cand-final.8 into main: 8a7bd1b (987 tests, ruff clean; builder code == 279a15a; 279a15a ancestor of main).
+- Artifact commit fa08cd4 (pathspec, exactly traces/final.log + submission/final.workflow.json; bytes == the run's;
+  secrets: 0 value matches, only 'Bearer <token>' placeholders). mock/data/services.json still uncommitted.
+- submission.json values: commit 279a15a (the run's START git=), workflow submission/final.workflow.json, trace
+  traces/final.log, mock_url https://teampistalogic.atlasreyiz.workers.dev/voice/v1 (= START tool_api).
+- Remote main unchanged (69c4a83). Push, public visibility and the services.json decision are the user's. The Submission
+  readiness reviewer re-checks the SHAs and finishes submission.json; the user sends the e-mail before 20:00 UTC.
+- **Keep the mock live (0ea3104f, suffix routing) until the results.**
+
 ## UPDATE 18:29 UTC: D11 = C: cand-final.8 (URL-join fix) rebuild + round 3 = 5/6 (validated before 19:00)
 
 - Fallback preserved: cand-final.7 build (2efc338; ad052130 v2 / agent 2276b4c7) in `runs/final/build2/` (final.log
