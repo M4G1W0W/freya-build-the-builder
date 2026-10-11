@@ -26,6 +26,33 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 17:23 UTC: FINAL CASE ARRIVING; frozen builder CRASHES on it; user D6 = case-blind generic fallback
+
+- **Case folder: `/Users/atlasdenizakbulut/Desktop/Freya Final case`** (outside the repo). The client sends documents
+  over ~1 h (user 17:16: "they are simulating it like a client is sending docs"). At 17:12: `BRIEF.md` +
+  `statement-debt-call-flow.pdf` only. The brief lists README.md, sources/ (emails + 3 analysis versions, documents
+  incl. the IVR integration document whose **section 6 = the mock's contract**, meetings), test-environment/
+  (test customers .md/.json + rules), example-scenarios.md (6 calls), cloudflare-mock/. Submission: e-mail
+  submission.json + exported workflow + trace to the address in BRIEF.md before 20:00 UTC.
+- **The case is an INBOUND enquiry line** (statement debt in several currencies, due/cut-off dates, change cut-off date,
+  e-mail the statement, hand-off to a human; identity done by the IVR; variables `customerNumber`, `now` ISO with +03:00).
+  `now` with offset parses fine (local wall time).
+- **Frozen builder fails on such cases (proven case-blind):** synthetic library-enquiry folder
+  `<this scratchpad>/synth-inquiry/` (my own text) on main f35ccf3 `--dry`: spec check FAIL ('tool API has no
+  verify_identity / create_promise / close_call'), then `ValueError: spec expression promise window min '': empty
+  expression` in codegen.setup_source; END ok=False, 335 s, no agent. spec.py:389 requires those roles.
+- **User D6 (17:20): generic fallback fix, CASE-BLIND** (Methodology; target tag cand-final.5 ~18:05): when the contract
+  lacks the collections roles, render a generic workflow (consolidated rules + every contract operation as an api_call
+  tool, ids baked from same-named call variables, goodbye + end) instead of crashing; collections renders byte-identical.
+  Spec sent to Methodology 17:21 (synthetic reproducer only). **Disclosure (Methodology 17:22): before that message it
+  had read BRIEF.md and the flow PDF text (17:19-17:22) at the user's pointer; it opens nothing more and builds/tests only
+  on synthetic cases.** This chat verifies the tag before adoption.
+- **Mock rebuilt as fixture-driven** (commit below; deployed b39d28e4): `mock/src/fixtures.js` resolves (method, path
+  with {params}, fields from path+query+body) against `data/fixtures.json` (endpoints + documented answers with exact
+  status; most specific match wins; endpoint default; `unmatched`); every fixture request logged to a RequestLog DO
+  (`GET /__admin/log` with x-admin-token; DELETE clears). Practice-kit routes kept as fallback. `npm test` 10 pass.
+  fixtures.json is EMPTY until the integration document + test customers arrive.
+
 ## UPDATE 17:05 UTC: FROZEN `freeze-final-2` = cand-final.4 e2635e9, merged into main; repo pushed
 
 - **Build the final from `main` (builder code == `freeze-final-2`).** cand-final.4 = cand-final.3 + date-language fix

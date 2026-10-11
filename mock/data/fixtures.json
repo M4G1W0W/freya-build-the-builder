@@ -1,0 +1,6 @@
+{
+ "_note": "Filled after the bank's integration document and test customers arrive. endpoints: [{method, path, default}]; fixtures: [{id, method, path, match, status, body}]; unmatched: answer when no endpoint matches.",
+ "endpoints": [],
+ "fixtures": [],
+ "unmatched": {"status": 404, "body": {"error": "not found"}}
+}

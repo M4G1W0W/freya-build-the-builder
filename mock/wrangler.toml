@@ -11,3 +11,11 @@ class_name = "CustomerState"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CustomerState"]
+
+[[durable_objects.bindings]]
+name = "REQUEST_LOG"
+class_name = "RequestLog"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["RequestLog"]
