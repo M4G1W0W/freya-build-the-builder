@@ -88,6 +88,9 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 08:30 | M2 extra-B (styled-extra-b x3): PUB-11 1/3, PUB-12 0/3, PUB-13 2/3, but **4 of 6 calls in reps 2-3 have no judge verdict** ("analysis never arrived (300s)", platform), so those reps are invalid as measurements. Real failures: PUB-11 r2 LEDGER (closed not_verified/declined during identity: identity defect); PUB-12 r1, r3 judge (paid sentence / car-loan persuasion attempt) |
 | 08:20-08:28 | `scripts/run_cases_retry.py` (user request): auto-pause of stuck simulations (4c677d1), then concurrency 13 + one automatic repeat of a rep without judge verdicts + review fixes (2b4f430). Active from M3 on |
 | 08:36 | **M3: G1 (exp-g1-a) on styled-a x3 = 10/10 cases at strict 3/3 (30/30 calls)** vs F2 v8 control (styledA-a2-bd4da7c) 8/10 (PUB-03 2/3, PUB-06 2/3). Newly failing: none. Closes the PUB-07-pieces caveat (3/3). Note: M3 ran at concurrency 13, the control at 5 |
+| 08:13-08:38 | **Identity fix v2 implemented** (user instruction) on branch `cand-id` off G1: c4186e7 (cand-id.1) -> 3 verifier lenses (conformance PASS-WITH-ISSUES LOW only; model-read 1 HIGH + 2 MED; replay 1 MED) -> fix round 48c8ab4 (cand-id.2: hint-retry rebuild, resend exception, year joining) -> recheck: all fixed, LOW only -> 63d1c19 (cand-id.3: neutral example year; a public case uses 1991). 778 passed; render vs G1 differs only in nodes.identity.task_message (1071 words) |
+| 08:44 | exp-i12-a deployed (agent f652db08, wf 14cbdcaf) from cand-id.3 with `--spec runs/dev/spec-a-llm.json` after 2 platform failures (503 "API key validation is temporarily unavailable", 504, 500); export MATCH; vs exp-g1-a export only identity task_message differs. Chat probes skipped (chat API 504) |
+| 08:47 | Identity A/B queued after O4, before O1 (user decision): gate R1/R2 x3 plain + asks_back on exp-i12-a; t1/t2/t3 interleaved rep by rep vs exp-g1-a; guard styled-a x3 on exp-i12-a. Runner handed over to qrun2.sh (CAP 400) |
 | 02:00 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
 | 02:02 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
 | 02:04-02:23 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
@@ -107,6 +110,13 @@ Generic; renders correct on 16 saved specs; only the 3 intended lines differ fro
 what the blocked M3/M4/M5/O1 were to measure: PUB-07 in pieces style (styled-a has it), customer-proposed date/amount
 (o1-a PUB-05, o1-b PUB-12), Brief B on G1 (M5). Cheap code hardening (no sim): print the line only when the attempt-1
 date is valid (today <= date <= deadline).
+
+## Builder robustness finding (11 Oct 08:41, NOT fixed; generic bug fix candidate)
+The deploy path has no retry on transient platform 5xx: `platform.dry_run` -> `kit.validate_workflow` (POST
+?dryRun=true, idempotent) failed with 503 "API key validation is temporarily unavailable" and then 504/500; the build
+ended ok=False (exp-i12-a needed 3 attempts). On Sunday the same outage would fail the hidden-brief build. Proposal:
+retry the dry-run validation and the publish/save calls on 503/504 and on the "temporarily unavailable" message (the
+request is rejected before it is processed), with bounded backoff inside the 30-min budget; never retry 4xx.
 
 ## Demonstrated correctness gaps (morning proposals; generic; NOT implemented overnight)
 1. **Identity: a complete security answer inside a cut-off message is not submitted** (LEDGER failures: M1 G1 r3
