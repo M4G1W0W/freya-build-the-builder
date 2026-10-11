@@ -17,9 +17,10 @@ simulation and whenever a new one is refused because another is running.
 
 A rep with calls the judge never scored ("analysis never arrived", 11 Oct 08:22 UTC) is not a measurement: it is
 discarded and repeated once with fresh bank sessions (printed as "-- run discarded", which the call ledger counts).
-Before that, a run still "analyzing" takes the judge verdict already on its call record (successCriteriaResult;
-11 Oct 12:15 UTC, user-approved): printed as "VERDICT FROM CALL RECORD" and marked verdict_source "call" in the
-rows, so such results stay separable from run verdicts.
+Before that, a run with no judge verdict (still "analyzing", or "error"/"inconclusive" because the analysis never
+arrived) takes the verdict already on its call record (successCriteriaResult; 11 Oct 12:20/12:31 UTC,
+user-approved): printed as "VERDICT FROM CALL RECORD" and marked verdict_source "call" in the rows, so such results
+stay separable from run verdicts. Rows also carry their run's attempt count.
 
 Calls per simulation: the kit's FREYA_SIM_CONCURRENCY (default 5). It ran at 13 on 11 Oct 08:30-09:22 UTC; on the
 13-case A+B set that made agent turns slow (20-60 s) and simulated customers hung up, so it is back to the default
@@ -252,12 +253,24 @@ def read_call_once(call_id) -> dict | None:
         return None
 
 
+def awaits_judge(run) -> bool:
+    """No judge verdict on the run: still "analyzing", or ended "error"/"inconclusive" because the judge never
+    arrived (no reason, or "analysis never arrived"; 6d0c9464 had 2 such runs, both with a verdict on their call
+    record; user-approved 12:31 UTC). An inconclusive with the judge's own reason is a verdict and stays."""
+    outcome = run.get("outcome")
+    if outcome in (None, "", "analyzing"):
+        return True
+    return outcome in ("error", "inconclusive") and bool(
+        NO_VERDICT.search(run.get("reason") or "no verdict")
+    )
+
+
 def with_call_verdicts(get_iteration, get_call, seen, attempts=None):
     """Wrap the kit's get_iteration: a run still waiting for the judge takes the verdict on its call record.
 
     11 Oct 12:15 UTC, smoke 94c9e350: the run stayed "analyzing" (attempt 2/4) while its call record already had
-    successCriteriaResult.success=True; run_cases scored it "conversation: no verdict". A verdict the run has
-    (pass, fail, inconclusive, error) is never replaced. Calls whose verdict came from the record go into `seen`;
+    successCriteriaResult.success=True; run_cases scored it "conversation: no verdict". Only runs that await the
+    judge (awaits_judge) are filled; a verdict the run has is never replaced. Calls whose verdict came from the record go into `seen`;
     `attempts` collects each run's attempt count by call (the platform re-runs a stalled call on the same bank
     session, so a row from attempt 2+ is one to audit).
     """
@@ -267,7 +280,7 @@ def with_call_verdicts(get_iteration, get_call, seen, attempts=None):
         for run in iteration.get("runs") or []:
             if attempts is not None and run.get("callId"):
                 attempts[run["callId"]] = run.get("attempts")
-            if run.get("outcome") not in (None, "", "analyzing") or not run.get("callId"):
+            if not awaits_judge(run) or not run.get("callId"):
                 continue
             try:
                 result = (get_call(run["callId"]) or {}).get("successCriteriaResult")

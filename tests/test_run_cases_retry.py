@@ -324,15 +324,23 @@ def test_a_failing_call_record_verdict_keeps_the_judges_reason():
     assert "floor offered twice" in run["reason"] and "call record" in run["reason"]
 
 
-@pytest.mark.parametrize("outcome", ["pass", "fail", "inconclusive", "error"])
-def test_a_run_that_has_a_verdict_is_never_overridden(outcome):
+@pytest.mark.parametrize(
+    "outcome,reason",
+    [
+        ("pass", None),
+        ("fail", None),
+        ("fail", "Call ended but analysis never arrived (300s)"),
+        ("inconclusive", "the transcript does not show which date was agreed"),
+        ("error", "[after 4 attempts] No call created within 300s"),
+    ],
+)
+def test_a_run_that_has_a_verdict_is_never_overridden(outcome, reason):
     def get_call(call_id):
         raise AssertionError("no call read for a judged run")
 
     seen = set()
-    get_iteration = rcr.with_call_verdicts(
-        lambda s, i: _iteration({"id": "r1", "outcome": outcome, "callId": "c1"}), get_call, seen
-    )
+    run = {"id": "r1", "outcome": outcome, "reason": reason, "callId": "c1"}
+    get_iteration = rcr.with_call_verdicts(lambda s, i: _iteration(run), get_call, seen)
     assert get_iteration("s1", "i1")["runs"][0]["outcome"] == outcome and not seen
 
 
@@ -437,3 +445,23 @@ def test_rows_carry_the_attempt_count_of_their_run():
         ("run", 0),
         ("run", None),
     ]
+
+
+@pytest.mark.parametrize(
+    "outcome,reason",
+    [
+        (
+            "error",
+            "Call ended but analysis never arrived (300s)",
+        ),  # 6d0c9464 run 06d16b86, call ed7f5328
+        ("inconclusive", None),  # 6d0c9464 run b94597c3, call babc4608
+    ],
+)
+def test_a_run_whose_judge_never_arrived_takes_the_call_record_verdict(outcome, reason):
+    # user-approved 12:31 UTC: both such 6d0c9464 runs had successCriteriaResult.success on their call record
+    seen = set()
+    calls = {"c1": {"successCriteriaResult": {"success": False, "reason": "floor offered twice"}}}
+    run = {"id": "r1", "outcome": outcome, "reason": reason, "callId": "c1", "attempts": 3}
+    get_iteration = rcr.with_call_verdicts(lambda s, i: _iteration(run), calls.__getitem__, seen)
+    out = get_iteration("s1", "i1")["runs"][0]
+    assert out["outcome"] == "fail" and "floor offered twice" in out["reason"] and seen == {"c1"}
