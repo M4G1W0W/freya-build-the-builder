@@ -1,6 +1,6 @@
 # Overnight v2 execution report (live; morning handoff)
 
-## MORNING HANDOFF (read this first; state at 02:20 UTC, final update below)
+## MORNING HANDOFF (read this first; final state at 02:30 UTC)
 
 **Highest-value decision for you:** the Freya simulation `a36c1d01-1003-4b83-8d5e-b5121a82bc39` (M2 rep 2, A+B control)
 has been stuck in "running" since 01:21:29 UTC although all 13 of its calls ended by 01:21:07. It blocks every

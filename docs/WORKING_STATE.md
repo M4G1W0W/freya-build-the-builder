@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 05:35 Istanbul (02:35 UTC Sun), after the overnight run. Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+**Snapshot:** 2026-10-11 05:30 Istanbul (02:30 UTC Sun), after the overnight run. Last commit: see `git log`. Hidden briefs open Sun 11 Oct
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
