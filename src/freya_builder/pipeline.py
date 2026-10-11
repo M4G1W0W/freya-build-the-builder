@@ -222,19 +222,15 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     freya = platform.kit()
     variables = {v["name"]: _example(v) for v in spec["meta"]["call_vars"]}
     body = {"workflowId": saved["workflow_id"], "message": "Hello?", "customerVariables": variables}
-    r = None
-    for attempt in (1, 2):  # the kit warns a long chat turn can return 504; retry a 5xx once
-        try:
-            r = freya.api("POST", "/api/v2/chat/message", body)
-            break
-        except RuntimeError as e:
-            transient = any(f"-> {c}" in str(e) for c in (500, 502, 503, 504))
-            if attempt == 1 and transient:
-                trace.warn(f"chat smoke test: {str(e)[:120]}; retrying once")
-                time.sleep(5)
-                continue
-            trace.test("chat smoke test: workflow starts", False, str(e)[:200])
-            return False
+    try:  # the kit warns a long chat turn can return 504. A repeat only opens another test chat.
+        r = platform.call(
+            trace,
+            "POST /api/v2/chat/message",
+            lambda: freya.api("POST", "/api/v2/chat/message", body),
+        )
+    except (RuntimeError, *platform.NETWORK_ERRORS) as e:
+        trace.test("chat smoke test: workflow starts", False, str(e)[:200])
+        return False
     reply = str(r.get("response") or "")
     forbidden = [
         w for w in spec["opening"]["forbidden_before_verified"] if w.lower() in reply.lower()
@@ -244,6 +240,6 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     if r.get("callId"):
         try:
             freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]})
-        except RuntimeError:
+        except (RuntimeError, *platform.NETWORK_ERRORS):
             pass
     return ok
