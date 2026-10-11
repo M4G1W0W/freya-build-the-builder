@@ -69,6 +69,18 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
 - **12:16:40 the platform re-ran the paused smoke's call** (new call af507b83, attempt 3/4) although call 6af560aa
   had success=True: a stalled analysis triggers a full call retry (cost up to 4x per case while the judge stalls).
   Ledger +2 (attempt 3 + a possible 4): cum **289**. Queue still PAUSED; waiting for Service Check BOTH_QUIET.
+- **12:22 UTC:** 6d0c9464 un-paused itself a 2nd time (status running, updatedAt 12:21:31: the platform flips status
+  when it retries); re-paused 12:22:22 (API confirmed). Runs left: 91a0f2c7 analyzing 4/4 (no retry), b94597c3
+  inconclusive 3/4, 06d16b86 error 3/4 => at most 2 more calls. Re-pause each time it flips (standing approval).
+- **12:23-12:29 UTC:** review of the fallback (2 lenses) -> fixes aa7726a (shape guard, ONE unretried call read, rows
+  carry `attempts`); 798 passed. Open (needs user): fallback for runs ending `error`/`inconclusive` with 'analysis
+  never arrived' (they still repeat the whole rep); read-only: both such 6d0c9464 runs with a call have a call verdict
+  (True), 7 more run==call agreements. **6d0c9464 COMPLETED 12:26:29** (final pass 6, fail 1, error 5, inconclusive 1;
+  no more calls possible). Smoke 94c9e350: paused, run at 4/4 'analyzing' (no retry left); its retry call af507b83
+  (12:10:32-12:10:58) had call verdict True and NORMAL latency (agent gaps 0-1.5 s, DOB asked once); the smoke
+  customer's ledger holds exactly one consistent set (5 tools, 1 promise) although both calls made create_promise
+  per the judge (probably close_call ends the session; unverified). **Credits 391.06 (12:29)**: 10.78 USD since 11:30
+  ~ 41-49 calls, matching 6d0c9464's ~41 attempts: ledger corrected +22 -> cum **311**. Only our 2 sims exist.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
