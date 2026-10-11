@@ -62,6 +62,13 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   run of eng.4's FACTS code nodes: the flow worked end to end. Ledger +2 (2 attempts): cum **287**. Cost 0.2055 USD.
   **Queue stays PAUSED** (simulation-level result missing, latency degraded); user decides whether the call-level
   verdict counts.
+- **12:20 UTC user: YES to the call-level verdict fallback (unit-tested first). Done: 4631971.** `run_cases_retry.py`
+  now fills runs with no outcome or 'analyzing' from the call record's successCriteriaResult (never overrides
+  pass/fail/inconclusive/error), prints `VERDICT FROM CALL RECORD`, marks rows `verdict_source` call|run. 12 new
+  tests, 794 passed. Read-only check: call-record verdict == run verdict on **43/43** judged calls (M3 x3, M2 r3).
+- **12:16:40 the platform re-ran the paused smoke's call** (new call af507b83, attempt 3/4) although call 6af560aa
+  had success=True: a stalled analysis triggers a full call retry (cost up to 4x per case while the judge stalls).
+  Ledger +2 (attempt 3 + a possible 4): cum **289**. Queue still PAUSED; waiting for Service Check BOTH_QUIET.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
