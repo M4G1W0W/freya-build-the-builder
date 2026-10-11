@@ -3,28 +3,52 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 05:30 Istanbul (02:30 UTC Sun), after the overnight run. Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+**Snapshot:** 2026-10-11 13:35 Istanbul (10:35 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
-## OVERNIGHT RESULT (11 Oct, coordinator session; read this first)
+## SIMULATION CHAT STATE (11 Oct 10:35 UTC; read this first after a context clear)
 
-**Morning handoff: `docs/plans/2026-10-11-overnight-report.md` (top section).** Short version:
-- **Decision needed:** Freya simulation a36c1d01 is stuck `running` since 01:21:29 UTC and blocks every simulation
-  (not the submission build). Freeing it needs a PUT pause (not authorized overnight). Sims stopped 01:53 UTC.
-- **W = G1** (branch cand-g1, **83f8263**, tag cand-g1.1; slot exp-g1-a, export verified). M1 strict per case:
-  G1 3/4 cases at 3/3 (PUB-06 3/3), G2 2/4, F2 1/4. Not merged to main. Caveats: `runs/dev/r4/g1-review.md`.
-- **Precedence** (cand-wp-g1, **58a7473**, tag cand-wp-g1.1 = G1 + ending_wins + 2 guards): gates 1-3 pass, review
-  SHIP-TO-O4; gate 4 (O4 sims) not run, so it stays isolated.
-- **Built, not simulated:** exp-raw-w, exp-ab1-w (W fresh builds), exp-raw-wp, exp-ab1-wp (precedence fresh builds).
-  Resume queue pre-loaded (244 calls); command in the report.
-- **New cases (committed, never run):** `tests/fixtures/cases/o1-a.json`, `o1-b.json`, `extra-b-rederived.json`,
-  `identity-rd.json` (all D1/D2 exact matches).
-- **Top generic gap:** identity stage (LEDGER failures; corrects-style PUB-03 ~30% on every build; "why do you need
-  that?" counted as a decline). Design v2 after 3 adversarial reviews: `docs/proposals/2026-10-11-identity-fix-v2.md`
-  (not implemented; 81-call matched plan inside).
-- Calls 62/340, credits 428.93 (02:04 UTC). Worktrees: wt-g1/wt-g2/wt-f2 (old scratchpad 4f150fc6…), wt-wp/wt-wpg1
-  (scratchpad ababcede…).
+**Two chats now.** This one runs SIMULATIONS ONLY (queue, deploys of measurement slots, results, analysis). A separate
+ENGINE chat fixes the builder from `docs/plans/2026-10-11-engine-fixes-brief.md` on branch `cand-eng` (off
+`cand-final.1`) and hands fixes over as tags `cand-eng.N` (log: `docs/plans/2026-10-11-engine-fixes-log.md`).
+Detailed event log and results: `docs/plans/2026-10-11-overnight-report.md` (handoff at the top, event log below).
+
+**Candidate to measure next: `cand-final.1` = ca80d52** (worktree `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-final`): G1 83f8263 + identity fix v2 +
+builder platform retries + offer-wait fix + precedence ending_wins with 2 guards. 820 tests; offline checks and a
+fresh-clone `--dry` rehearsal passed. Not merged to main (user decision). NOT yet deployed or simulated.
+
+**Queue (user decision 10:33: measure cand-final first, but do not start until the user says so):**
+- Runner: `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh` (CAP 500; queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt` "name slot casefile reps"; slot table
+  `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/slots.tsv`; output `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.out`; ledger `runs/dev/r4/calls.tsv` + `<name>.meta.json` sidecars).
+  `STOP` file is SET: the runner stops after the item now running (M5r2-ab1W-all-c5: M5 re-run reps 2-3 at concurrency
+  5 on exp-ab1-w, simulation 3d8c7da4; the platform was very slow at 10:31: 3/13 calls done after 19 min).
+- `scripts/run_cases_retry.py` (every item uses it): GET retries ~17 min, health gate before start, auto-pause of stuck
+  simulations (standing user approval), one automatic repeat of a rep without judge verdicts, concurrency 5 (kit
+  default; 13 caused latency hang-ups on A+B).
+- Staged order: FINAL-A-styledA (exp-final-a, styled-a x3), FINAL-AB-all (exp-final-ab, styled-ab-all x3),
+  FINAL-AB-xb (exp-final-ab, styled-extra-b x3), then O4 (precedence fresh builds), identity A/B (exp-i12-a vs
+  exp-g1-a), offer-wait A/B (exp-idw-a vs exp-i12-a), M2 extra-B re-run, O1. Old order saved as queue-before-reorder.txt.
+- **To start (only on the user's go):** (1) deploy the two slots from wt-final:
+  `cd /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-final && set -a && . ./.env && set +a && uv run python builder/build.py "$R/kit/briefs/brief-a.md" "$R/kit/tools/openapi.json" --spec "$R/runs/dev/spec-a-llm.json" --slot exp-final-a`
+  and the same with `"$R/kit/briefs/brief-a.md" "$R/kit/briefs/brief-b.md"` + `--spec "$R/runs/dev/spec-ab-llm-c45758f.json" --slot exp-final-ab`
+  (R = repo root; exit 3 with only a chat 504 = deployed; see RUNBOOK). (2) Add both to slots.tsv (agent id, workflow
+  id, version 1, build cand-final.1 ca80d52, spec path). (3) Export check: `freya.export_workflow(<wf>, runs/dev/r4/exports/<slot>.json)`,
+  render with `--dry` into `runs/dev/r4/renders/<slot>.json`, `python3 runs/dev/r4/exportdiff.py <slot> <render> <export>`
+  (0 changed, 0 render-only). (4) `rm /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/STOP; bash /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh >> /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.out 2>&1` (background).
+- Matched controls: styled-a: M3 G1 exp-g1-a 10/10 strict (`runs/dev/r4/M3-G1-styledA.json`), F2 v8 8/10
+  (`runs/dev/r3/styledA-a2-bd4da7c.json`); styled-ab-all: M2 F2 v14 dev-ab-llm 8/13 (reps 1-2 in `M2-ABv14-all.log`,
+  rep 3 `M2-ABv14-all-r3.json`), same saved spec as exp-final-ab; extra-B: M2 (partly unjudged) and M5.
+- Ledger: 231 calls before M5r2 (+26 when it ends). Credits ~406 at 10:09.
+
+**Measured so far (strict 3/3 per case, raw):** M1 PUB-06 block: G1 3/4 cases, G2 2/4, F2 1/4 (W = G1). M3 G1
+styled-a 10/10 vs F2 8/10. M4 G1 fresh raw-A 8/10 (PUB-06 r3 agent-caused re-offer -> blocked G1 under the
+binding rule; offer-wait fix targets it). M5 G1 fresh A+B 7/13 vs M2 F2 8/13, but its new failures were latency
+hang-ups at concurrency 13 (re-run pending). M2 A+B control 8/13. PUB-12 extra-B fails on every build (Brief B gap,
+engine item 3).
+
+**Platform:** outage 09:38-10:08 UTC; degraded after (list endpoint 500/504, slow runs, chat 504s). Check with
+`.venv/bin/python scripts/credits.py "check"` before blaming code.
 
 ## TONIGHT: execute the APPROVED overnight plan v2 (start here)
 
