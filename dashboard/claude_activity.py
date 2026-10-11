@@ -25,6 +25,8 @@ import os
 import re
 import subprocess
 import time
+from datetime import datetime
+from itertools import islice
 from pathlib import Path
 
 import data as D
@@ -402,7 +404,116 @@ def _label(cmd: str) -> str:
     return clean(f"{exe} {script}" if script else f"{exe} (command hidden)", 80)
 
 
-def session_processes(cli_id: str) -> dict:
+RESUMES = re.compile(r"--(?:resume|session-id)[= ]([0-9a-f]{8}-[0-9a-f-]{27})")
+SHELL_OWNER = re.compile(
+    r"_SESSION_ID='([0-9a-f]{8}-[0-9a-f-]{27})'"
+)  # a hook exports the shell's session
+START_TOL_S = 5
+
+
+def etime_s(et: str) -> int | None:
+    """ps etime ([[dd-]hh:]mm:ss) in seconds."""
+    m = re.fullmatch(r"(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)", et)
+    if not m:
+        return None
+    d, h, mi, s = (int(x) if x else 0 for x in m.groups())
+    return ((d * 24 + h) * 60 + mi) * 60 + s
+
+
+_starts: dict[str, float] = {}
+
+
+def transcript_start(path: str) -> float | None:
+    """Time of the transcript's first entry (it never changes once written, so it is cached)."""
+    if path not in _starts:
+        try:
+            with open(path, "rb") as f:  # read-only
+                for line in islice(f, 50):
+                    try:
+                        ts = json.loads(line).get("timestamp")
+                    except ValueError:
+                        continue
+                    if isinstance(ts, str):
+                        _starts[path] = datetime.fromisoformat(
+                            ts.replace("Z", "+00:00")
+                        ).timestamp()
+                        break
+        except (OSError, ValueError):
+            return None
+    return _starts.get(path)
+
+
+def match_agent(
+    rows: list[list[str]], cli_id: str, start: float | None, now: float
+) -> tuple[str | None, str]:
+    """The agent process of one session, from ps rows [pid, ppid, etime, command]. Strongest first:
+    1. its command line resumes this transcript (--resume=<id>);
+    2. its Bash shells export this session's id (..._SESSION_ID='<id>', set by a SessionStart hook);
+    3. it started within START_TOL_S of the transcript's first entry, and no other agent did;
+    4. last resort: shells without any export whose command mentions this session's id.
+    A shell that exports another session's id never counts for this one. Mentions rank last because
+    a chat often names another chat's id (grepping its transcript)."""
+    cmd = {pid: c for pid, _, _, c in rows}
+    etime = {pid: et for pid, _, et, _ in rows}
+    agents = [pid for pid, _, _, c in rows if AGENT.search(c)]
+    launchers = {ppid for _, ppid, _, c in rows if AGENT.search(c) and ppid in agents}
+    agents = [a for a in agents if a not in launchers]  # the app's launcher wraps the real agent
+    named = {a: RESUMES.findall(cmd[a]) for a in agents}
+    hit = [a for a in agents if cli_id in named[a]]
+    if len(hit) == 1:
+        return hit[0], "its command line resumes this transcript"
+    shells = {a: [c for _, pp, _, c in rows if pp == a and WRAPPER.match(c)] for a in agents}
+    exports = {a: [m.group(1) for c in shells[a] if (m := SHELL_OWNER.search(c))] for a in agents}
+
+    def unique_best(score: dict[str, int]) -> str | None:
+        ranked = sorted((a for a in agents if score[a]), key=lambda a: -score[a])
+        if len(ranked) == 1 or (len(ranked) > 1 and score[ranked[0]] > score[ranked[1]]):
+            return ranked[0]
+        return None
+
+    owned = {a: exports[a].count(cli_id) for a in agents}
+    best = unique_best(owned)
+    if best:
+        return best, f"parent of {owned[best]} shell(s) exporting this session's id"
+    notes = []
+    if len(hit) > 1:
+        notes.append(f"ambiguous: {len(hit)} agent processes resume this transcript")
+    if sum(1 for a in agents if owned[a]) > 1:
+        notes.append("ambiguous: several agent processes have shells exporting this session's id")
+    elsewhere = {  # agents that evidently serve another session
+        a
+        for a in agents
+        if (named[a] and cli_id not in named[a]) or any(x != cli_id for x in exports[a])
+    }
+    if start is not None and not notes:
+        near = []
+        for a in agents:
+            age = etime_s(etime[a])
+            if age is not None and a not in elsewhere and abs(start - (now - age)) <= START_TOL_S:
+                near.append((a, start - (now - age)))
+        if len(near) == 1:
+            a, d = near[0]
+            return a, (
+                f"started {abs(d):.0f} s {'before' if d >= 0 else 'after'} this transcript's first "
+                "entry (start-time match; no shell of this session is open)"
+            )
+        if near:
+            notes.append(f"ambiguous: {len(near)} agent processes started with this transcript")
+    mentions = {
+        a: sum(1 for c in shells[a] if not SHELL_OWNER.search(c) and cli_id in c) for a in agents
+    }
+    best = unique_best(mentions) if not notes else None
+    if best:
+        return best, (
+            f"weak: parent of {mentions[best]} shell(s) that mention this session's id but export none"
+        )
+    return None, "; ".join(notes) or (
+        "not identifiable right now (no resume argument, no open Bash shell of this session, "
+        "and no agent process started with this transcript)"
+    )
+
+
+def session_processes(cli_id: str, transcript_path: str | None = None) -> dict:
     try:
         out = subprocess.run(
             ["ps", "-Ao", "pid,ppid,etime,command"], capture_output=True, text=True, timeout=5
@@ -413,21 +524,11 @@ def session_processes(cli_id: str) -> dict:
     children: dict[str, list] = {}
     for pid, ppid, etime, cmd in rows:
         children.setdefault(ppid, []).append((pid, etime, cmd))
-    agents = [pid for pid, _, _, cmd in rows if AGENT.search(cmd)]
-    # an agent is linked by its wrapper shells (the Bash tool's `zsh -c`), whose argv carries the session id
-    score = {
-        a: sum(1 for _, _, c in children.get(a, []) if WRAPPER.match(c) and cli_id in c)
-        for a in agents
-    }
-    linked = sorted((a for a in agents if score[a]), key=lambda a: -score[a])
-    agent, note = None, "not identifiable right now (no Bash shells of this session are open)"
-    if len(linked) == 1 or (len(linked) > 1 and score[linked[0]] > score[linked[1]]):
-        agent, note = linked[0], f"parent of {score[linked[0]]} shell(s) of this session"
-    elif len(linked) > 1:
-        note = f"ambiguous: {len(linked)} agent processes have shells mentioning this session"
+    start = transcript_start(transcript_path) if transcript_path else None
+    agent, note = match_agent(rows, cli_id, start, time.time())
     scripts = []
     if agent:
-        stack = [p for p, _, c in children.get(agent, []) if WRAPPER.match(c) and cli_id in c]
+        stack = [p for p, _, c in children.get(agent, []) if WRAPPER.match(c)]
         seen = set()
         while stack:
             p = stack.pop()
@@ -472,7 +573,7 @@ def activity(wanted: str | None = None) -> dict:
     path = primary["_transcript_path"]
     parsed = parse(read_tail(path))
     age = now - os.stat(path).st_mtime
-    procs = session_processes(primary["cli_session_id"])
+    procs = session_processes(primary["cli_session_id"], path)
     pending = parsed["pending_tool"]
     open_tasks = [  # a Monitor with a timeout has ended once the timeout ran out
         o

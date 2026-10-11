@@ -89,6 +89,10 @@ and are not visible.
 - **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events. Every transcript of the session is included: the desktop app lists the earlier ones (before a context save, `/clear` or a restart) in `priorCliSessionIds`, they are read in full (cached, they no longer change) and a `transcript k of n begins` event marks each boundary. `?limit=N` returns only the last N items plus every earlier prompt.
   System reminders, thinking and tool content are left out. Secrets are redacted and e-mails masked. It is written
   to `reports/latest_conversation.{json,md}` for an external reviewer (`reports/` is gitignored).
+- **Agent process.** Each chat is linked to its local agent process from `ps` alone, strongest evidence first: the
+  command line resumes the chat's transcript (`--resume=<id>`); its Bash shells export the chat's session id; the
+  process started within 5 s of the transcript's first entry (works when no shell is open, e.g. a chat working in a
+  worktree); last, shells that merely mention the id (labelled weak). The evidence is shown with the pid.
 - **Safety.** Files are opened read-only. The only subprocess is `ps`. Requests whose Host is not
   `127.0.0.1:<port>` or `localhost:<port>` get 403 (DNS-rebinding guard).
 - **Limits.**
