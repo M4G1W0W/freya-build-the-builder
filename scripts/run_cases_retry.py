@@ -224,7 +224,7 @@ def unjudged(rows) -> list[str]:
     return [r["id"] for r in rows if any(NO_VERDICT.search(f) for f in r.get("failed", []))]
 
 
-def repeat_unjudged(run_once, seen=frozenset()):
+def repeat_unjudged(run_once, seen=frozenset(), attempts=None):
     """Wrap the kit's run_once: a rep with an unjudged call is discarded and repeated once (fresh sessions).
     Every scored row is marked with its verdict source (`seen`: calls judged from their call record)."""
 
@@ -237,31 +237,44 @@ def repeat_unjudged(run_once, seen=frozenset()):
                 flush=True,
             )
             out = run_once(agent_id, cases, ids)
-        mark_verdict_source(out[0], seen)
+        mark_verdict_source(out[0], seen, attempts)
         return out
 
     return checked
 
 
-def with_call_verdicts(get_iteration, get_call, seen):
+def read_call_once(call_id) -> dict | None:
+    """One plain read of a call record (no retries: the fallback must not stall scoring); None on failure."""
+    try:
+        return _api("GET", f"/api/v2/call/{call_id}")["call"]
+    except Exception as e:
+        log.warning("call record read for %s failed: %s", call_id, e)
+        return None
+
+
+def with_call_verdicts(get_iteration, get_call, seen, attempts=None):
     """Wrap the kit's get_iteration: a run still waiting for the judge takes the verdict on its call record.
 
     11 Oct 12:15 UTC, smoke 94c9e350: the run stayed "analyzing" (attempt 2/4) while its call record already had
     successCriteriaResult.success=True; run_cases scored it "conversation: no verdict". A verdict the run has
-    (pass, fail, inconclusive, error) is never replaced. Calls whose verdict came from the record go into `seen`.
+    (pass, fail, inconclusive, error) is never replaced. Calls whose verdict came from the record go into `seen`;
+    `attempts` collects each run's attempt count by call (the platform re-runs a stalled call on the same bank
+    session, so a row from attempt 2+ is one to audit).
     """
 
     def wrapped(sim_id, it_id):
         iteration = get_iteration(sim_id, it_id)
         for run in iteration.get("runs") or []:
+            if attempts is not None and run.get("callId"):
+                attempts[run["callId"]] = run.get("attempts")
             if run.get("outcome") not in (None, "", "analyzing") or not run.get("callId"):
                 continue
             try:
-                result = get_call(run["callId"]).get("successCriteriaResult") or {}
+                result = (get_call(run["callId"]) or {}).get("successCriteriaResult")
             except Exception as e:  # a failed read leaves the run unjudged, as before
                 log.warning("call record read for %s failed: %s", run["callId"], e)
                 continue
-            if not isinstance(result.get("success"), bool):
+            if not isinstance(result, dict) or not isinstance(result.get("success"), bool):
                 continue
             was = run.get("outcome")
             run["outcome"] = "pass" if result["success"] else "fail"
@@ -269,7 +282,7 @@ def with_call_verdicts(get_iteration, get_call, seen):
             seen.add(run["callId"])
             print(
                 f"VERDICT FROM CALL RECORD: run {run.get('id')} call {run['callId']}: "
-                f"{run['outcome']} (the run still said {was!r})",
+                f"{run['outcome']} (the run still said {was!r}; attempt {run.get('attempts')})",
                 flush=True,
             )
         return iteration
@@ -277,10 +290,12 @@ def with_call_verdicts(get_iteration, get_call, seen):
     return wrapped
 
 
-def mark_verdict_source(rows, seen) -> None:
-    """Each scored row says whether its conversation verdict came from the run or from the call record."""
+def mark_verdict_source(rows, seen, attempts=None) -> None:
+    """Each scored row says whether its conversation verdict came from the run or from the call record, and
+    its run's attempt count."""
     for r in rows:
         r["verdict_source"] = "call" if r.get("call_id") in seen else "run"
+        r["attempts"] = (attempts or {}).get(r.get("call_id"))
 
 
 def wait_until_healthy(api=None, limit_s=HEALTH_WAIT_S) -> None:
@@ -308,8 +323,9 @@ def main() -> None:
     import run_cases  # kit/tools is on sys.path (scripts/_kit.py); imported, not run
 
     seen: set[str] = set()
-    freya.get_iteration = with_call_verdicts(freya.get_iteration, freya.get_call, seen)
-    run_cases.run_once = repeat_unjudged(run_cases.run_once, seen)
+    attempts: dict = {}
+    freya.get_iteration = with_call_verdicts(freya.get_iteration, read_call_once, seen, attempts)
+    run_cases.run_once = repeat_unjudged(run_cases.run_once, seen, attempts)
     run_cases.main()
 
 

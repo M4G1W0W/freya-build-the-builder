@@ -388,3 +388,52 @@ def test_every_scored_rep_is_marked_with_its_verdict_sources():
         "a", [], {}
     )
     assert out[0][0]["verdict_source"] == "call"
+
+
+@pytest.mark.parametrize("result", ["pending", [{"success": True}]])
+def test_a_call_record_verdict_of_another_shape_leaves_the_run_unjudged(result):
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration({"id": "r1", "outcome": "analyzing", "callId": "c1"}),
+        lambda call_id: {"successCriteriaResult": result},
+        set(),
+    )
+    assert get_iteration("s1", "i1")["runs"][0]["outcome"] == "analyzing"
+
+
+def test_the_call_record_is_read_once_without_retries(monkeypatch):
+    # review of 4631971: through freya.get_call the read inherited ~17 min of GET retries per stuck run,
+    # all before the ledger is read. One plain read; a failure leaves the run unjudged.
+    reads = []
+
+    def api(method, path, body=None, **params):
+        reads.append(path)
+        raise RuntimeError(f"{method} {path} -> 504: error code: 504")
+
+    monkeypatch.setattr(rcr, "_api", api)
+    monkeypatch.setattr(rcr.time, "sleep", lambda s: pytest.fail("no retry sleep"))
+    assert rcr.read_call_once("c1") is None and reads == ["/api/v2/call/c1"]
+
+
+def test_rows_carry_the_attempt_count_of_their_run():
+    attempts = {}
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration(
+            {"id": "r1", "outcome": "analyzing", "callId": "c1", "attempts": 2},
+            {"id": "r2", "outcome": "pass", "callId": "c2", "attempts": 0},
+        ),
+        lambda call_id: {"successCriteriaResult": {"success": True, "reason": ""}},
+        set(),
+        attempts,
+    )
+    get_iteration("s1", "i1")
+    rows = [
+        {"id": "A", "call_id": "c1"},
+        {"id": "B", "call_id": "c2"},
+        {"id": "C", "call_id": None},
+    ]
+    rcr.mark_verdict_source(rows, {"c1"}, attempts)
+    assert [(r["verdict_source"], r["attempts"]) for r in rows] == [
+        ("call", 2),
+        ("run", 0),
+        ("run", None),
+    ]
