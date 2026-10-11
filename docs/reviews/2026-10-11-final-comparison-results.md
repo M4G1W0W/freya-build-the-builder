@@ -1,4 +1,4 @@
-# Final comparison results: eng.4 vs eng.9 on fresh builds (11 Oct, 15:55 UTC)
+# Final comparison results: eng.4 vs eng.9 on fresh builds (11 Oct, 15:49 UTC)
 
 Plan (pre-registered): `docs/plans/2026-10-11-final-comparison-plan.md`. Harness: maxRetries 0, no reruns, every attempt
 kept (`runs/dev/r4/C-*.attempts.jsonl`, calls in `runs/dev/r4/final.calls/`). Arms: eng.4 = cand-eng.4 cfa4d9d
