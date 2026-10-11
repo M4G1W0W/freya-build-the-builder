@@ -11,10 +11,11 @@ Background and rationale: dossier `docs/reviews/2026-10-11-final-selection-evide
 | Arm | Code | A agent (slot) | A+B agent (slot) |
 |---|---|---|---|
 | eng.4 | cand-eng.4 cfa4d9d (detached worktree, clean) | `tests/fixtures/briefs/raw-a.md` -> exp-eng4-fr | `tests/fixtures/briefs/ab-single.md` -> exp-eng4-fab |
-| challenger | the 15:00 tag, else 4267bb0 (detached worktree of the explicit sha) | raw-a.md -> exp-ch-fr | ab-single.md -> exp-ch-fab |
+| challenger | **cand-eng.9 = b103e21** (Methodology, tagged 14:37 UTC inside the 15:00 gate: eng.8 + one-condition closing guard in `spec.early_lines`, 875 tests; detached worktree of the explicit sha) | raw-a.md -> exp-ch-fr | ab-single.md -> exp-ch-fab |
 
 Tool API `kit/tools/openapi.json`; `--save-spec runs/dev/r4/spec-<slot>.json`, `--export runs/dev/r4/exports/<slot>.json`.
-Record per build: trace `git=<sha> dirty=False`, build seconds, and whether the trace has a STEP line "said before the
+eng.4 builds 14:34-14:38 UTC: exp-eng4-fr 114 s, exp-eng4-fab 118 s, `git=cfa4d9d dirty=False`, spec check, validation
+and smoke PASS, export MATCH (0 changed, 0 render-only, 0 needs-review). Record per build: trace `git=<sha> dirty=False`, build seconds, and whether the trace has a STEP line "said before the
 customer answers" (the closing fix active in that extraction or not).
 
 ## Case sets per arm and round (harness: `run_one.sh` + `suite_once.py` via `plan_run.sh`; `qrun4.sh` not used)
