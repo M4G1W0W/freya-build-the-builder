@@ -11,6 +11,10 @@
 import { handle } from "./bank.js";
 import customers from "../data/customers.json";
 
+// Request headers kept for debugging (which headers does the platform send per call?); credentials and IPs dropped.
+const safeHeaders = (request) =>
+  Object.fromEntries([...request.headers].filter(([k]) => !/cookie|authorization|token|key|ip$|forwarded/i.test(k)));
+
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
@@ -33,14 +37,14 @@ export class CustomerState {
   }
 
   async fetch(request) {
-    const { op, tool, body, customer } = await request.json();
+    const { op, tool, body, customer, headers } = await request.json();
     let state = await this.ctx.storage.get("state");
     if (op === "init") {
       await this.ctx.storage.put("customer", customer);
       await this.ctx.storage.delete("state");
       return json(200, { ok: true });
     }
-    if (op === "ledger") return json(200, { ok: true, state: state || null });
+    if (op === "ledger") return json(200, { ok: true, state: state || null, headers: (await this.ctx.storage.get("headers")) || [] });
     if (op === "practice_ledger") return json(200, { ok: true, ...ledgerView(state) });
     if (op === "reset") {
       await this.ctx.storage.delete("state");
@@ -50,6 +54,7 @@ export class CustomerState {
     if (!who) return json(404, { ok: false, error: "unknown customer_id" });
     const res = handle(state, who, tool, body, customers.config || {});
     await this.ctx.storage.put("state", res.state);
+    if (headers) await this.ctx.storage.put("headers", [...((await this.ctx.storage.get("headers")) || []), { tool, headers }].slice(-20));
     return json(res.status, res.body);
   }
 }
@@ -93,6 +98,6 @@ export default {
     const customer = findCustomer(body.customer_id) || null; // null: a practice session, its customer is in the DO
     if (!customer && !String(body.customer_id || "").startsWith("s_")) return json(404, { ok: false, error: "unknown customer_id" });
     const stub = env.CUSTOMER_STATE.get(env.CUSTOMER_STATE.idFromName(body.customer_id));
-    return stub.fetch("https://do/", { method: "POST", body: JSON.stringify({ op: "tool", tool: parts[1], body, customer }) });
+    return stub.fetch("https://do/", { method: "POST", body: JSON.stringify({ op: "tool", tool: parts[1], body, customer, headers: safeHeaders(request) }) });
   },
 };
