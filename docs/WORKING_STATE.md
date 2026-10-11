@@ -26,6 +26,29 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 18:08 UTC: build 1 + round 1 (3/6); user D9/D10 -> cand-final.7 (cut-off line language + 30 s timeout)
+
+- **Build 1 (candidate, NOT final):** main 0531102 (= cand-final.6 ed112fd), 17:50:40-17:54:54 UTC, mock_url
+  `https://teampistalogic.atlasreyiz.workers.dev/voice/v1`, END ok=True 254 s, 4 model calls, 7 tools (token op dropped,
+  credentials), platform dry-run PASS, smoke PASS; workflow ad052130 / agent 2276b4c7 (slot `final`); files
+  traces/final.log + submission/final.workflow.json (uncommitted; will be replaced by the selected build).
+- **Round 1 (user D8; 6 example scenarios, our mock, maxRetries 0): 3/6** (EX-3 multi-card, EX-4 e-mail, EX-5 week change
+  under pressure PASS). Requests arrived properly nested ({"data": {...}, "call": {...}}). Failures = model adherence
+  (no additional-transaction offer after the reading, week options not listed, year left off dates) although the
+  consolidated rules contain all of it; plus one builder bug: the general prompt's fixed "Please go on." spoken in English.
+  Results `runs/final/R1.json`, `R1.log`, `R1.mocklog.json`. Ledger cum 531.
+- **User D9 (18:07): bug fix only** (cut-off line in the call language; NO adherence/"finish each step" prompt changes:
+  tuning). **User D10: general-flow tool timeout 30 s.** Asked Methodology for ONE tag cand-final.7 on cand-final.6.
+  Then: verify, merge into main, rebuild (the SELECTED build), round 2 (6 calls, the D8 repeat), ping the Submission
+  readiness reviewer with tag/commit, START/END, live mock version, mock_url.
+- **User (via Submission reviewer, 18:0x): no pushes of the artifact commit or case-derived mock content until the user
+  confirms; local commits OK.** `commit` in submission.json = the builder-run commit (START git=).
+- Mock live **0ea3104f** (18:02): + suffix path matching (any base, doubled base), '__' keys, GET /health = 200, field
+  aliases (customerNumber -> customerNo). Live replay 617/617 exact on `/voice/v1` and bare; token, dotted, '__', string
+  data, doubled base, alias all 200. Note: the earlier accidental push 00c23f3 put the filled `mock/data/services.json`
+  on the remote (disclosed to the user; keep/revert is the user's call).
+- Derived scenarios (16, skeptic-checked): `runs/cases/final-derived.json`; policy map `runs/final/policy-map.json`.
+
 ## UPDATE 17:37 UTC: MOCK LIVE ON THE REAL CONTRACT (617/617); roles split
 
 - **Roles (user 17:37):** `submission.json`, members and repo access belong to the **Submission readiness reviewer**
