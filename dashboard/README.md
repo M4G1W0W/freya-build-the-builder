@@ -19,6 +19,7 @@ Data is recomputed every 12 s. The page polls every 12 s.
 | `/api/failures` | Failed reps by category, persistence, introduced, resolved, awaiting retest, and an infra-adjusted interpretation |
 | `/api/overview`, `/api/builder` | Overview panels; build traces |
 | `/api/case?run=<run id>&case=<PUB-xx>` | Per-rep detail: ledger diff, judge text, tools, a transcript when a call dump exists locally, and the case history |
+| `/api/rules-and-cases` | Organizer rules, deadlines (UTC and Istanbul), briefs and cases, internal decisions, interpretations, clarifications, conflicts, with sources (see below) |
 | `/api/comparison?...` | Configuration comparison: scenario variants × exact configurations, plus a two-version diff (see below) |
 
 ## How numbers are derived
@@ -220,3 +221,35 @@ configuration is not determinable (the log has no agent id).
 - Uncommitted edits to a case file cannot be detected.
 
 Tests: `uv run pytest dashboard/test_compare.py` (synthetic records, no network).
+
+## Rules & Cases (`/api/rules-and-cases`, tab "Rules & Cases")
+
+A read-only reference for the organizer rules and everything around them, with provenance. Labels:
+- **official:** the organizer page as captured in `docs/reference/` (its header lines are team-written), and the kit.
+- **internal:** team-written decisions, plans, notes and code. These are never organizer rules.
+- **locally derived:** fixtures in `tests/fixtures/` built by the team.
+
+**Original text.** It is read from the files on every request (cached by file stat and git HEAD), and nothing is
+fetched. Briefs and case sets come straight from `kit/briefs`, `kit/public-test-set.json`,
+`docs/reference/hackathon_practice_cases.json` and `tests/fixtures/{briefs,cases}`.
+
+**Summaries.** They come from `dashboard/rules_catalog.json`, a dashboard-owned catalog. A read-only
+five-reader pass extracted it on 2026-10-11, with one skeptic per reader. Each item carries:
+- a verbatim quote, a category and the source file;
+- for every request, the quote is found again in the file. That gives `status` (`verified`, or `stale` if the
+  source changed), the line, the markdown section and the surrounding original paragraph.
+
+Organizer rules, deadlines and clarifications cite official sources only (checked by `dashboard/test_rules.py`).
+
+**Deadlines.** The page gives a weekday and a UTC time but no date. The catalog states the reconstructed date,
+its official basis quotes (event dates "October 10 and 11", kit "10 October 2026") and the derivation. Istanbul is
+computed at UTC+3; the organizers state no Istanbul time.
+
+**Conflicts and stale information.** The extracted conflicts are listed with both quotes; 7 disputed ones were
+dropped. A computed case-by-case diff compares the kit's cases with the page's cases. Each source shows its last
+commit and any uncommitted changes. `sha256_current` is the file as it is now, never a historical value.
+
+**Missing.** The readers' and checkers' notes on information not found in the project files are listed as
+reported.
+
+Tests: `uv run pytest dashboard/test_rules.py`.

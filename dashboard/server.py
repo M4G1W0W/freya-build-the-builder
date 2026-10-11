@@ -25,6 +25,7 @@ import claude_activity as CA  # noqa: E402
 import compare as C  # noqa: E402
 import data as D  # noqa: E402
 import evidence as EV  # noqa: E402
+import rules as RC  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 REPORTS = D.ROOT / "reports"
@@ -283,6 +284,16 @@ class Handler(BaseHTTPRequestHandler):
             except C.QueryError as exc:
                 return self._send(400, D.dumps({"error": str(exc)}).encode(), "application/json")
             return self._json({"refreshed": st["refreshed"], **found})
+        if url.path == "/api/rules-and-cases":
+            try:
+                return self._json(RC.view())
+            except Exception as exc:
+                traceback.print_exc()
+                return self._send(
+                    500,
+                    json.dumps({"error": f"rules view error: {type(exc).__name__}"}).encode(),
+                    "application/json",
+                )
         if url.path == "/api/case":
             detail = D.case_detail(st["runs"], q.get("run", [""])[0], q.get("case", [""])[0])
             return (
