@@ -59,6 +59,23 @@ def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[
     return docs
 
 
+MIN_RULES_CHARS = 1000  # shorter consolidated rules for a whole case folder cannot be complete
+
+
+def folder_prompt_brief(trace: Trace, spec: dict) -> None:
+    """A case folder also holds test customers, example calls and the service contract: the
+    agent's BANK BRIEF is consolidate's rule list, not every document (review 16:40 UTC).
+    Extraction still read the full text. Short or empty rules keep the full text, with a WARN."""
+    rules = str(spec.get("_consolidated_rules") or "").strip()
+    if len(rules) < MIN_RULES_CHARS:
+        trace.warn(
+            f"consolidated rules are {len(rules)} chars: the prompt keeps the full folder text"
+        )
+        return
+    spec["_prompt_brief"] = rules
+    trace.step(f"BANK BRIEF in the prompt = the consolidated rules, {len(rules)} chars")
+
+
 def join_documents(docs: list[tuple[str, str]]) -> str:
     return "\n\n".join(f"===== FILE: {name} =====\n{text}" for name, text in docs)
 
@@ -157,6 +174,8 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         else:
             spec = extract(trace, brief_text, tools)
         spec.setdefault("_prompt_brief", brief_text)
+        if any(Path(b).is_dir() for b in a.briefs):
+            folder_prompt_brief(trace, spec)
         if a.save_spec:
             Path(a.save_spec).write_text(json.dumps(spec, indent=1))
         workflow = render(spec, tools)

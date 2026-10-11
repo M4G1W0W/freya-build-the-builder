@@ -234,3 +234,61 @@ def test_a_worded_now_in_another_language_is_read_with_its_month_names():
     assert how == "clock"
     when, how = ns["_now"]({"now": "Wednesday 14 October 2026 11:00"}, {"now_var": "now"})
     assert how == "ok" and (when.month, when.day, when.hour) == (10, 14, 11)
+
+
+def _capture(seen: dict):
+    def render(spec, tools):
+        seen.update(spec)
+        return fake_render(spec, tools)
+
+    return render
+
+
+def _extract_with_rules(rules: str):
+    def extract(trace, text, tools):
+        out = fake_extract(trace, text, tools)
+        return {**out, "_prompt_brief": text, "_consolidated_rules": rules}
+
+    return extract
+
+
+def test_a_folders_prompt_brief_is_the_consolidated_rules(tmp_path, capsys):
+    # Review 16:40 UTC: a clean folder put test customers, example calls and the contract into
+    # the agent's BANK BRIEF.
+    case = tmp_path / "Case"
+    case.mkdir()
+    (case / "BRIEF.md").write_text("rules and more")
+    (case / "customers.csv").write_text("id,dob\n1,1988-03-14")
+    (case / "openapi.json").write_text(Path(API).read_text())
+    rules = "1. RULE " * 200
+    seen: dict = {}
+    assert (
+        cli.run([str(case), "https://m.dev", "--dry"], _extract_with_rules(rules), _capture(seen))
+        == 0
+    )
+    assert seen["_prompt_brief"] == rules.strip()
+    assert "BANK BRIEF in the prompt = the consolidated rules" in capsys.readouterr().err
+
+
+def test_short_consolidated_rules_keep_the_full_folder_text(tmp_path, capsys):
+    case = tmp_path / "Case"
+    case.mkdir()
+    (case / "BRIEF.md").write_text("rules")
+    (case / "openapi.json").write_text(Path(API).read_text())
+    seen: dict = {}
+    assert (
+        cli.run([str(case), "https://m.dev", "--dry"], _extract_with_rules("1. x"), _capture(seen))
+        == 0
+    )
+    assert seen["_prompt_brief"].startswith("===== FILE: BRIEF.md =====\nrules")
+    assert "consolidated rules are 4 chars" in capsys.readouterr().err
+
+
+def test_brief_files_keep_their_prompt_brief():
+    # The practice forms (brief-a.md, or brief-a.md + brief-b.md) are unchanged.
+    briefs = Path(API).parents[1] / "briefs"
+    for args in ([briefs / "brief-a.md"], [briefs / "brief-a.md", briefs / "brief-b.md"]):
+        seen: dict = {}
+        argv = [*map(str, args), API, "--dry"]
+        assert cli.run(argv, _extract_with_rules("1. RULE " * 200), _capture(seen)) == 0
+        assert seen["_prompt_brief"] == cli.read_briefs([str(a) for a in args])

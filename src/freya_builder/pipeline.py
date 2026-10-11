@@ -206,6 +206,7 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
             " slots (the official page: customers have one to three products)"
         )
     spec["_prompt_brief"] = rules_text
+    spec["_consolidated_rules"] = c.get("consolidated_rules", "")  # cli.py: folder input
     return spec
 
 
