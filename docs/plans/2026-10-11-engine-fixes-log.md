@@ -275,3 +275,65 @@ Suggested Freya measurement (Simulation Developer): fresh A+B builds; styled-ext
 target of both item 3 and Fix 1) and the B set x3; the A set x3 (every fresh build re-extracts with the
 new prompt). Comparing .4/.5/.6/.7 separates the two effects: .5 vs .4 = item 3, .6 vs .4 = Fix 1,
 .7 = both. Investigate any difference from cand-eng.4; do not call it noise.
+
+## DEFERRED: Fix 2 (the "too much" date), recorded 11:58 UTC. Not implemented; no further work now
+
+Decision (user): keep Fix 2 deferred; cand-eng.4-.7 untouched; current-candidate validation is the
+priority. Reconsider after that validation, or if new brief evidence makes the defect relevant.
+
+**Defect** (cand-final.1 has it too; not a regression). A brief that gives the "too much" floor offer
+its own date without calling it "not a persuasion attempt" is extracted as `too_much.offer=attempt_1`,
+`date_expr=""` (`pipeline.py:76` requires ""); FACTS (`sandbox/facts.py:566-580`) then say "offer exactly
+the floor ... on <attempt 1's date>; this IS attempt 1 (no other date ...)" and the ATTEMPTS clause
+(`render.py:444`) says "on attempt 1's date": a wrong promise date in the ledger. Second facet: with
+attempt 1 = "full" only, FACTS print no too-much line while ATTEMPTS still says attempt 1's date.
+Evidence of relevance: none so far. 0 of 9 briefs we hold have this wording (6 give the offer no own
+date; p2 and variant-e give one and call it "not an attempt", handled by `separate`); all 23 fresh
+attempt_1 extractions have date_expr ""; all 34 saved specs have attempt 1 = full_or_floor.
+
+**Unresolved design issues (must be settled in a separate review before any implementation):**
+1. Falling back to attempt 1's date is NOT safe: when the brief explicitly requires another date, that
+   fallback is exactly the defect. What a build should do with an own date it cannot verify is open.
+2. Sentence proximity cannot reliably establish semantic scope: a date in the same sentence can belong
+   to another clause, and a legitimate date can sit in another sentence, a table or an amending memo
+   (raw briefs). Verbatim-quote checks stop invented provenance but not misattribution.
+3. Attempt-counting cases need exact expected outcomes before they become acceptance tests: the
+   drafted variants leave open whether an own-date offer counts as attempt 1. If two blind
+   derivations disagree, the fixture wording must be made explicit; the code must not pick a reading.
+The proposed provenance fields (`trigger_source`, `date_source`), proximity checks and fallback are
+NOT to be added without that separate review. A matching date value is never by itself a reason to
+reject an own-date expression (legitimate dates can coincide with another attempt's).
+
+**Post-release restrictions: organizer rule vs our internal targets.**
+- Organizer (kit, authoritative: `kit/README.md:73`; same on the official page,
+  `docs/reference/hackathon_page.md:100` and `:277`): after the hidden briefs open (Sun 17:00 UTC,
+  page `:196`) "you may fix a bug in your builder. You may not write anything from a final brief into
+  it: no rule, no value, no name"; a reviewer checks the commit. Example given: fixing a crash on an
+  unexpected table is allowed; adding the new brief's holiday dates or outcome names is not.
+- Internal, not organizer rules: 12:00 candidate-change cutoff, 14:30 RUNBOOK rehearsal and 15:30
+  freeze tag `freeze-final` (`docs/plans/2026-10-11-overnight-plan-v2.md:299-303`, this chat's brief);
+  CLAUDE.md's stricter wording ("only generic bug fixes"; never paste hidden-brief text into code,
+  prompts, tests or fixtures).
+- Correction: my earlier "fixtures must exist before 17:00 / 15:30 is the practical latest point" was
+  our internal freeze target, not an organizer rule. The organizer text does not forbid adding
+  fixtures built only from the public briefs after 17:00; it forbids writing anything from a hidden
+  brief into the builder.
+
+**Case inventory (PROPOSAL only: no files written; every expected outcome UNRESOLVED until derived
+blind by 2 independent agents from the final fixture wording).** Variants of Brief A, now =
+Wed 2026-10-14, accounts reused by public case id:
+- variant-f: rule 26 -> "offer the floor, payable on the next business day after today, once"; no
+  "not an attempt".
+- variant-g: variant-f + rule 30 attempt 1 = the full amount only.
+- variant-h: rule 26 -> "payable on the deadline" (same date as attempt 2's floor offer).
+
+| Case | Brief | Account | Script | Tests | Expected |
+|---|---|---|---|---|---|
+| F1 | f | PUB-01 (420.00, 6 d, 1 attempt) | "too much" -> accepts the first lower offer | own date only | not yet derived; expected to be counting-independent |
+| F2 | f | PUB-06 (2125.10, 12 d, 2 attempts) | "too much" -> refuses -> accepts the next offer | attempt counting | **UNRESOLVED**: depends on whether the offer counts as attempt 1 |
+| F3 (optional) | f | PUB-07 (540.00, 5 d, 1 attempt) | "too much" -> refuses -> accepts any next offer | counting, no attempt left | **UNRESOLVED**: same question |
+| G1 | g | PUB-06 | no to today -> attempt 1 (full) -> "too much" -> accepts | full-only attempt 1 facet | **UNRESOLVED**: whether and when the own-date offer applies after attempt 1 |
+| H1 | h | PUB-06 | "too much" -> accepts | legitimate date collision | not yet derived; expected to be counting-independent |
+| H2 | h | PUB-06 | "too much" -> refuses -> accepts any next offer | collision after refusal (no-repeat rule) | **UNRESOLVED**: counting + whether attempt 2 repeats the refused offer |
+Decoys for extraction only: A, raw-A and variant-c ("Attempt 2 may name the floor again, on the
+deadline") must stay attempt_1 with no date; a variant with the own date in a second sentence.
