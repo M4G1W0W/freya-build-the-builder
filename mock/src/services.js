@@ -52,15 +52,38 @@ export function errorBody(cfg, code, message, guid) {
   };
 }
 
+const asObject = (v) => {
+  if (typeof v === "string") {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return {};
+    }
+  }
+  return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+};
+
+// Fields of a request: the `data` object (also when sent as a JSON string), then dotted top-level keys
+// ("data.cardNumber" -> cardNumber), then plain top-level keys; an empty value never hides a filled one.
 export function fieldsOf(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
-  const data = body.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data : {};
-  return { ...body, ...data };
+  const top = asObject(body);
+  const layers = [asObject(top.data), {}, {}];
+  for (const [k, v] of Object.entries(top)) {
+    if (k.includes(".")) layers[1][k.slice(k.lastIndexOf(".") + 1)] = v;
+    else layers[2][k] = v;
+  }
+  const out = {};
+  for (const layer of layers) {
+    for (const [k, v] of Object.entries(layer)) if (str(out[k]) === "") out[k] = v;
+  }
+  return out;
 }
 
 // -> {status, body, delaySeconds, service} or null when the path is not one of the bank's services.
 export function serve(pack, cfg, method, pathname, body, guid = "0".repeat(32)) {
   const path = pathname.replace(/\/+$/, "");
+  const token = cfg.token && (cfg.base || [""]).some((b) => (cfg.token.paths || []).some((t) => path === `${b}${t}`));
+  if (token) return { status: 200, body: cfg.token.response, delaySeconds: 0, service: "token" };
   const service = Object.keys(cfg.services).find((s) => (cfg.base || [""]).some((b) => path === `${b}/${s}`));
   if (!service) return null;
   const out = (r) => ({ ...r, service });

@@ -439,6 +439,22 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   merge of main clean, ruff clean, 931 passed, fresh-clone `--dry` of b9756fe with Python 3.12 (stdlib only) END ok=True
   in 104 s, trace secrets CLEAN. (System `python3` here is 3.9.6: the builder's 3.10+ guard stops it, as designed.)
 
+- 2026-10-11 17:20 UTC — **User D6: a generic, case-blind fallback for contracts the collections flow cannot
+  represent** (`general.py`, Methodology; tags cand-final.5 01492e0, then cand-final.6 with review fixes). Reason: after
+  the final case opened (17:00), the frozen builder (`freeze-final-2` e2635e9) was shown to CRASH on any non-collections
+  case, proven on a synthetic library-enquiry folder written by the Simulation chat
+  (`spec check FAIL: tool API has no verify_identity / create_promise / close_call`, then
+  `ValueError: spec expression promise window min '': empty expression`, END ok=False, no agent). The official rule
+  allows fixing bugs after 17:00 and forbids writing the case into the builder. The fix renders one general agent from
+  the documents' consolidated rules plus every contract operation as a tool, instead of crashing; the collections path
+  stays byte-identical (36/36 saved specs; spec-a-llm render identical). Alternatives: submit the frozen builder as is
+  (no agent at all: rejected). Case-blindness: Methodology built and tested it only on synthetic contracts sent by the
+  Simulation chat; disclosure: Methodology read the final folder's BRIEF.md and the flow-drawing text at 17:19-17:22
+  (before the case-blind instruction reached it) and then only file names/sizes (user D7 17:30); a document-inventory
+  phrase that mirrored the case was neutralised in cand-final.6. Builder defects found on the real folder are passed to
+  Methodology only as generic, synthetic descriptions. Evidence: WORKING_STATE 17:23-17:46 UTC; traces in the Simulation
+  chat's scratchpad (synth-inquiry.dry.log, final-dry.trace.log).
+
 ## Score log
 
 | Time (Istanbul) | Git ref | Change | Brief | Reps | Passed / N | Workflow / agent id | Build time | Notes |

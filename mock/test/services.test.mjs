@@ -77,3 +77,20 @@ test("missing or empty required field -> 400 naming it; top-level fields accepte
   assert.equal(call("/voice/v1/other", {}), null);
   assert.equal(call("/x.list", { customerNo: "10000001" }, "GET").status, 400);
 });
+
+test("dotted top-level keys and a data object sent as a JSON string are read; empty never hides filled", () => {
+  const dotted = serve(PACK, CFG, "POST", "/x.list", { data: {}, call: {}, "data.customerNo": "10000001", "call.ani": "x" });
+  assert.equal(dotted.status, 200);
+  const asString = serve(PACK, CFG, "POST", "/x.balance", { data: '{"cardNumber": "111111******2222"}' });
+  assert.deepEqual(asString.body, { data: { due: "01.01.2027" } });
+  const both = serve(PACK, CFG, "POST", "/x.list", { data: { customerNo: "" }, "data.customerNo": "10000001" });
+  assert.equal(both.status, 200);
+});
+
+test("the token path answers the documented token response under every base", () => {
+  const cfg = { ...CFG, token: { paths: ["/oauth2/token"], response: { access_token: "t", token_type: "Bearer", expires_in: 1800 } } };
+  for (const p of ["/voice/v1/oauth2/token", "/oauth2/token"]) {
+    const r = serve(PACK, cfg, "POST", p, "grant_type=client_credentials");
+    assert.deepEqual([r.status, r.body.token_type, r.service], [200, "Bearer", "token"]);
+  }
+});
