@@ -766,6 +766,58 @@ def test_identity_task_all_at_once_verify_identity(tmp_path):
     assert per_answer["description"].startswith("Check one security answer.")
 
 
+def _invented_mapping() -> dict:
+    """The P3 repair round's spec for an all-at-once tool: the two answer fields named as the
+    question and answer field, and the action flag `ok` as the one-answer flag (rehearsal P3b)."""
+    s = copy.deepcopy(SPEC_A)
+    keys = [q["key"] for q in s["identity"]["questions"]]
+    s["identity"].update(question_field=keys[0], answer_field=keys[1], answer_ok_field="ok")
+    return s
+
+
+def test_all_at_once_tool_with_invented_question_answer_mapping_renders_all_at_once(tmp_path):
+    # Engine-fixes item 1: keys that are verify_identity request fields decide the shape, so the
+    # agent never sends the question key as the first answer.
+    tools = _all_at_once_tools(tmp_path)
+    for spec in (_invented_mapping(), SPEC_A):
+        wf = render(spec, tools, BRIEF)
+        task = _ident(wf)
+        assert T2A in task and "(field date_of_birth;" in task
+        assert "send date_of_birth=" not in task and "set to the question key" not in task
+        fn = wf["nodes"]["identity"]["tools"][0]["function"]
+        assert fn["description"].startswith(T9)
+        props = fn["parameters"]["properties"]["body"]["properties"]
+        assert "Which security question" not in json.dumps(props)
+        assert props["date_of_birth"]["description"].startswith(
+            "The customer's answer to security question 1"
+        )
+        post = wf["nodes"]["identity"]["tools"][0]["post_process_code"]
+        assert "_good = str(_d.get('')).strip()" in post and "The bank marked as wrong" in post
+        assert validate(wf) == []
+
+
+def test_check_spec_accepts_all_at_once_verify_identity(tmp_path):
+    tools = _all_at_once_tools(tmp_path)
+    blank = copy.deepcopy(SPEC_A)
+    blank["identity"].update(question_field="", answer_field="", answer_ok_field="")
+    for spec in (blank, _invented_mapping(), SPEC_A):
+        assert [x for x in check_spec(spec, tools) if "identity" in x] == []
+
+
+def test_check_spec_all_at_once_needs_a_question_per_required_answer_field(tmp_path):
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["questions"] = spec["identity"]["questions"][:1]
+    problems = check_spec(spec, _all_at_once_tools(tmp_path))
+    assert any("requires 'phone_last4'" in x for x in problems)
+
+
+def test_check_spec_per_answer_missing_field_names_the_all_at_once_shape():
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["question_field"] = ""
+    problems = [x for x in check_spec(spec, TOOLS) if "verify_identity has no field" in x]
+    assert len(problems) == 1 and "takes every answer in one call" in problems[0]
+
+
 def test_identity_task_without_decline_explanation():
     # U7: no `say ""`, and the brief decides what declining does.
     task = _ident(render(_no_explain(), TOOLS, BRIEF))

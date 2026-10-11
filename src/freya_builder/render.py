@@ -10,7 +10,7 @@ import re
 
 from . import codegen, hooks, nodes
 from .codegen import OK_FIELD
-from .spec import PLACEHOLDER, call_var, customer_field
+from .spec import PLACEHOLDER, call_var, customer_field, identity_all_at_once
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
@@ -265,7 +265,10 @@ def _complete_when(fmt: str) -> tuple[str, str, str]:
 
 def _per_answer(spec: dict, t: Tool) -> bool:
     """verify_identity takes one answer per call (question and answer fields), the branch
-    verify_pre takes at runtime; otherwise it takes every answer at once, one field per key."""
+    verify_pre takes at runtime; otherwise it takes every answer at once, one field per key
+    (also when the spec names two answer fields as question and answer field: P3)."""
+    if identity_all_at_once(spec, t):
+        return False
     return t.field(spec["identity"]["answer_field"]) is not None
 
 
@@ -456,19 +459,29 @@ RECORDING: after the read-back and a clear yes, call the create_promise tool of 
 
 def _verify_tool(spec: dict, t: Tool) -> dict:
     i = spec["identity"]
-    tool = model_tool(
-        t,
-        "Check one security answer. CALL it every time the customer gives a complete answer to a security question."
-        if _per_answer(spec, t)
-        else "Check the security answers. CALL it once the customer has given a complete answer to every security question, each in its own field.",
-        _bake_customer(spec, t),
-        {
+    if _per_answer(spec, t):
+        desc = "Check one security answer. CALL it every time the customer gives a complete answer to a security question."
+        fields = {
             i["question_field"]: "Which security question was answered.",
             i["answer_field"]: "The customer's answer, in the format the current step asks for.",
-        },
-        post_process_code=hooks.verify_post(spec, i["failed_row"]),
+        }
+    else:
+        desc = "Check the security answers. CALL it once the customer has given a complete answer to every security question, each in its own field."
+        fields = {
+            q[
+                "key"
+            ]: f"The customer's answer to security question {n}, in the format the step asks for."
+            for n, q in enumerate(i["questions"], 1)
+        }
+    return model_tool(
+        t,
+        desc,
+        _bake_customer(spec, t),
+        fields,
+        post_process_code=hooks.verify_post(
+            spec, i["failed_row"], all_at_once=not _per_answer(spec, t)
+        ),
     )
-    return tool
 
 
 def _callback_tool(spec: dict, t: Tool) -> dict:
