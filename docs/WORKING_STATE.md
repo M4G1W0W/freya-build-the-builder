@@ -81,6 +81,14 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   customer's ledger holds exactly one consistent set (5 tools, 1 promise) although both calls made create_promise
   per the judge (probably close_call ends the session; unverified). **Credits 391.06 (12:29)**: 10.78 USD since 11:30
   ~ 41-49 calls, matching 6d0c9464's ~41 attempts: ledger corrected +22 -> cum **311**. Only our 2 sims exist.
+- **12:31 UTC user: extend the fallback, then resume. Extension done: 7bfcf41** (`awaits_judge`: also error/
+  inconclusive whose reason is missing or 'analysis never arrived'; 801 passed). **BUT (Service Check 12:31):** smoke
+  94c9e350 COMPLETED 12:29:51 with run outcome ERROR after 4/4 ('No call created within 300s' on attempt 4 at
+  12:23:25) and 6d0c9464 started one more call 12:23:45 (f007306e) before completing. A call-creation failure at
+  12:23-12:28 = continuing platform error under the user's rule, so the queue is NOT resumed yet. Plan: after
+  Service Check's first BOTH_QUIET tick, a 2nd bounded smoke via scratch `smoke_once.py` (fallback wired, no rep
+  repeat, POST maxRetries 0 = one attempt, live spec 0-10); resume the E4 queue only if it gives a judged verdict
+  (run or call record) with a created call and normal latency.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
