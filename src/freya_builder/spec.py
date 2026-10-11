@@ -524,6 +524,12 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     exprs += [(f"attempt {a['n']} date", a["date_expr"]) for a in spec["attempts"]]
     if too_much_separate(spec) and too_much(spec)["date_expr"].strip():
         exprs += [("too much offer date", too_much(spec)["date_expr"])]
+    elif too_much_separate(spec):
+        # attempt 1's date would make the refused offer and attempt 1 the same (review)
+        p.append(
+            "too_much.offer is 'separate' but date_expr is empty: give the date the "
+            "specification sets for that floor offer"
+        )
     exprs += [("promise window min", spec["promise_window"]["min_expr"])]
     exprs += [("promise window max", spec["promise_window"]["max_expr"])]
     exprs += [(f"callback day {i}", e) for i, e in enumerate(cb["day_exprs"])]

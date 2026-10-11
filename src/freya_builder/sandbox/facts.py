@@ -499,6 +499,7 @@ def _product(k, raw, today, C, vs):
         )
         afns = C.get("fn_attempt") or []
         first = None
+        floor_dates = []  # (n, date) of attempts whose amount after "too much" is the floor
         for ai, attempt in enumerate(C.get("attempts") or []):
             n = int(attempt.get("n") or 0)
             names = attempt.get("bands") or []
@@ -507,6 +508,8 @@ def _product(k, raw, today, C, vs):
             when = _ev(afns[ai], today, deadline, days_late)
             if first is None:
                 first = (attempt.get("amount"), when)
+            if attempt.get("amount") in ("floor", "full_or_floor"):
+                floor_dates.append((n, when))
             plan.append(
                 str(n)
                 + ") "
@@ -520,25 +523,39 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
-        if C.get("too_much_separate") and floor is not None:
+        separate = C.get("too_much_separate") and floor is not None
+        if separate and not band.get("transfer_row"):
             # the brief's own rule: this floor offer is not a persuasion attempt (rehearsal P2)
             tfns = C.get("fn_too_much") or []
             when = _ev(tfns[0], today, deadline, days_late) if tfns else None
             if not tfns and first is not None:
                 when = first[1]
             line = (
-                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH: offer exactly the floor "
+                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
+                + " exactly the floor "
                 + _amount(floor)
                 + " on "
                 + _ds(when)
             )
+            if when is not None and when < today:
+                line += " (already past: not a valid promise date)"
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
-            lines.append(
-                line
-                + ", once; this offer is NOT a persuasion attempt: every listed attempt stays"
+            line += (
+                ", once; this offer is NOT a persuasion attempt: every listed attempt stays"
                 + " available (no other date: not today unless that is this date)"
             )
+            for n, adate in floor_dates:
+                if when is not None and adate == when:
+                    # review of cand-eng.3: next_business_day can be attempt 1's date
+                    line += (
+                        "; attempt "
+                        + str(n)
+                        + " below offers the same floor on the same date: if the customer refused"
+                        + " this offer, follow the brief's rules on refused offers for attempt "
+                        + str(n)
+                    )
+            lines.append(line)
             too_much_plan = (
                 ' (after "too much": first the floor '
                 + _amount(floor)
@@ -547,7 +564,8 @@ def _product(k, raw, today, C, vs):
                 + ", not one of these offers)"
             )
         elif (
-            first is not None
+            not separate
+            and first is not None
             and first[0] == "full_or_floor"
             and first[1] is not None
             and floor is not None

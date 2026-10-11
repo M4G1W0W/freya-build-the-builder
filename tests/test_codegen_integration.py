@@ -199,8 +199,9 @@ def test_too_much_separate_offer_has_its_own_date_and_is_not_an_attempt():
     facts = _account(_too_much("separate", "next_business_day(today)"), "2026-10-14T11:00", CARD_12)
     too = _too_much_line(facts)
     assert too.startswith(
-        "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH: offer exactly the floor 637.50 on "
-        "2026-10-15 (Thursday 15 October 2026), once; this offer is NOT a persuasion attempt"
+        "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer exactly "
+        "the floor 637.50 on 2026-10-15 (Thursday 15 October 2026), once; this offer is NOT a "
+        "persuasion attempt"
     )
     assert "IS attempt 1" not in facts
     attempt_1 = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
@@ -225,3 +226,39 @@ def test_too_much_attempt_1_and_a_spec_without_the_field_render_as_before():
         assert codegen.account_source(spec) == codegen.account_source(SPEC_A)
         assert codegen.setup_source(spec) == codegen.setup_source(SPEC_A)
     assert "this IS attempt 1" in _too_much_line(_account(old, "2026-10-14T11:00", CARD_12))
+
+
+def test_too_much_separate_review_fixes():
+    # Review of cand-eng.3 (items 2/4): on Thu 15 Oct the next business day is attempt 1's date,
+    # a past date gets the same mark as an attempt, and a transfer band gets no offer line.
+    spec = _too_much("separate", "next_business_day(today)")
+    too = _too_much_line(_account(spec, "2026-10-15T11:00", CARD_12))
+    assert "on 2026-10-16 (Friday 16 October 2026), once" in too
+    assert too.endswith(
+        "; attempt 1 below offers the same floor on the same date: if the customer refused this "
+        "offer, follow the brief's rules on refused offers for attempt 1"
+    )
+    assert "attempt 1 below" not in _too_much_line(_account(spec, "2026-10-14T11:00", CARD_12))
+    past = _too_much("separate", "add_days(today, -1)")
+    assert "(already past: not a valid promise date), once" in _too_much_line(
+        _account(past, "2026-10-14T11:00", CARD_12)
+    )
+    xfer = copy.deepcopy(spec)
+    xfer["bands"][1]["transfer_row"] = xfer["default_rows"]["negotiate"]
+    facts = _account(xfer, "2026-10-14T11:00", CARD_12)
+    assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts and "first the floor" not in facts
+
+
+def test_too_much_separate_date_is_checked_like_an_attempt_date():
+    from freya_builder.datecheck import check_dates
+    from freya_builder.spec import check_spec
+    from freya_builder.toolapi import load_tool_api
+
+    tools = load_tool_api(ROOT / "kit" / "tools" / "openapi.json")
+    assert check_dates(_too_much("separate", "next_business_day(today)")) == []
+    past = check_dates(_too_much("separate", "add_days(today, -1)"))
+    assert past and all("the too-much offer of band" in x for x in past)
+    assert any(
+        x.startswith("too_much.offer is 'separate' but date_expr is empty")
+        for x in check_spec(_too_much("separate", ""), tools)
+    )
