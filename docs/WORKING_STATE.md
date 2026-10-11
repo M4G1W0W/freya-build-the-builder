@@ -3,9 +3,9 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 17:20 Istanbul (14:20 UTC Sun). Last commit: see `git log`. Hidden briefs open **17:00 UTC**
-(20:00 Istanbul, about 2 h 40 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
-`cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
+**Snapshot:** 2026-10-11 19:20 Istanbul (16:20 UTC Sun). Last commit: see `git log`. The final case opens **17:00 UTC**
+(20:00 Istanbul, ~40 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
+`cand-f3` = a069dd2 (F3; no longer main's builder code), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, **`freeze-final` b9756fe** (= main 8e251fe's builder code).
 
 ## SIMULATION CHAT HANDOFF (16:20 UTC; READ FIRST after a context clear; then the 16:08 block below)
