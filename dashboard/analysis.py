@@ -42,6 +42,28 @@ def _score(r: dict | None) -> dict | None:
     }
 
 
+def _code_unclear(r: dict) -> bool:
+    """The commit does not identify the code: a dirty build or an in-memory experiment variant."""
+    return any("dirty" in f or "experiment variant" in f for f in r["flags"])
+
+
+def like_for_like(a: dict, b: dict) -> bool:
+    """Same agent slot, build mode and case file: only then is a score change a trend."""
+    return (a["slot"], a["build_mode"], a["case_file"]) == (
+        b["slot"],
+        b["build_mode"],
+        b["case_file"],
+    )
+
+
+def previous_like(official: list[dict]) -> dict | None:
+    """The last earlier official run of the latest run's configuration (not merely the run before)."""
+    if not official:
+        return None
+    latest = official[-1]
+    return next((r for r in reversed(official[:-1]) if like_for_like(r, latest)), None)
+
+
 def _fixture(r: dict) -> bool:
     """A hand-written fixture spec (tests/fixtures): renderer-only, not builder output."""
     return bool(r.get("spec")) and r["spec"].startswith("tests/fixtures")
@@ -53,14 +75,23 @@ def panels(runs: list[dict]) -> list[dict]:
         all_official = [r for r in runs if r["panel"] == name and r["official_style"]]
         official = [r for r in all_official if not _fixture(r)]  # fixture-spec runs: history only
         other = [r for r in runs if r["panel"] == name and not r["official_style"]]
+        notes: list[str] = []
         latest = official[-1] if official else None
-        prev = official[-2] if len(official) > 1 else None
+        prev = previous_like(official)
+        if latest and len(official) > 1 and prev is not official[-2]:
+            before = official[-2]
+            notes.append(
+                f"Trend compares with the last run of the same slot, build mode and case file "
+                f"({prev['id'] if prev else 'none'}); the run just before ({before['id']}: "
+                f"{before['slot']}, {before['build_mode']}, {before['case_file']}) was a different "
+                "configuration"
+            )
         best = (
             max(official, key=lambda r: (r["strict_passed"] / r["total"], r["end_ts"]))
             if official
             else None
         )
-        trend, notes = None, []
+        trend = None
         if latest and prev:
             diff = latest["strict_passed"] / latest["total"] - prev["strict_passed"] / prev["total"]
             trend = "improvement" if diff > 0 else "regression" if diff < 0 else "unchanged"
@@ -94,11 +125,22 @@ def panels(runs: list[dict]) -> list[dict]:
         resolvable = bool(
             latest
             and latest["commit"]
+            and not _code_unclear(latest)
             and D.git("rev-parse", "--verify", "--quiet", latest["commit"] + "^{commit}").strip()
         )
         untested = D.code_commits_after(latest["commit"]) if resolvable else None
+        differs = D.code_differs(latest["commit"]) if resolvable else None
+        if resolvable and not D.is_ancestor(latest["commit"]):
+            notes.append(
+                f"Tested commit {latest['commit']} is not on main; builder files that differ from HEAD: "
+                + (", ".join(differs) if differs else "none")
+            )
         if latest and not latest["commit"]:
             notes.append("Latest run has no known tested commit")
+        if latest and _code_unclear(latest):
+            notes.append(
+                "Latest run's build was dirty or an experiment variant: its commit does not identify the code, so staleness is unknown"
+            )
         out.append(
             {
                 "panel": name,
@@ -111,9 +153,10 @@ def panels(runs: list[dict]) -> list[dict]:
                 "official_runs": len(official),
                 "latest_non_official": _score(other[-1]) if other else None,
                 "untested_code_commits_since_latest": untested,
+                "builder_files_differing_from_head": differs,
                 "stale": (
-                    bool(untested) if untested is not None else None
-                ),  # None = unknown tested commit
+                    bool(differs) if differs is not None else None
+                ),  # tree diff of src/ and builder/ against HEAD; None = tested code unknown
                 "history": [
                     {
                         "end": r["end"],
@@ -179,7 +222,7 @@ def failures(runs: list[dict]) -> dict:
         off = [r for r in runs if r["panel"] == name and r["official_style"] and not _fixture(r)]
         if not off:
             continue
-        latest, prev = off[-1], (off[-2] if len(off) > 1 else None)
+        latest, prev = off[-1], previous_like(off)  # like for like only
         lat = {c["id"]: c for c in latest["cases"]}
         if prev:
             pre = {c["id"]: c for c in prev["cases"]}
@@ -281,8 +324,10 @@ def overview(
     complete = [r for r in runs if r["complete"]]
     latest = complete[-1] if complete else None
     measured = [
-        r for r in complete if r["commit_order"] is not None and r["official_style"]
-    ]  # 3-rep full sets only
+        r
+        for r in complete
+        if r["commit_order"] is not None and r["official_style"] and not _code_unclear(r)
+    ]  # 3-rep full sets only; dirty or variant builds do not identify a commit
     newest = min(measured, key=lambda r: (r["commit_order"], -r["end_ts"])) if measured else None
     untested = D.code_commits_after(newest["commit"]) if newest else []
     flags = [

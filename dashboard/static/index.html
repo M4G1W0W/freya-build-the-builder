@@ -24,6 +24,7 @@ select{font:inherit;padding:4px;background:var(--card);color:var(--ink);border:1
 .bar{height:10px;background:var(--acc);border-radius:3px}.r{text-align:right}
 .msg{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--card)}.msg.you{border-left:4px solid var(--acc)}.msg.claude{border-left:4px solid var(--ok)}.msg pre{max-height:none;background:transparent;padding:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.evt{color:var(--mute);font-size:11px;margin:2px 0 2px 10px}
 .cited{outline:2px solid var(--warn);background:var(--warnbg)}.kv td:first-child{color:var(--mute);white-space:nowrap;width:1%}.box{border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin:6px 0}
+.sw button{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:4px 9px;border-radius:6px;cursor:pointer;font:inherit}.sw button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .note{color:var(--warn);background:var(--warnbg);border-radius:4px;padding:2px 6px;margin-top:4px;overflow-wrap:anywhere}
 .cmpm th,.cmpm td{white-space:nowrap}.cmpm .rh{position:sticky;left:0;z-index:2;background:var(--card);white-space:normal;min-width:230px;max-width:300px}.cmpm th.rh{z-index:4}.cmpm th{z-index:3}.cmpm tr.grp td{background:var(--code);font-weight:650}.cmpm tr.fam td{color:var(--mute)}.cmpm .ent{margin:1px 0}a.evl{margin-left:4px;font-size:11px;color:var(--acc);text-decoration:none}.cmpm .note{margin-top:1px;padding:0 4px;white-space:normal;max-width:220px}
 </style>
@@ -35,10 +36,10 @@ select{font:inherit;padding:4px;background:var(--card);color:var(--ink);border:1
 </header>
 <main>
 <section id="overview"></section><section id="history"></section><section id="cases"></section><section id="evidence"></section>
-<section id="compare"></section><section id="failures"></section><section id="builder"></section><section id="claude"></section><section id="system"></section>
+<section id="compare"></section><section id="rules"></section><section id="failures"></section><section id="builder"></section><section id="claude"></section><section id="system"></section>
 </main>
 <script>
-const TABS=[["overview","Overview"],["history","Test History"],["cases","Case Explorer"],["evidence","Failure Evidence"],["compare","Config Comparison"],["failures","Failure Analysis"],["builder","Builder Generalization"],["claude","Claude Session"],["system","System Status"]];
+const TABS=[["overview","Overview"],["history","Test History"],["cases","Case Explorer"],["evidence","Failure Evidence"],["compare","Config Comparison"],["rules","Rules & Cases"],["failures","Failure Analysis"],["builder","Builder Generalization"],["claude","Claude Session"],["system","System Status"]];
 let S={},tab=location.hash.slice(1)||"overview",selRun=null,selCase=null;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const NA='<span class="mute">Not available</span>';
@@ -51,12 +52,35 @@ function nav(){document.getElementById("nav").innerHTML=TABS.map(([k,l])=>`<butt
 function go(k){tab=k;location.hash=k;nav();render()}
 async function load(){
   try{
-    const [o,r,f,b,s,c,cv]=await Promise.all(["overview","runs","failures","builder","snapshot","claude-activity","claude-conversation"].map(p=>fetch("/api/"+p).then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()})));
-    const first=!S.o;S={o,r,f,b,s,c,cv};document.getElementById("fresh").textContent="data refreshed "+o.refreshed+" · page polls every 12 s";
-    if(first||!["evidence","compare"].includes(tab))render();  // evidence and comparison: no re-render while reading
-  }catch(e){document.getElementById("fresh").textContent="refresh failed: "+e}
+    const get=p=>fetch("/api/"+p).catch(()=>new Promise(ok=>setTimeout(ok,600)).then(()=>fetch("/api/"+p)))  // one retry on a dropped connection
+      .then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()});
+    const [o,r,f,b,s,c,cv,cs]=await Promise.all(["overview","runs","failures","builder","snapshot","claude-activity","claude-conversation","claude-sessions"].map(get));
+    S={o,r,f,b,s,c,cv,cs};health(o);
+    polling=true;await render();polling=false;  // every tab is live; unchanged views are not rebuilt
+  }catch(e){polling=false;const el=document.getElementById("fresh");el.className="bad";el.textContent="STALE: refresh failed ("+(e.message||e)+"); showing data from "+(S.o?S.o.refreshed:"never")}
 }
-function render(){for(const [k] of TABS)document.getElementById(k).classList.toggle("on",k===tab);if(!S.o)return;({overview,history,cases,evidence,compare,failures,builder,claude,system})[tab]()}
+function health(o){
+  const el=document.getElementById("fresh"),h=o.health||{},age=h.data_age_s??Math.round((Date.now()-Date.parse(o.refreshed))/1000);
+  const stale=age>40||!!h.last_error;el.className=stale?"bad":"";
+  el.textContent=stale?`STALE: data is ${age} s old${h.last_error?" · last refresh error: "+h.last_error:""} (the server refreshes every ${h.refresh_every_s||12} s)`:`live · data refreshed ${o.refreshed} (${age} s ago) · page polls every 12 s`;
+}
+let polling=false,busy=false,again=false;const sigs={};
+// a poll skips rebuilding a view whose data did not change; clicks and filters always rebuild
+function unchanged(key,text){const sig=text.replace(/"(refreshed|generated_at)": ?"[^"]*"/g,"");const same=polling&&sigs[key]===sig;sigs[key]=sig;return same}
+async function render(){
+  for(const [k] of TABS)document.getElementById(k).classList.toggle("on",k===tab);if(!S.o)return;
+  if(busy){again=true;return}busy=true;
+  const el=document.getElementById(tab),sync=!["cases","evidence","compare","rules","claude"].includes(tab),keep=sync?state(el):null;
+  try{await ({overview,history,cases,evidence,compare,rules,failures,builder,claude,system})[tab]()}
+  finally{if(sync)restore(el,keep);tick();busy=false;if(again){again=false;render()}}
+}
+// scroll and open state survive a rebuild; async views call swap() right at the rebuild (after their fetch)
+const KEEP=".wrap:not(#convo),pre,details";
+function state(el){return [...el.querySelectorAll(KEEP)].map(x=>[x.scrollTop,x.scrollLeft,x.open])}
+function restore(el,k){[...el.querySelectorAll(KEEP)].forEach((x,i)=>{const s=k[i];if(!s)return;if(x.tagName==="DETAILS")x.open=s[2];else{x.scrollTop=s[0];x.scrollLeft=s[1]}})}
+function swap(el,html,keep=true){const k=keep?state(el):[];el.innerHTML=html;if(keep)restore(el,k)}
+function asof(el,t){const m=t.match(/"(?:refreshed|generated_at)": ?"([^"]*)"/);if(m)el.querySelectorAll(".asof").forEach(x=>x.textContent=m[1])}
+function tick(){document.querySelectorAll("[data-utc]").forEach(e=>{const left=Date.parse(e.dataset.utc)-Date.now();e.textContent=left<0?"passed":`in ${Math.floor(left/3600000)} h ${Math.floor(left%3600000/60000)} min`})}
 
 function scoreBlock(p){
   const l=p.latest;if(!l)return `<div class="big mute">—</div><div>${NA}: no complete 3-rep full-set run</div>`;
@@ -123,19 +147,25 @@ async function cases(){
   const runs=[...S.r.runs].reverse();if(!selRun)selRun=(runs.find(r=>r.official_style)||runs[0]||{}).id;
   const r=S.r.runs.find(x=>x.id===selRun);if(!r){document.getElementById("cases").innerHTML=NA;return}
   const el=document.getElementById("cases");
-  el.innerHTML=`<div class="row"><b>Run</b><select onchange="selRun=this.value;selCase=null;render()">${runs.map(x=>`<option value="${esc(x.id)}" ${x.id===selRun?"selected":""}>${esc(x.end.slice(5,16))} · ${esc(x.panel)} · ${x.strict_passed}/${x.total} · ${esc(x.style)} · ${esc((x.commit||"?").slice(0,7))} · ${esc(x.name)}</option>`).join("")}</select></div>
+  if(polling&&unchanged("cases",JSON.stringify([r,selCase]))&&el.innerHTML){if(selCase)await showCase();return}
+  unchanged("cases",JSON.stringify([r,selCase]));
+  swap(el,`<div class="row"><b>Run</b><select onchange="selRun=this.value;selCase=null;caseKey=caseHTML='';render()">${runs.map(x=>`<option value="${esc(x.id)}" ${x.id===selRun?"selected":""}>${esc(x.end.slice(5,16))} · ${esc(x.panel)} · ${x.strict_passed}/${x.total} · ${esc(x.style)} · ${esc((x.commit||"?").slice(0,7))} · ${esc(x.name)}</option>`).join("")}</select></div>
   <div class="sm" style="margin:6px 0">commit <code>${short(r.commit)}</code> ${csrc(r.commit_source)} · ${esc(r.build_mode)} · agent ${esc(r.slot||"?")} v${esc(r.version??"?")} · deploy ${esc(r.deploy_log||"Not available")} · ${r.flags.map(f=>pill(f,"warn")).join(" ")}</div>
   <div class="split"><div class="wrap"><table><tr><th>Case</th><th>Set</th><th>Style</th>${Array.from({length:r.reps},(_,i)=>`<th>Rep ${i+1}</th>`).join("")}<th>Strict</th><th>Category (auto)</th><th>Commit</th><th>Agent v</th></tr>
   ${r.cases.map(c=>`<tr class="click ${c.id===selCase?"sel":""}" onclick="selCase='${esc(c.id)}';showCase()"><td><b>${esc(c.id)}</b><div class="sm mute">${esc(c.family)}</div></td><td>${esc(r.case_set)}</td><td class="sm">${esc(c.style)}</td>${c.reps.map(rep).join("")}<td>${c.strict?pill("PASS","ok"):pill("FAIL","bad")}</td><td class="sm">${esc(c.category||"")}</td><td><code>${short(r.commit)}</code></td><td>${esc(r.version??"?")}</td></tr>`).join("")}</table></div>
-  <div id="detail" class="card">Select a case.</div></div>`;
-  if(selCase)showCase();
+  <div id="detail" class="card" data-key="${esc(caseKey)}">${caseHTML||"Select a case."}</div></div>`);
+  if(selCase)await showCase();
 }
+let caseKey="",caseHTML="";
 async function showCase(){
   document.querySelectorAll("#cases tr.click").forEach(t=>t.classList.toggle("sel",t.textContent.startsWith(selCase)));
-  const d=document.getElementById("detail");d.innerHTML="loading…";
-  const res=await fetch(`/api/case?run=${encodeURIComponent(selRun)}&case=${encodeURIComponent(selCase)}`);
-  if(!res.ok){d.innerHTML=NA;return}const x=await res.json();
-  d.innerHTML=`<h3>${esc(x.case.id)} · ${esc(x.case.family)} · ${esc(x.case.style)} · ${x.case.strict?pill("strict PASS","ok"):pill("strict FAIL","bad")}</h3>
+  const key=selRun+"|"+selCase,d0=document.getElementById("detail");if(!d0)return;
+  if(d0.dataset.key!==key)d0.innerHTML="loading…";  // only for a new selection, never on a poll
+  const res=await fetch(`/api/case?run=${encodeURIComponent(selRun)}&case=${encodeURIComponent(selCase)}`);const t=await res.text();
+  const d=document.getElementById("detail");if(!d||key!==selRun+"|"+selCase)return;  // a newer selection won
+  if(unchanged("case"+key,t)&&d.dataset.key===key)return;
+  if(!res.ok){d.innerHTML=NA;return}const x=JSON.parse(t);
+  swap(d,`<h3>${esc(x.case.id)} · ${esc(x.case.family)} · ${esc(x.case.style)} · ${x.case.strict?pill("strict PASS","ok"):pill("strict FAIL","bad")}</h3>
   <div class="sm">Recurring: failed (not 3/3) in ${x.recurring.failed_runs} of ${x.recurring.runs_with_case} runs of this case set ${x.recurring.failed_runs>1?pill("recurring","bad"):""}</div>
   <details><summary>History of this case</summary><table>${x.recurring.history.map(h=>`<tr><td class="sm">${esc(h.end)}</td><td class="sm">${esc(h.run)}</td><td><code>${short(h.commit)}</code></td><td>${h.reps.map(rep).join(" ")}</td><td>${h.official_style?"official":"non-official"}</td></tr>`).join("")}</table></details>
   <h2>Expected ledger <span class="sm mute">(${esc(x.expected_source)})</span></h2>${x.expected?`<pre>${esc(JSON.stringify(x.expected,null,1))}</pre>`:NA}
@@ -145,33 +175,37 @@ async function showCase(){
    ${rp.detail?`<div class="sm">category (auto): <b>${esc(rp.detail.category)}</b> · tags: ${esc(rp.detail.tags.join(", "))}</div>
     ${rp.detail.ledger.length?`<table><tr><th>Ledger field</th><th>Actual</th><th>Expected</th></tr>${rp.detail.ledger.map(l=>`<tr><td>${esc(l.field)}</td><td class="bad">${esc(l.actual)}</td><td>${esc(l.expected)}</td></tr>`).join("")}</table>`:'<div class="sm">Ledger: no mismatch reported</div>'}
     ${rp.detail.judge.map(j=>`<div class="sm"><b>Judge</b> <span class="mute">(as stored by run_cases.py, cut at 400 chars by the kit)</span>: ${esc(j)}</div>`).join("")}${rp.detail.other.map(j=>`<div class="sm">${esc(j)}</div>`).join("")}`:""}
-   <div class="sm"><a href="#evidence" data-rep="${rp.rep}" onclick="evSel={run:selRun,case:selCase,rep:+this.dataset.rep};evData=null">open the full evidence for rep ${rp.rep} →</a></div>
+   <div class="sm"><a href="#evidence" data-rep="${rp.rep}" onclick="evGroup=(S.r.runs.find(q=>q.id===selRun)||{}).official_style?'completed_official':'completed_not_official';evSel={run:selRun,case:selCase,rep:+this.dataset.rep};evData=null">open the full evidence for rep ${rp.rep} →</a></div>
    <details><summary>Transcript ${rp.transcript?`(${esc(rp.transcript_source)})`:"— Not available locally"}</summary>${rp.transcript?`<pre>${esc(rp.transcript)}</pre>`:NA}</details>`).join("")}
   <h2>Human notes (Score log rows citing this run)</h2>${x.human_notes.length?x.human_notes.map(n=>`<pre>${esc(n)}</pre>`).join(""):NA}
-  <h2>Artifacts</h2>${x.artifacts.filter(Boolean).map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`;
+  <h2>Artifacts</h2>${x.artifacts.filter(Boolean).map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`);
+  d.dataset.key=caseKey=key;caseHTML=d.innerHTML;
 }
 let evIdx=null,evSel=null,evData=null,evGroup="completed_official";
 const V=x=>x==null?NA:typeof x==="string"?(x.startsWith("Not available")?`<span class="mute">${esc(x)}</span>`:esc(x)):`<pre>${esc(JSON.stringify(x,null,1))}</pre>`;
 const KV=o=>`<table class="kv">${Object.entries(o).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="sm">${V(v)}</td></tr>`).join("")}</table>`;
 async function evidence(){
   const el=document.getElementById("evidence");
-  if(!evIdx||tab==="evidence"&&!evIdx._fresh){evIdx=await fetch("/api/failure-details").then(r=>r.json());evIdx._fresh=true;setTimeout(()=>{if(evIdx)evIdx._fresh=false},30000)}
+  const t=await fetch("/api/failure-details").then(r=>r.text());if(unchanged("evidence",t)&&el.innerHTML){asof(el,t);if(evSel)await showEvidence();return}
+  evIdx=JSON.parse(t);
   const rows=evIdx[evGroup]||[],cov=evIdx.coverage;
-  el.innerHTML=`<div class="sm mute">${esc(evIdx.note)} Coverage: ${cov.failed_reps} failed reps; raw call dump for ${cov.with_raw_call_dump}, formatted transcript only for ${cov.with_formatted_transcript_only}; the rest have result-row evidence only. Endpoint: <code>${esc(evIdx.endpoint)}</code></div>
+  swap(el,`<div class="sm mute">${esc(evIdx.note)} Data as of <span class="asof">${esc(evIdx.refreshed)}</span> (live). Coverage: ${cov.failed_reps} failed reps; raw call dump for ${cov.with_raw_call_dump}, formatted transcript only for ${cov.with_formatted_transcript_only}; the rest have result-row evidence only. Endpoint: <code>${esc(evIdx.endpoint)}</code></div>
   <div class="row" style="margin:6px 0"><b>Show</b><select onchange="evGroup=this.value;render()">${["completed_official","completed_not_official"].map(g=>`<option value="${g}" ${g===evGroup?"selected":""}>${g==="completed_official"?"completed official-style runs (strict 3/3 rule)":"completed runs that are NOT official-style (1-rep / subset)"} (${(evIdx[g]||[]).length})</option>`).join("")}</select></div>
   <div class="split"><div class="wrap" style="max-height:760px"><table><tr><th>Ended</th><th>Case</th><th>Rep</th><th>Style</th><th>Category (auto)</th><th>Commit · v</th><th>Evidence</th></tr>
   ${rows.map(x=>`<tr class="click ${evSel&&evSel.run===x.run&&evSel.case===x.case&&evSel.rep===x.rep?"sel":""}" data-run="${esc(x.run)}" data-case="${esc(x.case)}" data-rep="${x.rep}" onclick="evSel={run:this.dataset.run,case:this.dataset.case,rep:+this.dataset.rep};evData=null;render()"><td class="sm">${esc((x.end||"").slice(5,16))}</td><td><b>${esc(x.case)}</b><div class="sm mute">${esc(x.panel)}</div></td><td>${x.rep}</td><td class="sm">${esc(x.style)}${(x.style_source||"").startsWith("file name")?' <span class="mute">(file name, unverified)</span>':""}</td><td class="sm">${esc(x.category)}</td><td class="sm"><code>${short(x.commit)}</code> v${esc(x.version??"?")}</td><td>${x.raw_call?pill("raw call","ok"):x.formatted_transcript?pill("txt only","warn"):pill("row only")}</td></tr>`).join("")}</table></div>
-  <div id="evdetail" class="card">${evSel?"loading…":"Select a failed rep."}</div></div>
-  <h2>Incomplete runs (no per-rep results; kept apart from strict scores)</h2><div class="wrap" style="max-height:220px"><table><tr><th>Time</th><th>Log</th><th>Status</th><th>Last line</th></tr>${(evIdx.incomplete_runs||[]).map(i=>`<tr><td class="sm">${esc(i.time)}</td><td class="sm">${esc(i.file)}</td><td>${pill(i.status,"bad")}</td><td class="sm">${esc(i.reason)}</td></tr>`).join("")}</table></div>`;
+  <div id="evdetail" class="card" data-key="${esc(evKey)}">${evSel?(evHTML||"loading…"):"Select a failed rep."}</div></div>
+  <h2>Incomplete runs (no per-rep results; kept apart from strict scores)</h2><div class="wrap" style="max-height:220px"><table><tr><th>Time</th><th>Log</th><th>Status</th><th>Last line</th></tr>${(evIdx.incomplete_runs||[]).map(i=>`<tr><td class="sm">${esc(i.time)}</td><td class="sm">${esc(i.file)}</td><td>${pill(i.status,"bad")}</td><td class="sm">${esc(i.reason)}</td></tr>`).join("")}</table></div>`);
   if(evSel)showEvidence();
 }
+let evKey="",evHTML="";
 async function showEvidence(){
-  const d=document.getElementById("evdetail");if(!d)return;
-  if(!evData||evData._key!==JSON.stringify(evSel)){
-    const r=await fetch(`/api/failure-detail?run=${encodeURIComponent(evSel.run)}&case=${encodeURIComponent(evSel.case)}&rep=${evSel.rep}`);
-    evData=r.ok?await r.json():{error:"Not available"};evData._key=JSON.stringify(evSel);
-  }
-  const x=evData;if(x.error){d.innerHTML=esc(x.error);return}
+  const key=JSON.stringify(evSel),d0=document.getElementById("evdetail");if(!d0||!evSel)return;
+  if(d0.dataset.key!==key)d0.innerHTML="loading…";
+  const r=await fetch(`/api/failure-detail?run=${encodeURIComponent(evSel.run)}&case=${encodeURIComponent(evSel.case)}&rep=${evSel.rep}`);const t=await r.text();
+  const d=document.getElementById("evdetail");if(!d||key!==JSON.stringify(evSel))return;  // a newer click won
+  if(unchanged("evdetail"+key,t)&&d.dataset.key===key)return;
+  evData=r.ok?JSON.parse(t):{error:"Not available"};
+  const x=evData;if(x.error){d.innerHTML=esc(x.error);d.dataset.key=key;return}
   const rawCited=(typeof x.judge.full==="object"&&x.judge.full.cited_messages)||{},cited={},otherCited=[];
   for(const [k,v] of Object.entries(rawCited)){const m=String(k).match(/^(?:message\s*)?(\d+)$/i);if(m)cited[+m[1]]=v;else otherCited.push([k,v])}
   const msgs=x.transcript.messages, tl=x.transcript.timeline||[];
@@ -183,7 +217,7 @@ async function showEvidence(){
     :V(x.transcript.kind);
   const dc=x.date_chain,mp=x.multi_product;
   const list=a=>Array.isArray(a)?(a.length?a.map(m=>`<div class="sm">#${m.n} ${esc(m.who)}: ${esc(m.text)}</div>`).join(""):'<span class="mute">none</span>'):V(a);
-  d.innerHTML=`<h3>${esc(x.case.case)} · rep ${x.case.rep} of ${x.case.reps_recorded} · ${esc(x.case.family)} · ${esc(x.case.title||"")}</h3>
+  swap(d,`<h3>${esc(x.case.case)} · rep ${x.case.rep} of ${x.case.reps_recorded} · ${esc(x.case.family)} · ${esc(x.case.title||"")}</h3>
   <div class="sm">${x.result.raw_rep_pass?pill("rep PASS","ok"):pill("rep FAIL","bad")} reps: ${x.result.all_reps.map(rep).join(" ")} · strict in this run: ${x.result.strict_case_pass_in_this_run?pill("PASS","ok"):pill("FAIL","bad")} · ${esc(x.case.run_status)}</div>
   <div class="sm">call <code>${esc(x.result.call_id)}</code> · ended ${esc(x.result.ended)} · slowest turn ${esc(x.result.slowest_turn_s)} s · ledger calls ${esc((x.result.ledger_calls_in_order||[]).join(" > "))}</div>${x.case.rep_note?`<div class="sm mute">${esc(x.case.rep_note)}</div>`:""}
   <h2>Judge</h2><div class="sm"><b>Result row</b> <span class="mute">(${esc(x.judge.result_row_note)})</span>:</div>${V(x.judge.from_result_row)}<div class="sm"><b>Full verdict</b>${typeof x.judge.full==="object"?` <span class="mute">(${esc(x.judge.full.source)})</span>`:""}:</div>${typeof x.judge.full==="string"?V(x.judge.full):`<pre>${esc(x.judge.full.reason)}</pre>`}${otherCited.length?`<div class="sm"><b>Other judge citations:</b> ${otherCited.map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(" · ")}</div>`:""}
@@ -210,7 +244,8 @@ async function showEvidence(){
   <div class="wrap" style="max-height:700px;padding:6px;background:var(--bg)">${transcript}</div>
   <h2>Runtime variables (last workflow snapshot)</h2>${typeof x.runtime_variables==="object"?Object.entries(x.runtime_variables).map(([k,v])=>`<details><summary class="sm">${esc(k)}</summary><pre>${esc(typeof v==="string"?v:JSON.stringify(v))}</pre></details>`).join(""):V(x.runtime_variables)}
   <h2>Human notes (Score log rows citing this run; interpretation)</h2>${Array.isArray(x.human_notes)?x.human_notes.map(n=>`<pre>${esc(n)}</pre>`).join(""):V(x.human_notes)}
-  <h2>Artifacts</h2>${x.artifacts.map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`;
+  <h2>Artifacts</h2>${x.artifacts.map(a=>`<div class="sm"><code>${esc(a)}</code></div>`).join("")}`);
+  d.dataset.key=evKey=key;evHTML=d.innerHTML;
 }
 function failures(){
   const f=S.f,max=Math.max(1,...f.categories_official_runs.map(c=>c[1]));
@@ -234,13 +269,22 @@ function builder(){
   ${[...b.traces].reverse().map(t=>`<tr><td>${esc(t.start)}</td><td class="sm">${esc(t.file)}</td><td class="sm">${esc(t.inputs.join(", "))}</td><td>${t.submission_path?pill(t.mode,"ok"):pill(t.mode,t.mode==="saved-spec"?"warn":"")}</td><td><code>${esc(t.git||"not recorded")}</code>${t.dirty?pill("dirty","bad"):""}</td><td>${t.model_calls}</td><td>${esc(t.build_seconds??"")}</td><td>${t.complete?(t.ok?pill("ok","ok"):pill("not ok","bad")):pill("incomplete","bad")}</td>
   <td class="sm">${t.tests.map(x=>`${esc(x.name)}: ${x.result==="PASS"?pill("PASS","ok"):pill("FAIL","bad")}`).join("<br>")}</td><td>${t.unresolved||""}</td><td>${t.not_enforced||""}</td><td class="sm">${t.created?`${esc(t.created.steps)} steps, ${esc(t.created.tools)} tools, v${esc(t.created.version??"?")}`:"no deploy"}</td></tr>`).join("")}</table></div>`;
 }
-function claude(){
-  const c=S.c,el=document.getElementById("claude"),old=document.getElementById("convo");
-  const atBottom=!old||old.scrollTop+old.clientHeight>=old.scrollHeight-30,prevTop=old?old.scrollTop:0;
-  if(!c||!c.available){el.innerHTML=`<div class="card">${esc(c?.reason||"Not available")}</div>`;return}
+let claudeSel=null,claudeShown=null;  // the chat shown in the Claude Session tab (null = primary)
+async function claude(){
+  const ss=(S.cs&&S.cs.sessions)||[],sel=claudeSel&&ss.some(x=>x.desktop_session_id===claudeSel)?claudeSel:(ss[0]||{}).desktop_session_id;
+  const row=ss.find(x=>x.desktop_session_id===sel)||{};
+  let c=S.c,cv=S.cv;  // the primary chat comes with the 12 s poll; any other is fetched (served from the server's cache)
+  if(sel&&!row.primary){
+    const q="?session="+encodeURIComponent(sel);
+    try{[c,cv]=await Promise.all(["claude-activity","claude-conversation"].map(p=>fetch("/api/"+p+q).then(x=>x.json())))}catch(e){c={available:false,reason:"fetch failed: "+e}}
+  }
+  const el=document.getElementById("claude"),old=document.getElementById("convo"),moved=claudeShown!==sel;claudeShown=sel;
+  const atBottom=moved||!old||old.scrollTop+old.clientHeight>=old.scrollHeight-30,prevTop=old?old.scrollTop:0;
+  const sw=ss.length?`<div class="row sw" style="margin-bottom:8px"><b>Chat</b>${ss.map(x=>`<button class="${x.desktop_session_id===sel?"on":""}" data-sid="${esc(x.desktop_session_id)}" onclick="claudeSel=this.dataset.sid;render()" title="${esc((x.state||x.reason||"")+"\n"+(x.conversation_file||""))}">${esc(x.title||x.desktop_session_id)}${x.primary?" · primary":""}</button>`).join("")}<span class="sm mute">every non-archived chat of this repo · index: <code>reports/conversations_index.md</code></span></div>`:"";
+  if(!c||!c.available){el.innerHTML=sw+`<div class="card">${esc(c?.reason||"Not available")}</div>`;return}
   const s=c.session,oc=Object.entries(c.outcome_counts_last_100||{}).map(([k,v])=>pill(k+": "+v,k==="ok"?"ok":k==="error"||k==="declined"?"bad":"")).join(" ");
   const out=o=>o==="ok"?pill("ok","ok"):o==="error"||o==="declined"?pill(o,"bad"):pill(o,"warn");
-  el.innerHTML=`<div class="card sm">Passive, read-only monitor. ${esc(c.how)}. Shown: ${esc(c.exposed)}. Never shown: ${esc(c.never_exposed)}.</div>
+  swap(el,sw+`<div class="card sm">Passive, read-only monitor. ${esc(c.how)}. Shown: ${esc(c.exposed)}. Never shown: ${esc(c.never_exposed)}.</div>
   <div class="grid" style="margin-top:10px">
    <div class="card"><h3>Session</h3><div><b>${esc(s.title)}</b></div><div class="sm">${pill(s.runs,"ok")} ${esc(s.model)} · effort ${esc(s.effort)} · ${esc(s.completed_turns)} turns</div><div class="sm mute">desktop ${esc(s.desktop_session_id)}<br>transcript ${esc(s.transcript)}</div></div>
    <div class="card"><h3>State</h3><div><b>${esc(c.state)}</b></div><div class="sm">transcript last written ${esc(c.transcript_last_write)} (${ago(c.seconds_since_last_write)} ago)</div><div class="sm">agent process: ${c.processes.agent_process?pill("pid "+c.processes.agent_process.pid,"ok"):pill("not identified","warn")} <span class="mute">${esc(c.processes.agent_note)}</span></div></div>
@@ -256,12 +300,12 @@ function claude(){
    ${c.hook_errors.length?`<h2>Hook errors</h2>${c.hook_errors.map(h=>`<div class="sm">${esc(h.at)} · ${esc(h.count)} × ${esc(h.error)}</div>`).join("")}`:""}
    <h2>Desktop sessions for this repo</h2><table><tr><th>Title</th><th>Desktop id</th><th>Turns</th><th>Last activity</th></tr>${c.sessions_for_this_repo.map(x=>`<tr><td class="sm">${esc(x.title)}${x.desktop_session_id===s.desktop_session_id?" "+pill("monitored","ok"):""}</td><td class="sm"><code>${esc(x.desktop_session_id)}</code></td><td>${esc(x.completed_turns)}</td><td class="sm">${esc(x.last_activity)}</td></tr>`).join("")}</table><div class="sm mute">selection: ${esc(c.selection)} · cloud sessions: ${esc(c.cloud_sessions)}</div>
   </div></div>
-  <h2>Conversation (your prompts and Claude's replies, newest at the bottom) ${pill("also in reports/latest_conversation.md for ChatGPT","warn")}</h2>
-  ${convo()}`;
+  <h2>Conversation (your prompts and Claude's replies, newest at the bottom) ${pill("also in "+(row.conversation_file||"reports/latest_conversation.md")+" for ChatGPT","warn")}</h2>
+  ${convo(cv)}`,!moved);
   const box=document.getElementById("convo");if(box)box.scrollTop=atBottom?box.scrollHeight:prevTop;
 }
-function convo(){
-  const cv=S.cv;if(!cv||!cv.available)return `<div class="card">${esc(cv?.reason||"Not available")}</div>`;
+function convo(cv){
+  if(!cv||!cv.available)return `<div class="card">${esc(cv?.reason||"Not available")}</div>`;
   return `<div class="sm mute">${esc(cv.note)} Showing ${cv.items.length} of ${cv.total_items}.</div>
   <div id="convo" class="wrap" style="max-height:640px;padding:6px 10px;background:var(--bg)">${cv.items.map(i=>i.role==="event"?`<div class="evt">⏵ ${esc((i.at||"").slice(11,19))} ${esc(i.text)}</div>`:
    `<div class="msg ${i.role}"><div class="sm"><b>${i.role==="you"?"You":"Claude"}</b> <span class="mute">${esc((i.at||"").replace("T"," ").slice(0,19))} UTC${i.queued?" · queued while Claude was busy":""}</span></div>${i.role==="claude"&&i.text.length>1500?`<details><summary>${esc(i.text.slice(0,300))}…</summary><pre>${esc(i.text)}</pre></details>`:`<pre>${esc(i.text)}</pre>`}</div>`).join("")}</div>`;
@@ -271,7 +315,7 @@ function system(){
   document.getElementById("system").innerHTML=`<div class="grid">
   <div class="card"><h3>Processes (live)</h3>${o.running.length?o.running.map(p=>`<div>${esc(p.kind)} · pid ${esc(p.pid)} · ${esc(p.elapsed)}<div class="sm mute">${esc(p.what)}</div></div>`).join(""):"No run_cases.py, build.py or chain script is running."}</div>
   <div class="card"><h3>Git</h3><div>HEAD <code>${esc(o.head)}</code></div><div class="sm">tracked changes:</div><pre>${esc(o.tracked_changes.join("\n")||"none")}</pre><div class="sm">untracked:</div><pre>${esc(o.untracked.join("\n")||"none")}</pre></div>
-  <div class="card"><h3>Portable snapshot for reviewers</h3><div class="sm"><code>reports/latest_snapshot.json</code> and <code>.md</code>, rewritten every 12 s</div><div class="sm">API: <code>/api/snapshot</code> <code>/api/runs</code> <code>/api/failures</code> <code>/api/overview</code> <code>/api/builder</code> <code>/api/case?run=&case=</code> <code>/api/comparison</code></div><div class="sm">snapshot generated ${esc(S.s.generated_at)}</div></div>
+  <div class="card"><h3>Portable snapshot for reviewers</h3><div class="sm"><code>reports/latest_snapshot.json</code> and <code>.md</code>, rewritten every 12 s</div><div class="sm">API: <code>/api/snapshot</code> <code>/api/runs</code> <code>/api/failures</code> <code>/api/overview</code> <code>/api/builder</code> <code>/api/case?run=&case=</code> <code>/api/comparison</code> <code>/api/rules-and-cases</code></div><div class="sm">snapshot generated ${esc(S.s.generated_at)}</div></div>
   <div class="card"><h3>Data provenance</h3><pre>${esc(JSON.stringify(S.s.provenance,null,1))}</pre></div></div>`;
 }
 // ---- Configuration comparison (GET /api/comparison): rows = scenario variants, columns = exact configurations
@@ -303,7 +347,7 @@ function cmpBucket(cm,k,title){
 const cfgTip=c=>[c.id,"commit "+(c.commit||"not recorded")+" ("+c.commit_source+")",c.build_mode,c.spec?"spec "+c.spec+" ("+c.spec_status+")":"",...c.flags].filter(Boolean).join("\n");
 async function compare(){
   const el=document.getElementById("compare");let r,x;
-  try{r=await fetch(cmpURL());x=await r.json()}catch(e){el.innerHTML=`<div class="card bad">${esc(e)}</div>`;return}
+  try{r=await fetch(cmpURL());const t=await r.text();if(r.ok&&unchanged("compare"+cmpURL(),t)&&el.innerHTML){asof(el,t);return}x=JSON.parse(t)}catch(e){el.innerHTML=`<div class="card bad">${esc(e)}</div>`;return}
   if(!r.ok){el.innerHTML=`<div class="card"><span class="bad">${esc(x.error||("HTTP "+r.status))}</span> <button onclick="cmpReset()">Reset filters</button></div>`;return}
   const o=x.options,cf=x.configurations,cm=x.comparison;
   const sel=(k,opts,all)=>`<label class="sm">${esc(k)} <select onchange="cmpSet('${k}',this.value)"><option value="">${esc(all)}</option>${opts.map(v=>`<option value="${esc(v)}" ${v===cmpQ[k]?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`;
@@ -313,9 +357,9 @@ async function compare(){
     if(row.brief!==lastB){body+=`<tr class="grp"><td class="rh">Brief ${esc(row.brief)}</td><td colspan="${cf.length}"></td></tr>`;lastB=row.brief;lastF=null}
     if(row.family!==lastF){body+=`<tr class="fam"><td class="rh sm">${esc(row.family)}</td><td colspan="${cf.length}"></td></tr>`;lastF=row.family}
     const d=row.definition;
-    body+=`<tr><td class="rh"><b>${esc(row.case)}</b> ${row.style?pill(row.style,"ok"):`<span title="${esc(row.style_source)}">${pill("style unknown","warn")}</span>`}<div class="sm mute" title="${esc(d.hash_of+"\nattributed by "+d.attributed_by)}">${esc(d.file.split("/").pop())} #${esc(d.hash||"definition unknown")} @${esc(d.commits.join(",")||"?")}</div>${/CURRENT|ASSUMED/.test(d.hash_of)?`<div class="sm note">${esc(d.hash_of)}</div>`:""}</td>${cf.map(c=>{const k=row.cells[c.id];return k?`<td>${k.entries.map(e=>cmpEntry(e,row.case)).join("")}<div class="sm mute">${k.runs} run${k.runs>1?"s":""} · ${k.reps_recorded} reps</div></td>`:'<td class="mute sm">–</td>'}).join("")}</tr>`;
+    body+=`<tr><td class="rh"><b>${esc(row.case)}</b> ${row.style?pill(row.style,"ok"):`<span title="${esc(row.style_source)}">${pill("style unknown","warn")}</span>`}<div class="sm mute" title="${esc(d.hash_of+"\nattributed by "+d.attributed_by)}">${esc(d.files.map(f=>f.split("/").pop()).join(", "))} #${esc(d.hash||"definition unknown")} @${esc(d.commits.join(",")||"?")}</div>${/CURRENT|ASSUMED/.test(d.hash_of)?`<div class="sm note">${esc(d.hash_of)}</div>`:""}</td>${cf.map(c=>{const k=row.cells[c.id];return k?`<td>${k.entries.map(e=>cmpEntry(e,row.case)).join("")}<div class="sm mute">${k.runs} run${k.runs>1?"s":""} · ${k.reps_recorded} reps</div></td>`:'<td class="mute sm">–</td>'}).join("")}</tr>`;
   }
-  el.innerHTML=`<div class="sm mute">Read-only. Every run stays a separate entry: <b>passes/reps</b>, ✓/✗ = strict (complete run, 3+ reps, every rep passed); no mark = no strict result; <b>*</b> = not comparable (hover); <b>r2</b> = failure evidence for rep 2 (⚑ = structural platform evidence). Endpoint: <code>${esc(x.endpoint)}</code></div>
+  swap(el,`<div class="sm mute">Data as of <span class="asof">${esc(x.refreshed)}</span> (live). Read-only. Every run stays a separate entry: <b>passes/reps</b>, ✓/✗ = strict (complete run, 3+ reps, every rep passed); no mark = no strict result; <b>*</b> = not comparable (hover); <b>r2</b> = failure evidence for rep 2 (⚑ = structural platform evidence). Endpoint: <code>${esc(x.endpoint)}</code></div>
   <details style="margin:6px 0"><summary>Definitions and data limitations</summary><ul class="sm">${x.definitions.map(t=>`<li>${esc(t)}</li>`).join("")}</ul><ul class="sm">${x.limitations.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></details>
   <div class="row card" style="margin:6px 0">${sel("brief",o.briefs,"all briefs")}${sel("case",o.cases,"all scenarios")}${sel("style",o.styles,"all styles")}
    <label class="sm">from <input type="date" value="${esc(cmpQ.from)}" onchange="cmpSet('from',this.value)"></label><label class="sm">to <input type="date" value="${esc(cmpQ.to)}" onchange="cmpSet('to',this.value)"></label>
@@ -336,7 +380,43 @@ async function compare(){
   <h2>Configurations (${cf.length})</h2><div class="wrap" style="max-height:420px"><table><tr><th>Configuration</th><th>Deploy (UTC)</th><th>Commit</th><th>Agent · version</th><th>Build</th><th>Spec</th><th>Input sha256 (trace)</th><th>Flags</th><th>Run commit claims</th></tr>
   ${cf.map(c=>`<tr><td class="sm"><b>${esc(c.label)}</b><div class="mute">${esc(c.id)}</div></td><td class="sm">${esc(c.deploy_time||"Not available")}</td><td class="sm"><code>${short(c.commit)}</code>${c.dirty?" "+pill("dirty","bad"):""}<div class="mute">${esc(c.commit_source)}</div>${c.commit_subject?`<div>${esc(c.commit_subject)}</div>`:""}</td><td class="sm">${esc(c.slot||"?")} v${esc(c.version??"?")}<div class="mute">${esc(c.agent_id||"")}${c.version_source?" · "+esc(c.version_source):""}</div></td><td class="sm">${esc(c.build_mode)}${c.experiment_variants.map(v=>`<div class="note">${esc(v)}</div>`).join("")}</td><td class="sm">${c.spec?`<code>${esc(c.spec)}</code><div class="mute">${esc(c.spec_status)}</div>`:'<span class="mute">none</span>'}</td><td class="sm"><code>${esc(c.input_sha256||"")}</code>${c.input_sha256?"":'<span class="mute">not in trace</span>'}</td><td class="sm">${c.flags.map(f=>`<div>${esc(f)}</div>`).join("")}</td><td class="sm">${c.run_commit_claims.map(k=>`<div>${esc(k.run.split("/").pop())}: <code>${esc(k.commit)}</code> <span class="mute">${esc(k.source)}</span></div>`).join("")}</td></tr>`).join("")}</table></div>
   <h2>Incomplete runs (no result JSON; never strict; configuration not determinable)</h2><div class="wrap" style="max-height:300px"><table><tr><th>Log time</th><th>Log</th><th>Status</th><th>Reps done</th><th>Per case (partial reps)</th><th>Note</th></tr>
-  ${x.incomplete_runs.map(p=>`<tr><td class="sm">${esc(p.time)}</td><td class="sm">${esc(p.file)}</td><td>${pill(p.status,"bad")}</td><td>${p.reps_completed}${p.reps_planned?" of "+p.reps_planned:""}</td><td class="sm">${p.cases.map(c=>`<div><b>${esc(c.id)}</b> ${c.style?esc(c.style):"style unknown"}: ${c.reps.map(rep).join(" ")}</div>`).join("")||'<span class="mute">no per-case lines</span>'}</td><td class="sm">${esc(p.strict_note)}<div class="mute">${esc(p.configuration)}</div></td></tr>`).join("")||'<tr><td colspan="6" class="mute">none</td></tr>'}</table></div>`;
+  ${x.incomplete_runs.map(p=>`<tr><td class="sm">${esc(p.time)}</td><td class="sm">${esc(p.file)}</td><td>${pill(p.status,"bad")}</td><td>${p.reps_completed}${p.reps_planned?" of "+p.reps_planned:""}</td><td class="sm">${p.cases.map(c=>`<div><b>${esc(c.id)}</b> ${c.style?esc(c.style):"style unknown"}: ${c.reps.map(rep).join(" ")}</div>`).join("")||'<span class="mute">no per-case lines</span>'}</td><td class="sm">${esc(p.strict_note)}<div class="mute">${esc(p.configuration)}</div></td></tr>`).join("")||'<tr><td colspan="6" class="mute">none</td></tr>'}</table></div>`);
+}
+// ---- Rules & Cases (GET /api/rules-and-cases): organizer rules vs internal decisions, briefs and cases, with original text
+let rcData=null;
+const LBL={official:"ok",internal:"warn","locally derived":"warn",unregistered:"bad"};
+const lbl=l=>pill(l,LBL[l]||"");
+const stat=s=>!s?"":s.startsWith("verified")?pill(s,"ok"):pill(s.split(":")[0],"bad");
+const src=i=>`<code>${esc(i.source_file||i.file)}</code>${i.line?":"+esc(i.line):""}${i.section?` <span class="mute">§ ${esc(i.section)}</span>`:""}`;
+const orig=i=>i.original?`<details><summary class="sm">original text</summary><pre>${esc(i.original)}</pre><div class="sm mute">quoted: “${esc(i.quote)}”</div></details>`:`<div class="sm bad">original not found: ${esc(i.status||"")}</div><div class="sm mute">catalog quote: “${esc(i.quote)}”</div>`;
+function rcItems(xs,showLabel){
+  return xs.length?`<table><tr><th>Topic</th><th>Summary (dashboard catalog)</th><th>Source</th><th>Status</th></tr>${xs.map(i=>`<tr><td class="sm"><b>${esc(i.topic)}</b><div class="mute">${esc(i.category)}</div></td><td class="sm">${esc(i.summary)}${i.notes?`<div class="mute">${esc(i.notes)}</div>`:""}${(i.flags||[]).map(f=>`<div class="note">${esc(f)}</div>`).join("")}${orig(i)}</td><td class="sm">${showLabel?lbl(i.source_label)+" ":""}${src(i)}</td><td>${stat(i.status)}</td></tr>`).join("")}</table>`:'<div class="sm mute">none recorded</div>';
+}
+async function rules(){
+  const el=document.getElementById("rules");
+  let r,t;try{r=await fetch("/api/rules-and-cases");t=await r.text()}catch(e){el.innerHTML=`<div class="card bad">${esc(e)}</div>`;return}
+  if(!r.ok){el.innerHTML=`<div class="card bad">HTTP ${r.status}: ${esc(t.slice(0,200))}</div>`;return}
+  if(unchanged("rules",t)&&el.innerHTML){asof(el,t);return}
+  const x=rcData=JSON.parse(t);
+  const cat=(xs,c)=>xs.filter(i=>i.category===c);
+  swap(el,`<div class="sm mute">Read-only. ${esc(x.about||"")} Endpoint: <code>${esc(x.endpoint)}</code> · ${x.counts.items} catalog items: ${x.counts.verified} quotes re-found in their sources, ${x.counts.stale} stale · generated <span class="asof">${esc(x.generated_at)}</span> (live: re-read on every poll; quotes re-checked whenever a source changes)</div>
+  <div class="row" style="margin:6px 0">${Object.entries(x.labels||{}).map(([k,v])=>`<span class="sm">${lbl(k)} ${esc(v)}</span>`).join(" ")}</div>
+  <h2>Organizer deadlines (UTC and Istanbul)</h2><table><tr><th>What</th><th>UTC</th><th>Istanbul (UTC+3)</th><th>Status</th><th>Basis (official quotes)</th></tr>${x.deadlines.map(d=>`<tr><td class="sm"><b>${esc(d.what)}</b><div>${pill(d.label,"ok")}</div></td><td class="sm">${esc(d.time.utc)}</td><td class="sm">${esc(d.time.istanbul)}</td><td class="sm" data-utc="${esc(d.time.utc)}">${esc(d.time.status)}</td><td class="sm">${d.basis.map(b=>`<div>${src(b)} ${stat(b.status)} “${esc(b.quote)}”</div>`).join("")}<div class="mute">${esc(d.derivation)}</div></td></tr>`).join("")}</table>
+  <h3 style="margin:10px 0 4px">Reported, not yet in project files ${pill("user reports: not organizer text","warn")}</h3>${x.reported.length?`<table><tr><th>What</th><th>UTC</th><th>Istanbul (UTC+3)</th><th>Status</th><th>Report (verbatim) · who · when</th></tr>${x.reported.map(r=>`<tr><td class="sm"><b>${esc(r.what)}</b><div>${pill(r.label,"warn")}</div></td><td class="sm">${esc(r.time.utc)}</td><td class="sm">${esc(r.time.istanbul)}</td><td class="sm" data-utc="${esc(r.time.utc)}">${esc(r.time.status)}</td><td class="sm">“${esc(r.report)}”<div class="mute">${esc(r.reported_by)} · ${esc(r.reported_at)}</div><div class="mute">${esc(r.notes)}</div></td></tr>`).join("")}</table>`:'<div class="sm mute">none</div>'}
+  <h3 style="margin:10px 0 4px">Internal timing targets ${pill("team decisions, not organizer deadlines","warn")}</h3>${x.internal_timing.length?`<table><tr><th>What</th><th>UTC</th><th>Istanbul</th><th>Status</th><th>Source</th></tr>${x.internal_timing.map(i=>`<tr><td class="sm"><b>${esc(i.topic)}</b><div>${esc(i.summary)}</div></td><td class="sm">${esc(i.time.utc)}</td><td class="sm">${esc(i.time.istanbul)}</td><td class="sm" data-utc="${esc(i.time.utc)}">${esc(i.time.status)}</td><td class="sm">${lbl(i.source_label)} ${src(i)} ${stat(i.status)}</td></tr>`).join("")}</table>`:'<div class="sm mute">none</div>'}
+  <h2>Organizer rules ${pill("official sources only","ok")}</h2>
+  ${[["submission","Submission requirements"],["deadline","Deadlines"],["after_hidden_briefs","After the hidden briefs open"],["scoring","Scoring"],["limit","Limits"],["organizer_rule","Other rules"]].map(([c,t])=>`<h3 style="margin:10px 0 4px">${esc(t)}</h3>${rcItems(cat(x.organizer_rules,c),true)}`).join("")}
+  <h2>Conflicts and stale information</h2>${x.conflicts_and_stale.map(c=>`<div class="card" style="margin:6px 0"><h3>${esc(c.kind)} · ${esc(c.topic)}</h3><div class="sm">${esc(c.explanation)}</div>${(c.sides||[]).map(s=>`<div class="box sm">${lbl((x.sources.find(m=>m.file===s.source_file)||{}).label||"unregistered")} ${src(s)} ${stat(s.status)}<div>“${esc(s.quote)}”</div></div>`).join("")}${c.differences?(c.differences.length?`<details><summary class="sm">${c.differences.length} difference(s)</summary><table><tr><th>Case</th><th>Field</th><th>Kit</th><th>Page snapshot</th></tr>${c.differences.map(d=>`<tr><td>${esc(d.case)}</td><td class="sm">${esc(d.field)}</td><td class="sm"><pre>${esc(JSON.stringify(d.kit,null,1))}</pre></td><td class="sm"><pre>${esc(JSON.stringify(d.page,null,1))}</pre></td></tr>`).join("")}</table></details>`:'<div class="sm ok">no differences</div>'):""}</div>`).join("")}
+  <h2>Internal decisions ${pill("team-written, NOT organizer rules","warn")}</h2>
+  ${[["internal_budget","Budgets"],["internal_freeze","Freeze targets"],["internal_promotion","Promotion criteria"],["internal_other","Other internal decisions"]].map(([c,t])=>`<h3 style="margin:10px 0 4px">${esc(t)}</h3>${rcItems(cat(x.internal_decisions,c),true)}`).join("")}
+  <h2>Unresolved interpretations</h2>${rcItems(x.interpretations,true)}
+  <h2>Organizer clarifications</h2>${rcItems(x.clarifications,true)}
+  <h2>Missing or not recorded</h2>${x.missing.length?`<ul class="sm">${x.missing.map(m=>`<li>${esc(m)}</li>`).join("")}</ul>`:'<div class="sm mute">none</div>'}
+  <h2>Briefs (${x.briefs.length})</h2><table><tr><th>File</th><th>Label</th><th>Sections</th><th>Last change</th></tr>${x.briefs.map(b=>`<tr><td class="sm"><code>${esc(b.file)}</code><details><summary class="sm">original text</summary><pre>${esc(b.text)}</pre></details></td><td>${lbl(b.label)}<div class="sm mute">${esc(b.kind||"")}</div></td><td class="sm">${b.sections.slice(0,12).map(s=>esc(s)).join("<br>")}${b.sections.length>12?"<br>…":""}</td><td class="sm">${esc(b.last_commit_date||b.modified||"")}${b.uncommitted_changes?" "+pill("uncommitted changes","warn"):""}</td></tr>`).join("")}</table>
+  <h2>Case sets (${x.case_sets.length})</h2>${x.reported.map(r=>`<div class="card" style="margin:6px 0;border-color:var(--warn)"><b>Pending: ${esc(r.what)}</b> ${pill(r.label,"warn")} · arrives ${esc(r.time.istanbul)} = ${esc(r.time.utc)} · <span data-utc="${esc(r.time.utc)}">${esc(r.time.status)}</span><div class="sm mute">Shows up here by itself once its case file is in kit/, docs/reference/, tests/fixtures/cases/ or named by a run's launch record.</div></div>`).join("")}${x.case_sets.map(s=>`<details class="card" style="margin:6px 0"${s.label==="official"?" open":""}><summary><b><code>${esc(s.file)}</code></b> ${lbl(s.label)} <span class="sm mute">${esc(s.kind||"")} · ${s.cases.length} case(s) · last change ${esc(s.last_commit_date||s.modified||"?")}</span></summary>
+   ${(s.notes||[]).map(n=>`<div class="sm note">${esc(n.summary)} <span class="mute">${esc(n.notes||"")}</span></div>`).join("")}
+   <table><tr><th>Case</th><th>Brief · family · level</th><th>Style</th><th>Expected</th><th>Checks</th></tr>${s.cases.map(c=>`<tr><td class="sm"><b>${esc(c.id)}</b><div>${esc(c.title||"")}</div>${c.script?`<details><summary class="sm">script</summary><pre>${esc(c.script)}</pre></details>`:""}</td><td class="sm">${esc(c.brief??"")} · ${esc(c.family??"")} · ${esc(c.level??"")}</td><td class="sm">${esc(c.style??"–")}</td><td class="sm"><pre>${esc(JSON.stringify(c.expected,null,1))}</pre></td><td class="sm">${(c.checks||[]).map(k=>`<div>• ${esc(k)}</div>`).join("")}</td></tr>`).join("")}</table></details>`).join("")}
+  <h2>Sources (${x.sources.length})</h2><div class="wrap" style="max-height:420px"><table><tr><th>File</th><th>Label</th><th>Kind · link · captured</th><th>Last commit</th><th>Working tree</th></tr>${x.sources.map(s=>`<tr><td class="sm"><code>${esc(s.file)}</code></td><td>${lbl(s.label)}</td><td class="sm">${esc(s.kind||"")}${s.link?`<div><code>${esc(s.link)}</code></div>`:""}${s.captured?`<div class="mute">captured: ${esc(s.captured)}</div>`:""}${(s.notes||[]).filter(n=>n.category==="source_date").map(n=>`<div class="mute">stated: “${esc(n.quote)}”</div>`).join("")}</td><td class="sm">${s.exists?`${esc(s.last_commit_date||"never committed")} <code>${esc(s.last_commit||"")}</code><div class="mute">${esc(s.last_commit_subject||"")}</div>`:pill("missing","bad")}</td><td class="sm">${s.uncommitted_changes?pill("uncommitted changes","warn"):s.exists?"clean":""}${s.modified?`<div class="mute">modified ${esc(s.modified)}</div>`:""}</td></tr>`).join("")}</table></div>`);
 }
 window.addEventListener("hashchange",()=>{const k=location.hash.slice(1);if(k&&k!==tab&&TABS.some(t=>t[0]===k)){tab=k;nav();render()}});
 nav();load();setInterval(load,12000);

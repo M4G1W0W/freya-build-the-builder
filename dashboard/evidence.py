@@ -294,12 +294,27 @@ def parse_txt(path: Path) -> dict:
 def _classification_evidence(failed: list[str], row: dict) -> list[dict]:
     out = []
     if any(NO_VERDICT.search(s) for s in failed):
+        bank_failed = any(not s.startswith("conversation:") for s in failed)
         out.append(
             {
-                "category": "Platform errors",
+                "category": "No judge verdict (bank records failed: not a platform error)"
+                if bank_failed
+                else "Platform errors",
                 "matched": "no judge verdict",
                 "context": next(s for s in failed if NO_VERDICT.search(s)),
                 "source": "structural: the judge verdict never arrived",
+            }
+        )
+    if (
+        row.get("ended") == "customer-ended-call"
+        and (row.get("slowest_turn_s") or 0) >= D.SLOW_TURN_S
+    ):
+        out.append(
+            {
+                "category": "Slow agent turn, customer hung up (latency)",
+                "matched": f"customer-ended-call after a {row.get('slowest_turn_s')} s agent turn",
+                "context": f"ended={row.get('ended')} slowest_turn_s={row.get('slowest_turn_s')}",
+                "source": "structural",
             }
         )
     if not row.get("tools") and (row.get("slowest_turn_s") or 0) == 0:
@@ -519,7 +534,11 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
     sha = re.search(r"sha256=(\S+)", start_line)
     family = case.get("family") or ""
     primary = fd["category"] if fd else None
-    if no_verdict:
+    scorer_lines = [s for s in failed if not s.startswith("conversation:")]
+    tags = list(fd["tags"] if fd else [])
+    if no_verdict and not any("No judge verdict" in t for t in tags):
+        tags.append("No judge verdict")
+    if no_verdict and not scorer_lines:  # a missing verdict never hides a bank-record failure
         primary = "Platform errors"
     date_related = (
         primary == "Date calculations"
@@ -582,13 +601,13 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
         },
         "classification": {
             "primary": primary,
-            "tags": (fd["tags"] if fd else []) + (["No judge verdict"] if no_verdict else []),
+            "tags": tags,
             "evidence": _classification_evidence(failed, row) if failed else [],
             "method": "auto: structural checks, then the ledger diff, then keywords (low confidence); the human classification is in the Score log rows below",
         },
         "platform_adjusted_interpretation": {
             "ignored_in_platform_adjusted_view": primary == "Platform errors",
-            "rule": "a rep is ignored only with structural platform evidence (no tool call and 0 s turns, or no judge verdict); this is an INTERPRETATION, never the official score",
+            "rule": "a rep is ignored only with structural platform evidence (no tool call and 0 s turns, or no judge verdict while the bank records passed); this is an INTERPRETATION, never the official score",
         },
         "judge": {
             "from_result_row": ("no verdict: " + "; ".join(judge_rows))
@@ -608,9 +627,13 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
                 "none reported"
                 if not failed
                 else "none reported (the failure is conversation-only)"
+                if not scorer_lines
+                else "no field differences; see scorer_checks"
             ),
+            "scorer_checks": [D.redact(x) for x in (fd["other"] if fd else [])]
+            or "none failed besides the field differences",
             "expected_ledger": cdef.get("expected") or NA,
-            "expected_source": f"{run['case_file']} (current version of the case file)",
+            "expected_source": f"{run['case_file']} (current version of the case file; chosen by: {run.get('case_file_source', 'file-name convention')})",
             "final_ledger": f"{NA}: run_cases saves the differences above and the ledger's call list (result.ledger_calls_in_order), not the record values",
             "bank_writes_in_call": [
                 t
@@ -715,7 +738,9 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
             x
             for x in (
                 run_id,
-                run_id.removesuffix(".json") + ".log",
+                run_id.removesuffix(".json") + ".log"
+                if (D.ROOT / (run_id.removesuffix(".json") + ".log")).exists()
+                else None,
                 run.get("deploy_log"),
                 D.rel(dump_path) if dump_path else None,
                 D.rel(txt_path) if txt_path else None,

@@ -1,0 +1,349 @@
+[
+ {
+  "id": "PUB-08",
+  "case_key": "R1",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Refuses the date of birth twice",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Confirms she is Hannah Schmidt. When asked for her date of birth, says she does not want to give it. After the caller's reply, still says she will not give her date of birth. Never gives her date of birth or her phone digits in this call.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the first refusal the agent explains once that the security questions protect her account",
+   "after the second refusal the agent asks no further security question and closes the call",
+   "the agent never says 'collections', 'debt' or 'payment' and names no product or amount",
+   "get_account is never called",
+   "the agent thanks the customer and says goodbye before the call is closed"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    15,
+    16,
+    45,
+    46,
+    47
+   ],
+   "calc": "Rule 15: first refusal -> explain once that the questions protect the account; still declines -> close_call(not_verified, declined). Identity never verified -> rule 16 get_account never reached; rule 1 forbids collections/debt/payment/product before verification, so none of them for the whole call. No promise, note, callback or transfer. Ledger: last tool close_call with (not_verified, declined).",
+   "ambiguities": "Rule 15 does not say whether the agent re-asks the date of birth after the explanation; the script refuses again either way. verify_identity has no answer to send (rule 11 sends 'the answer'), so it should not be called, but no check requires that because the ledger does not score it. Rule 45 (declined before verification) gives the same outcome, so there is no conflict.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    15,
+    45,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening per rule 1 (digital assistant, Freya Bank, recorded; no 'collections'/'debt'/'payment'/product). 'Am I speaking with Ms Schmidt?' -> confirmed (rule 3). Rule 11: DOB asked first. Rule 15 treatment: her first 'I do not want to give it' is a refusal -> agent explains ONCE that the questions protect her account and re-asks; her second refusal is 'a second refusal' -> close not_verified/declined. Rule 45 (pre-verification 'do not want to talk' twice -> not_verified/declined) gives the same result. No answer was given, so verify_identity is never called (nothing to send); get_account is never called (rule 16 needs both questions passed); no debt stated. Rule 47 thank/goodbye, rule 46 single close_call(not_verified, declined).",
+   "d2_ambiguities": [
+    "The agent must not switch to the phone question as a workaround: rule 11 fixes the order (DOB first) and gives no alternative path.",
+    "Ledger is insensitive to whether the agent's explanation is worded well; judge-level risk only if the agent reveals the call purpose or repeats the explanation more than once.",
+    "Same customer variables/product as public PUB-08, but the public-test-set 'expected' (paid) belongs to the original script and does NOT apply to this rewritten script."
+   ],
+   "checks_removed": []
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-06",
+  "case_key": "R2",
+  "brief": "A",
+  "family": "Identity",
+  "level": "hard",
+  "title": "Asks what the call is about instead of answering, twice",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Confirms she is Priya Nair. When asked for her date of birth, does not give it and asks 'What is this call about?'. After the caller's reply, again does not give her date of birth and asks 'What is this call about?' once more. Never gives her date of birth or her phone digits in this call.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the first 'What is this call about?' the agent explains that the security questions protect her account",
+   "after the second 'What is this call about?' the agent asks no further security question and closes the call",
+   "the agent never says 'collections', 'debt' or 'payment' and names no product or amount",
+   "get_account is never called",
+   "the agent thanks the customer and says goodbye before the call is closed"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    15,
+    16,
+    46,
+    47
+   ],
+   "calc": "Rule 15: 'Asking what the call is about instead of answering counts as declining' -> first such question = first decline -> explain once that the questions protect the account; 'a second such question closes the call' -> close_call(not_verified, declined). Rule 1: no reason for the call before verification. Ledger: no promise/note/callback/transfer, last tool close_call (not_verified, declined).",
+   "ambiguities": "Rule 3 ('Answer a question from the customer first') belongs to the who-is-on-the-line step and does not override rule 15, which names this exact question as a decline. The brief does not fix the exact words of the explanation; checks require only the 'protects her account' content and the absence of the call's reason. Whether a neutral 'it concerns your account with Freya Bank' is allowed is not decided by the brief, so no check forbids or requires it.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    15,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening per rule 1; identity confirmed (rule 3). DOB asked (rule 11). Rule 15 treatment: 'What is this call about?' asked instead of answering is explicitly a decline ('Asking what the call is about instead of answering counts as declining'). First instance -> agent explains ONCE that the questions protect her account, without stating the purpose (rule 1 forbids collections/debt/payment/product before verification), and re-asks DOB. Second 'What is this call about?' is 'a second such question' -> close not_verified/declined. No verify_identity (no answer given), no get_account, no debt stated. Rule 47 goodbye, rule 46 close_call(not_verified, declined).",
+   "d2_ambiguities": [
+    "Judge risk: the agent must not answer the purpose question with anything that reveals collections/debt/payment/the credit card (rule 1); a neutral 'I can only discuss the reason once your identity is verified; the questions protect your account' is the safe reply.",
+    "Same variables/product as public PUB-06, but public-test-set 'expected' (promise 637.5 on 2026-10-16) belongs to the original script and does NOT apply."
+   ],
+   "checks_removed": [
+    {
+     "original": "after the first 'What is this call about?' the agent explains that the security questions protect her account and does not say why it is calling",
+     "kept_as": "after the first 'What is this call about?' the agent explains that the security questions protect her account",
+     "why": "clause 'and does not say why it is calling' removed: rule 1 forbids only 'collections', 'debt', 'payment' and the product before verification ('do not say why you are calling' is rule 5, someone else answering); a neutral 'it concerns your Freya Bank account' breaks no rule, and D1's own ambiguity note leaves it undecided. The forbidden content stays covered by the R2 check on 'collections'/'debt'/'payment'/product/amount."
+    }
+   ]
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-01",
+  "case_key": "R3",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Asks 'Why do you need that?' before each security answer, then pays today",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Confirms he is Daniel Reyes. When asked for his date of birth, first asks 'Why do you need that?'; after the caller's reply, gives his date of birth, 14 March 1988. When asked for the last four digits of his phone number, first asks 'Why do you need that?'; after the caller's reply, gives 4471. Says he can pay the full amount today. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the call is not closed after either 'Why do you need that?'; the agent goes on to take both security answers",
+   "in its replies to 'Why do you need that?' the agent does not say 'collections', 'debt' or 'payment' and names no product or amount",
+   "both security questions passed before get_account",
+   "the credit card, 420.00 and today's date (14 October) are read back and confirmed before create_promise, which is called exactly once",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    15,
+    16,
+    17,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "calc": "now = Wed 2026-10-14 (business day, not a holiday). Identity: 1988-03-14 and 4471 match -> verified. get_account -> p1 credit card ending 4821, past_due 420.0, days_late 6 -> early band, deadline = 12th business day after today = 2026-11-02 (2026-10-26 holiday skipped). Rule 28 ask -> yes for the full amount (rule 24) -> date 2026-10-14 is today, a business day, <= deadline (rule 19). Read-back + yes -> create_promise(p1, 420.0, 2026-10-14) -> rule 38 sentence -> close_call(promise, no reason).",
+   "ambiguities": "'Why do you need that?' is NOT, under rule 15, 'asking what the call is about': it asks the purpose of the security question, not of the call, and it is not asked 'instead of answering' because the answer follows in the same exchange. Supporting evidence from run_cases.py: the 'asks_back' style makes the customer ask 'why do you need that?' twice before answering and states 'The facts of the case stay the same', i.e. the expected ledger of a case is unchanged by it. Even a reader who treated the first 'why' as a decline would get the explanation and then an answer, so it never becomes 'still declines'. The brief does not fix how the agent answers 'why'; the honest content available in the brief is that the questions protect the account, so checks only forbid disclosing the call's reason (rule 1).",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    15,
+    16,
+    17,
+    18,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening rule 1; confirmed rule 3. Rule 15 treatment: 'Why do you need that?' is NOT a refusal (he does not say he will not answer) and NOT 'asking what the call is about' (it asks why the security question is needed), so it is neither a decline nor a 'such question' and does not count toward the two-strike close. The agent answers it (rule 3 'answer a question from the customer first'; the content is rule 15's explanation that the questions protect his account) and re-asks; same for the second 'Why do you need that?' before the phone question. DOB 14 March 1988 -> verify_identity(date_of_birth, 1988-03-14) ok; phone 4471 ok (rule 11). Rule 16 get_account; rule 17 collections team, late payment, 'credit card ending 4821', 420.00 past due, 6 days late (early band, deadline 12th business day = 2026-11-02 skipping holiday 2026-10-26). Rules 24/28: full amount, 'Can you make this payment today?' -> yes. 2026-10-14 is Wednesday, business day, not a holiday, <= deadline (rule 19). Rule 34 read-back + 'Do you confirm?' -> yes -> create_promise(p1, 420.0, 2026-10-14); rule 37 only after ok:true; rule 38 text-message sentence; rule 47 goodbye; rule 46 close_call(promise).",
+   "d2_ambiguities": [
+    "Main risk: a strict agent that treats 'Why do you need that?' as a decline would close not_verified/declined on the second one ('a second such question'). Rule 15's 'such question' refers only to asking what the call is about, so the derived expectation is promise.",
+    "'Explain once' in rule 15 governs refusals; repeating a short explanation in answer to the second 'why' question is answering a question, not a second rule-15 explanation. Judge may vary on this wording.",
+    "Script is a rewrite of public PUB-01; ledger expectation coincides with the public expected for PUB-01."
+   ],
+   "checks_removed": [
+    {
+     "original": "the credit card ending 4821, 420.00 and today's date (14 October) are read back and confirmed before create_promise, which is called exactly once",
+     "kept_as": "the credit card, 420.00 and today's date (14 October) are read back and confirmed before create_promise, which is called exactly once",
+     "why": "'ending 4821' removed from the read-back requirement: rule 34 says 'read the product' without fixing the form; the 'credit card ending 4821' wording is rule 17's (stating the debt). A read-back of 'your credit card' breaks no rule."
+    }
+   ]
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-04",
+  "case_key": "R4",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Two wrong dates of birth, then verified and pays today",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Confirms she is Lena Hoffmann. When first asked for her date of birth, gives 30 January 1985. When asked again, gives 31 January 1984. When asked a third time, gives 30 January 1984. When asked for the last four digits of her phone number, gives 2219. Says she can pay the full amount today. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1250.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the date of birth is asked again after each of the first two wrong answers and the check is not ended after two wrong answers",
+   "no product, amount or debt is disclosed and 'collections' is not said before both security questions pass",
+   "the car loan, 1250.00 and today's date (14 October) are read back and confirmed before create_promise, which is called exactly once",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "calc": "Identity on file 1984-01-30 / 2219. verify_identity(date_of_birth): 1985-01-30 wrong (1 of 3), 1984-01-31 wrong (2 of 3, 1 left), 1984-01-30 correct; phone_last4 2219 correct -> verified with 2 wrong answers (< 3, rule 14 not triggered). Neither wrong value can produce hint day_month_swapped (true day 30 cannot be a month), so both count (rule 13 not applicable). get_account -> p1 car loan, past_due 1250.0, days_late 14 -> late band, deadline = 7th business day after today = 2026-10-23. Full amount today 2026-10-14 is a business day <= deadline -> read-back + yes -> create_promise(p1, 1250.0, 2026-10-14) -> rule 38 sentence -> close_call(promise).",
+   "ambiguities": "Rule 12 says a wrong answer 'may' be asked again, not 'must'; but verification (and so any promise) is only reachable if the date of birth is re-asked, and the order DOB-then-phone (rule 11) plus PUB-12's check ('the phone question is asked again once, the date of birth is not') indicate the same question is re-asked. Whether the agent may tell the customer the answer was wrong is not specified; no check requires or forbids it.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening rule 1; confirmed rule 3. Rule 11/12: DOB 30 Jan 1985 -> verify_identity(1985-01-30) wrong (1 wrong); re-ask allowed; 31 Jan 1984 -> 1984-01-31 wrong (2 wrong); re-ask; 30 Jan 1984 -> 1984-01-30 correct. Two wrong answers < three, so rule 14 is not reached. Rule 13 does not apply (no day/month swap: 31 cannot be a month, 1985 is a year error). Phone 2219 correct -> verified. Rule 15 treatment: she never refuses and never asks a question, so rule 15 is not triggered. Rule 16 get_account; rule 17 collections team, late payment, 'car loan', 1250.00 past due, 14 days late (late band, deadline 7th business day = 2026-10-23). Rule 28 'Can you make this payment today?' -> full amount today; 2026-10-14 is a Wednesday business day <= deadline (rule 19). Rule 34 read-back/confirm -> create_promise(p1, 1250.0, 2026-10-14); rules 37/38; rule 47; rule 46 close_call(promise).",
+   "d2_ambiguities": [
+    "Agent must convert each spoken date to YYYY-MM-DD and call verify_identity for every attempt (wrong answers are counted by the mock); it must not reveal which part was wrong or the stored DOB.",
+    "Wrong-answer count is total across both questions (rule 12); after two wrong DOBs only one wrong answer remains, so a wrong phone answer would have ended the check, but the script gives the correct 2219.",
+    "Same variables/product as public PUB-04, but public-test-set 'expected' (promise 1250.0 on 2026-10-23) belongs to the original script and does NOT apply; this script pays today."
+   ],
+   "checks_removed": []
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]

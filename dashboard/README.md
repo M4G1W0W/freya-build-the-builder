@@ -8,7 +8,12 @@ calls the network. It writes only `reports/latest_snapshot.{json,md}`.
 .venv/bin/python dashboard/server.py --snapshot-only   # just write reports/latest_snapshot.* and exit
 ```
 
-Data is recomputed every 12 s. The page polls every 12 s.
+**Live feed.** The server recomputes every 12 s and the page polls every 12 s. Every tab is live:
+- Config Comparison, Failure Evidence and Rules & Cases re-fetch on each poll.
+- A view is rebuilt only when its data changed. Scroll position and open sections are kept, and countdowns tick.
+- The header reads `live · data refreshed …` or turns red with STALE when a refresh fails or the data is over 40 s
+  old. The health check is in `/api/overview` under `health`.
+- The server queues up to 128 connections (the page fires 8+ at once), and the page retries a dropped request once.
 
 ## Endpoints (GET only; anything else returns 405)
 
@@ -19,6 +24,7 @@ Data is recomputed every 12 s. The page polls every 12 s.
 | `/api/failures` | Failed reps by category, persistence, introduced, resolved, awaiting retest, and an infra-adjusted interpretation |
 | `/api/overview`, `/api/builder` | Overview panels; build traces |
 | `/api/case?run=<run id>&case=<PUB-xx>` | Per-rep detail: ledger diff, judge text, tools, a transcript when a call dump exists locally, and the case history |
+| `/api/rules-and-cases` | Organizer rules, deadlines (UTC and Istanbul), briefs and cases, internal decisions, interpretations, clarifications, conflicts, with sources (see below) |
 | `/api/comparison?...` | Configuration comparison: scenario variants × exact configurations, plus a two-version diff (see below) |
 
 ## How numbers are derived
@@ -52,8 +58,17 @@ detail quotes.
 
 ## Known limits
 
-- **Style and case set.** These are not recorded in the result JSON, so they are read from the file name and the
-  case file (`styled*`, `extraB`, `style/<x>-<style>-`). The case file is read in its current version.
+- **Case file, style and case set.** The result JSON does not record them.
+  - **Launch record first.** The case file comes from the record the launcher writes next to the run: its
+    `<name>.meta.json`, which holds the case file's sha256, slot, agent, build and spec, or else that
+    directory's `calls.tsv` row.
+  - **File-name fallback.** Without a launch record, the file name decides (`styled*`, `extraB`,
+    `style/<x>-<style>-`), and `case_file_source` says which applied.
+  - **Case sets.** These are A, B, extra-B (the extra-b files) and A+B (13 cases).
+  - **Agent kind.** It comes from the deployed spec's `meta.max_products`, when the spec's content is verified
+    (launch sha256, or a file mtime before the deploy).
+  - **Displayed cases.** Expected outcomes, scripts and checks are the current version of the case file. The
+    Config Comparison uses the version committed when the run started.
 - **Transcripts.** Only calls already saved under `runs/` are shown; nothing is fetched from Freya.
 - **Judge text.** It is cut at 400 characters by the kit's `run_cases.py`.
 - **Older deploy traces.** Traces from before commit stamping (1a5245f) have no `git=`. Their commit falls back to
@@ -78,16 +93,25 @@ and are not visible.
 
 - **Which session.** `?session=<desktop or cli id>` or `DASHBOARD_SESSION`, else the non-archived session for this
   repo with the most completed turns. The choice is sticky until the server restarts.
+- **Every chat.** All non-archived chats of this repo are monitored, the primary one first; a chat switcher at the
+  top of the Claude Session tab shows each one's activity and conversation. Each chat's conversation goes to
+  `reports/latest_conversation.md` (primary) or `reports/latest_conversation_<desktop id, 8 chars>.md` (others), and
+  `reports/conversations_index.md` says which chat is which file. `GET /api/claude-sessions` lists them; archive a chat
+  in the app to drop it.
 - **Activity feed.** Tool names, Claude's own action descriptions (allowlisted fields only), outcomes, error kinds
   from a fixed vocabulary, live background processes (basenames only), and Claude's latest text. It never contains
   your prompts, thinking, tool inputs or tool output.
-- **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events.
+- **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events. Every transcript of the session is included: the desktop app lists the earlier ones (before a context save, `/clear` or a restart) in `priorCliSessionIds`, they are read in full (cached, they no longer change) and a `transcript k of n begins` event marks each boundary. `?limit=N` returns only the last N items plus every earlier prompt.
   System reminders, thinking and tool content are left out. Secrets are redacted and e-mails masked. It is written
   to `reports/latest_conversation.{json,md}` for an external reviewer (`reports/` is gitignored).
+- **Agent process.** Each chat is linked to its local agent process from `ps` alone, strongest evidence first: the
+  command line resumes the chat's transcript (`--resume=<id>`); its Bash shells export the chat's session id; the
+  process started within 5 s of the transcript's first entry (works when no shell is open, e.g. a chat working in a
+  worktree); last, shells that merely mention the id (labelled weak). The evidence is shown with the pid.
 - **Safety.** Files are opened read-only. The only subprocess is `ps`. Requests whose Host is not
   `127.0.0.1:<port>` or `localhost:<port>` get 403 (DNS-rebinding guard).
 - **Limits.**
-  - Only the session's current transcript is read. Prompts from before a context save are in older transcripts.
+  - An earlier transcript whose file was deleted cannot be shown; the note says how many are missing.
   - "Open tasks" are background launches with no recorded completion. Only the live processes prove that work is
     running.
 
@@ -205,9 +229,44 @@ from their console log: a rep counts once its `-- run k of N` line is written. T
 configuration is not determinable (the log has no agent id).
 
 **Limits.**
-- `run_cases` records neither `--cases` nor `--style`. The case file is attributed by the run file's name
-  (`styled*`/`extraB`, else the kit's public set).
-- The real arguments sit in launcher scripts in session scratchpads, outside the repo, and are not read.
+- `run_cases` records neither `--cases` nor `--style`.
+  - The case file comes from the launch record (`<name>.meta.json` or `calls.tsv`). Each definition is checked
+    against the case-file sha256 recorded at launch.
+  - Without a launch record, the run file's name decides (`styled*`/`extraB`, else the kit's public set).
+- Rows match on case + definition hash + style, whichever case file holds the definition.
+- Launcher scripts in session scratchpads are not read.
 - Uncommitted edits to a case file cannot be detected.
 
 Tests: `uv run pytest dashboard/test_compare.py` (synthetic records, no network).
+
+## Rules & Cases (`/api/rules-and-cases`, tab "Rules & Cases")
+
+A read-only reference for the organizer rules and everything around them, with provenance. Labels:
+- **official:** the organizer page as captured in `docs/reference/` (its header lines are team-written), and the kit.
+- **internal:** team-written decisions, plans, notes and code. These are never organizer rules.
+- **locally derived:** fixtures in `tests/fixtures/` built by the team.
+
+**Original text.** It is read from the files on every request (cached by file stat and git HEAD), and nothing is
+fetched. Briefs and case sets come straight from `kit/briefs`, `kit/public-test-set.json`,
+`docs/reference/hackathon_practice_cases.json` and `tests/fixtures/{briefs,cases}`.
+
+**Summaries.** They come from `dashboard/rules_catalog.json`, a dashboard-owned catalog. A read-only
+five-reader pass extracted it on 2026-10-11, with one skeptic per reader. Each item carries:
+- a verbatim quote, a category and the source file;
+- for every request, the quote is found again in the file. That gives `status` (`verified`, or `stale` if the
+  source changed), the line, the markdown section and the surrounding original paragraph.
+
+Organizer rules, deadlines and clarifications cite official sources only (checked by `dashboard/test_rules.py`).
+
+**Deadlines.** The page gives a weekday and a UTC time but no date. The catalog states the reconstructed date,
+its official basis quotes (event dates "October 10 and 11", kit "10 October 2026") and the derivation. Istanbul is
+computed at UTC+3; the organizers state no Istanbul time.
+
+**Conflicts and stale information.** The extracted conflicts are listed with both quotes; 7 disputed ones were
+dropped. A computed case-by-case diff compares the kit's cases with the page's cases. Each source shows its last
+commit and any uncommitted changes. `sha256_current` is the file as it is now, never a historical value.
+
+**Missing.** The readers' and checkers' notes on information not found in the project files are listed as
+reported.
+
+Tests: `uv run pytest dashboard/test_rules.py`.

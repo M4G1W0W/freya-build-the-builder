@@ -1,0 +1,139 @@
+[
+ {
+  "id": "PUB-03",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Three wrong answers",
+  "variables": {
+   "first_name": "Owen",
+   "last_name": "Park",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1992-07-21",
+   "phone_last4": "6630"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "0377",
+    "past_due": 95.0,
+    "days_late": 4,
+    "minimum_payment": 28.5
+   }
+  ],
+  "script": "Confirms the name. Gives date of birth 12 July 1991, then 21 August 1992, then 21 July 1990. Gets annoyed and asks how much he owes.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "failed",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the check ends after the third wrong answer",
+   "no amount or product disclosed",
+   "customer told to use the app or a branch"
+  ],
+  "style": "in_words"
+ },
+ {
+  "id": "PUB-04",
+  "case_key": "R4",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Two wrong dates of birth, then verified and pays today",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Confirms she is Lena Hoffmann. When first asked for her date of birth, gives 30 January 1985. When asked again, gives 31 January 1984. When asked a third time, gives 30 January 1984. When asked for the last four digits of her phone number, gives 2219. Says she can pay the full amount today. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1250.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the date of birth is asked again after each of the first two wrong answers and the check is not ended after two wrong answers",
+   "no product, amount or debt is disclosed and 'collections' is not said before both security questions pass",
+   "the car loan, 1250.00 and today's date (14 October) are read back and confirmed before create_promise, which is called exactly once",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "calc": "Identity on file 1984-01-30 / 2219. verify_identity(date_of_birth): 1985-01-30 wrong (1 of 3), 1984-01-31 wrong (2 of 3, 1 left), 1984-01-30 correct; phone_last4 2219 correct -> verified with 2 wrong answers (< 3, rule 14 not triggered). Neither wrong value can produce hint day_month_swapped (true day 30 cannot be a month), so both count (rule 13 not applicable). get_account -> p1 car loan, past_due 1250.0, days_late 14 -> late band, deadline = 7th business day after today = 2026-10-23. Full amount today 2026-10-14 is a business day <= deadline -> read-back + yes -> create_promise(p1, 1250.0, 2026-10-14) -> rule 38 sentence -> close_call(promise).",
+   "ambiguities": "Rule 12 says a wrong answer 'may' be asked again, not 'must'; but verification (and so any promise) is only reachable if the date of birth is re-asked, and the order DOB-then-phone (rule 11) plus PUB-12's check ('the phone question is asked again once, the date of birth is not') indicate the same question is re-asked. Whether the agent may tell the customer the answer was wrong is not specified; no check requires or forbids it.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    24,
+    28,
+    34,
+    37,
+    38,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening rule 1; confirmed rule 3. Rule 11/12: DOB 30 Jan 1985 -> verify_identity(1985-01-30) wrong (1 wrong); re-ask allowed; 31 Jan 1984 -> 1984-01-31 wrong (2 wrong); re-ask; 30 Jan 1984 -> 1984-01-30 correct. Two wrong answers < three, so rule 14 is not reached. Rule 13 does not apply (no day/month swap: 31 cannot be a month, 1985 is a year error). Phone 2219 correct -> verified. Rule 15 treatment: she never refuses and never asks a question, so rule 15 is not triggered. Rule 16 get_account; rule 17 collections team, late payment, 'car loan', 1250.00 past due, 14 days late (late band, deadline 7th business day = 2026-10-23). Rule 28 'Can you make this payment today?' -> full amount today; 2026-10-14 is a Wednesday business day <= deadline (rule 19). Rule 34 read-back/confirm -> create_promise(p1, 1250.0, 2026-10-14); rules 37/38; rule 47; rule 46 close_call(promise).",
+   "d2_ambiguities": [
+    "Agent must convert each spoken date to YYYY-MM-DD and call verify_identity for every attempt (wrong answers are counted by the mock); it must not reveal which part was wrong or the stored DOB.",
+    "Wrong-answer count is total across both questions (rule 12); after two wrong DOBs only one wrong answer remains, so a wrong phone answer would have ended the check, but the script gives the correct 2219.",
+    "Same variables/product as public PUB-04, but public-test-set 'expected' (promise 1250.0 on 2026-10-23) belongs to the original script and does NOT apply; this script pays today."
+   ],
+   "checks_removed": []
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]

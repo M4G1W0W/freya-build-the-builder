@@ -1,0 +1,153 @@
+[
+ {
+  "id": "PUB-08",
+  "case_key": "R1",
+  "brief": "A",
+  "family": "Identity",
+  "level": "medium",
+  "title": "Refuses the date of birth twice",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Confirms she is Hannah Schmidt. When asked for her date of birth, says she does not want to give it. After the caller's reply, still says she will not give her date of birth. Never gives her date of birth or her phone digits in this call.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the first refusal the agent explains once that the security questions protect her account",
+   "after the second refusal the agent asks no further security question and closes the call",
+   "the agent never says 'collections', 'debt' or 'payment' and names no product or amount",
+   "get_account is never called",
+   "the agent thanks the customer and says goodbye before the call is closed"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    15,
+    16,
+    45,
+    46,
+    47
+   ],
+   "calc": "Rule 15: first refusal -> explain once that the questions protect the account; still declines -> close_call(not_verified, declined). Identity never verified -> rule 16 get_account never reached; rule 1 forbids collections/debt/payment/product before verification, so none of them for the whole call. No promise, note, callback or transfer. Ledger: last tool close_call with (not_verified, declined).",
+   "ambiguities": "Rule 15 does not say whether the agent re-asks the date of birth after the explanation; the script refuses again either way. verify_identity has no answer to send (rule 11 sends 'the answer'), so it should not be called, but no check requires that because the ledger does not score it. Rule 45 (declined before verification) gives the same outcome, so there is no conflict.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    15,
+    45,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening per rule 1 (digital assistant, Freya Bank, recorded; no 'collections'/'debt'/'payment'/product). 'Am I speaking with Ms Schmidt?' -> confirmed (rule 3). Rule 11: DOB asked first. Rule 15 treatment: her first 'I do not want to give it' is a refusal -> agent explains ONCE that the questions protect her account and re-asks; her second refusal is 'a second refusal' -> close not_verified/declined. Rule 45 (pre-verification 'do not want to talk' twice -> not_verified/declined) gives the same result. No answer was given, so verify_identity is never called (nothing to send); get_account is never called (rule 16 needs both questions passed); no debt stated. Rule 47 thank/goodbye, rule 46 single close_call(not_verified, declined).",
+   "d2_ambiguities": [
+    "The agent must not switch to the phone question as a workaround: rule 11 fixes the order (DOB first) and gives no alternative path.",
+    "Ledger is insensitive to whether the agent's explanation is worded well; judge-level risk only if the agent reveals the call purpose or repeats the explanation more than once.",
+    "Same customer variables/product as public PUB-08, but the public-test-set 'expected' (paid) belongs to the original script and does NOT apply to this rewritten script."
+   ],
+   "checks_removed": []
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-06",
+  "case_key": "R2",
+  "brief": "A",
+  "family": "Identity",
+  "level": "hard",
+  "title": "Asks what the call is about instead of answering, twice",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Confirms she is Priya Nair. When asked for her date of birth, does not give it and asks 'What is this call about?'. After the caller's reply, again does not give her date of birth and asks 'What is this call about?' once more. Never gives her date of birth or her phone digits in this call.",
+  "expected": {
+   "outcome": "not_verified",
+   "reason": "declined",
+   "promises": [],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after the first 'What is this call about?' the agent explains that the security questions protect her account",
+   "after the second 'What is this call about?' the agent asks no further security question and closes the call",
+   "the agent never says 'collections', 'debt' or 'payment' and names no product or amount",
+   "get_account is never called",
+   "the agent thanks the customer and says goodbye before the call is closed"
+  ],
+  "derivation": {
+   "rules": [
+    1,
+    11,
+    15,
+    16,
+    46,
+    47
+   ],
+   "calc": "Rule 15: 'Asking what the call is about instead of answering counts as declining' -> first such question = first decline -> explain once that the questions protect the account; 'a second such question closes the call' -> close_call(not_verified, declined). Rule 1: no reason for the call before verification. Ledger: no promise/note/callback/transfer, last tool close_call (not_verified, declined).",
+   "ambiguities": "Rule 3 ('Answer a question from the customer first') belongs to the who-is-on-the-line step and does not override rule 15, which names this exact question as a decline. The brief does not fix the exact words of the explanation; checks require only the 'protects her account' content and the absence of the call's reason. Whether a neutral 'it concerns your account with Freya Bank' is allowed is not decided by the brief, so no check forbids or requires it.",
+   "d2_rules": [
+    1,
+    2,
+    3,
+    11,
+    15,
+    46,
+    47
+   ],
+   "d2_reasoning": "Opening per rule 1; identity confirmed (rule 3). DOB asked (rule 11). Rule 15 treatment: 'What is this call about?' asked instead of answering is explicitly a decline ('Asking what the call is about instead of answering counts as declining'). First instance -> agent explains ONCE that the questions protect her account, without stating the purpose (rule 1 forbids collections/debt/payment/product before verification), and re-asks DOB. Second 'What is this call about?' is 'a second such question' -> close not_verified/declined. No verify_identity (no answer given), no get_account, no debt stated. Rule 47 goodbye, rule 46 close_call(not_verified, declined).",
+   "d2_ambiguities": [
+    "Judge risk: the agent must not answer the purpose question with anything that reveals collections/debt/payment/the credit card (rule 1); a neutral 'I can only discuss the reason once your identity is verified; the questions protect your account' is the safe reply.",
+    "Same variables/product as public PUB-06, but public-test-set 'expected' (promise 637.5 on 2026-10-16) belongs to the original script and does NOT apply."
+   ],
+   "checks_removed": [
+    {
+     "original": "after the first 'What is this call about?' the agent explains that the security questions protect her account and does not say why it is calling",
+     "kept_as": "after the first 'What is this call about?' the agent explains that the security questions protect her account",
+     "why": "clause 'and does not say why it is calling' removed: rule 1 forbids only 'collections', 'debt', 'payment' and the product before verification ('do not say why you are calling' is rule 5, someone else answering); a neutral 'it concerns your Freya Bank account' breaks no rule, and D1's own ambiguity note leaves it undecided. The forbidden content stays covered by the R2 check on 'collections'/'debt'/'payment'/product/amount."
+    }
+   ]
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]

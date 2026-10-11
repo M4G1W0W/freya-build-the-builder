@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import calendar
+import hashlib
 import json
 import os
 import re
@@ -174,6 +175,19 @@ def resolve(commits: list[dict], prefix: str | None) -> dict | None:
     return None
 
 
+def code_differs(commit: str) -> list[str]:
+    """Builder-code files (src/, builder/) that differ between `commit` and HEAD: a tree diff, so it also
+    sees a tested commit that is not on main."""
+    return [
+        f for f in git("diff", "--name-only", commit, "HEAD", "--", *CODE_PATHS).splitlines() if f
+    ]
+
+
+def is_ancestor(commit: str) -> bool:
+    full = git("rev-parse", "--verify", "--quiet", commit + "^{commit}").strip()
+    return bool(full) and git("merge-base", full, "HEAD").strip() == full
+
+
 def code_commits_after(commit: str) -> list[dict]:
     """Commits touching src/ or builder/ after `commit` (exclusive) up to HEAD."""
     out = git("log", "--format=%h%x09%ct%x09%s", f"{commit}..HEAD", "--", *CODE_PATHS)
@@ -200,7 +214,7 @@ def parse_trace(path: Path) -> dict | None:
         return None
     start_ts, _, start_msg = parsed[0]
     t: dict = {
-        "file": rel(path),
+        "file": _shown(path),
         "start": start_ts,
         "start_ts": parse_utc(start_ts),
         "briefs": [],
@@ -245,9 +259,11 @@ def parse_trace(path: Path) -> dict | None:
                 t["unresolved"] += 1
             if "NOT ENFORCED" in msg:
                 t["not_enforced"] += 1
-            s = re.search(r"DEV: using provided spec (\S+?);", msg)
+            s = re.search(r"DEV: using provided spec (.+?); the brief", msg) or re.search(
+                r"DEV: using provided spec (\S+?);", msg
+            )
             if s:
-                t["spec"] = s.group(1)
+                t["spec"] = relpath(s.group(1))
         elif kind == "STEP":
             s = re.search(r"saved slot '([^']+)'", msg)
             if s:
@@ -277,6 +293,8 @@ def parse_trace(path: Path) -> dict | None:
                 else None,
                 "model_calls": kv.get("model_calls"),
             }
+    t["briefs"] = [relpath(b) for b in t["briefs"]]
+    t["variants"] = [ln.strip()[:160] for ln in lines if re.match(r"exp\w* variant=", ln)]
     if t["spec"]:
         t["mode"] = "saved-spec"
     elif t["models"] and t["created"]:
@@ -292,6 +310,12 @@ def parse_trace(path: Path) -> dict | None:
     t["multi_product_build"] = any("brief-b" in b for b in t["briefs"]) or len(t["briefs"]) > 1
     t["submission_path"] = t["mode"] == "full-builder" and t["complete"]
     return t
+
+
+def relpath(p: str) -> str:
+    """A path as written by a script, repo-relative when it points inside the repo."""
+    p = p.strip().strip("'\"")
+    return p[len(str(ROOT)) + 1 :] if p.startswith(str(ROOT) + "/") else p
 
 
 def all_traces() -> list[dict]:
@@ -312,12 +336,14 @@ STYLED = [  # longest prefix first: styledABA before styledA
     ("styledA", "styled-a.json"),
 ]
 STYLES = ("talkative", "pieces", "corrects", "asks_back", "in_words")
-EXPECTED_TOTAL = {"A": 10, "B": 3, "extra-B": 3}
+EXPECTED_TOTAL = {"A": 10, "B": 3, "extra-B": 3, "A+B": 13}
+B_IDS = {"PUB-11", "PUB-12", "PUB-13"}
 PANELS = [
     ("A agent · Brief A cases", "A-only", "A"),
     ("Multi-product agent · Brief B cases", "multi-product", "B"),
     ("Multi-product agent · extra-B cases", "multi-product", "extra-B"),
     ("Multi-product agent · Brief A cases", "multi-product", "A"),
+    ("Multi-product agent · A+B cases (all 13)", "multi-product", "A+B"),
 ]
 
 
@@ -358,8 +384,109 @@ def case_file_for(name: str) -> tuple[str | None, str]:
     return None, NO_STYLE
 
 
+def case_set_for(case_file: str | None, ids: list[str]) -> tuple[str, str]:
+    """(case set, how it was decided): the extra-B files by name, otherwise by the case ids."""
+    if "extra-b" in (case_file or "").rsplit("/", 1)[-1]:
+        return "extra-B", "case file name (extra-b)"
+    b = [i for i in ids if i in B_IDS]
+    if ids and len(b) == len(ids):
+        return "B", "case ids"
+    return ("A+B" if b else "A"), "case ids"
+
+
+def _calls_rows(d: Path) -> dict[str, dict]:
+    """The launcher's per-run ledger (calls.tsv): run name -> row; later rows win."""
+    try:
+        lines = (d / "calls.tsv").read_text(errors="replace").splitlines()
+    except OSError:
+        return {}
+    head, rows = None, {}
+    for ln in lines:
+        if not ln.strip() or ln.startswith("#"):
+            continue
+        cells = ln.split("\t")
+        if head is None:
+            head = cells
+        elif len(cells) > 1:
+            rows[cells[1]] = dict(zip(head, cells, strict=False))
+    return rows
+
+
+def _ended_before(end_utc: object, written: float | None) -> bool:
+    """A record that ended well before the file was last written belongs to an earlier attempt."""
+    if not written or not isinstance(end_utc, str) or not end_utc.endswith("Z"):
+        return False
+    try:
+        return parse_utc(end_utc[:19] + "Z") < written - 60
+    except ValueError:
+        return False
+
+
+def launch_record(path: Path, written: float | None = None) -> dict | None:
+    """What the launcher wrote when it started this run: <name>.meta.json beside the result (case file
+    and its sha256, slot, agent, version, build, spec and its sha256), else the run's calls.tsv row.
+    `written` (a console log's mtime) drops a record from an earlier attempt of the same name."""
+    meta_path = path.with_name(path.stem + ".meta.json")
+    meta = load_json(meta_path)
+    if (
+        isinstance(meta, dict)
+        and meta.get("cases")
+        and not _ended_before(meta.get("end_utc"), written)
+    ):
+        return {**meta, "source": _shown(meta_path)}
+    row = _calls_rows(path.parent).get(path.stem)
+    if row and _ended_before(row.get("end_utc"), written):
+        return None
+    if row and str(row.get("casefile", "")).endswith(".json"):
+        return {
+            "cases": row["casefile"],
+            "slot": row.get("slot"),
+            "exit": row.get("exit"),
+            "source": f"{_shown(path.parent / 'calls.tsv')} (row {path.stem})",
+        }
+    return None
+
+
+def _shown(path: Path) -> str:
+    try:
+        return rel(path)
+    except ValueError:  # outside the repo (tests)
+        return str(path)
+
+
+def case_ref(p: str) -> str:
+    """How a case file is named in run records: a bare name inside tests/fixtures/cases, else a path."""
+    p = relpath(p)
+    inner = p.removeprefix("tests/fixtures/cases/")
+    return inner if inner != p and "/" not in inner else p
+
+
+def sha256_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def spec_products(
+    spec: Path, launch_sha: str | None, deployed_ts: float | None
+) -> tuple[int | None, str]:
+    """meta.max_products of the deployed spec, only when its content is shown to be the deployed one."""
+    if launch_sha:
+        if sha256_file(spec) != launch_sha:
+            return None, "spec file differs from the launch record's sha256"
+        how = "spec content verified by the launch record's sha256"
+    elif deployed_ts and spec.exists() and spec.stat().st_mtime <= deployed_ts:
+        how = "spec file unchanged since the deploy (mtime)"
+    else:
+        return None, "deployed spec content not verifiable"
+    data = load_json(spec)
+    mp = (data or {}).get("meta", {}).get("max_products") if isinstance(data, dict) else None
+    return (mp if isinstance(mp, int) else None), how
+
+
 def load_cases(file: str | None) -> dict[str, dict]:
-    path = CASES_DIR / file if file else PUBLIC_CASES
+    path = PUBLIC_CASES if not file else (ROOT / file if "/" in file else CASES_DIR / file)
     data = load_json(path)
     if isinstance(data, dict):
         data = data.get("cases", [])
@@ -426,25 +553,37 @@ LEDGER = re.compile(
 
 def _ledger_category(failed: list[str]) -> str | None:
     """Structured first: what the bank ledger diff says, before any keyword guess."""
+    for s in failed:  # an identity outcome explains every later ledger difference
+        m = LEDGER.match(str(s))
+        if (
+            m
+            and m.group(1) == "outcome"
+            and ("not_verified" in m.group(2)) != ("not_verified" in m.group(3))
+        ):
+            return "Identity verification"
     for s in failed:
         m = LEDGER.match(str(s))
         if not m:
             continue
         field, actual, expected = m.group(1), m.group(2), m.group(3)
         if field == "promises" and actual.strip(" []"):
-            a, e = re.findall(r"[\d.]+", actual), re.findall(r"[\d.]+", expected)
-            dates_a, dates_e = (
-                re.findall(r"\d{4}-\d\d-\d\d", actual),
-                re.findall(r"\d{4}-\d\d-\d\d", expected),
-            )
-            return (
-                "Date calculations" if dates_a != dates_e and a[:1] == e[:1] else "Payment amounts"
-            )
-        if field == "outcome" and "not_verified" in actual and "not_verified" not in expected:
-            return "Identity verification"
+            try:
+                got, want = ast.literal_eval(actual.strip()), ast.literal_eval(expected.strip())
+            except (ValueError, SyntaxError):
+                return "Payment amounts"
+            if not (isinstance(got, list) and isinstance(want, list)):
+                return "Payment amounts"
+            if len(got) != len(want):
+                return "Promises missing or extra"
+            got, want = sorted(got), sorted(want)
+            same_amounts = [tuple(x[:2]) for x in got] == [tuple(x[:2]) for x in want]
+            return "Date calculations" if same_amounts else "Payment amounts"
         if field in ("notes", "callbacks", "transfers"):
             return "Tool arguments"
     return None
+
+
+SLOW_TURN_S = 30  # the kit simulator's customer hangs up on long silences
 
 
 def classify(row: dict) -> tuple[str, list[str]]:
@@ -461,8 +600,18 @@ def classify(row: dict) -> tuple[str, list[str]]:
         tags.insert(0, structured)
     if not row.get("tools") and (row.get("slowest_turn_s") or 0) == 0:
         tags.insert(0, "Platform errors")
+    elif (
+        row.get("ended") == "customer-ended-call"
+        and (row.get("slowest_turn_s") or 0) >= SLOW_TURN_S
+    ):
+        tags.insert(0, "Slow agent turn, customer hung up (latency)")
     if re.search(r"analysis never arrived|no verdict", text):
-        tags.insert(0, "Platform errors")  # the judge verdict never arrived
+        if any(not str(s).startswith("conversation:") for s in failed):
+            tags.append("No judge verdict (the bank records failed too)")
+        else:
+            tags.insert(
+                0, "Platform errors"
+            )  # the judge verdict never arrived, nothing else failed
     tags = list(dict.fromkeys(tags))
     primary = next((t for t in tags if not t.startswith("Possible platform")), None)
     return (primary or (tags[0] if tags else "Unknown")), tags
@@ -505,21 +654,48 @@ def build_runs(traces: list[dict], commits: list[dict]) -> tuple[list[dict], lis
 
     sim_ids = {r["simulation_id"] for r in results if r.get("simulation_id")}
     for path in sorted(RUNS.rglob("*.log")):
-        if path.with_suffix("") in json_paths or parse_trace(path) is not None:
+        if "exports" in path.parts or path.with_suffix("") in json_paths:
+            continue  # workflow export logs; console logs of runs that wrote a result
+        if parse_trace(path) is not None:
             continue
         text = path.read_text(errors="replace")
         if any(s in text for s in sim_ids):
             continue  # console log of a run whose result JSON exists under another name
-        if text and not re.search(r"passed|Traceback|error|run \d+ of", text):
+        launch = launch_record(path, path.stat().st_mtime)  # a launcher record makes it a run
+        if (
+            not launch
+            and text
+            and not re.search(
+                r"passed|Traceback|error|run \d+ of|^(PASS|FAIL) \S+|run discarded|run_cases",
+                text,
+                re.M,
+            )
+        ):
             continue  # not a run_cases log
         tail = [ln for ln in text.splitlines() if ln.strip()][-1:] or ["(empty file)"]
+        exit_code = (launch or {}).get("exit")
         incomplete.append(
             {
                 "file": rel(path),
-                "status": "incomplete: no result JSON",
+                "status": "incomplete: no result JSON"
+                + (f" (launcher exit {exit_code})" if exit_code not in (None, "") else ""),
                 "reason": redact(tail[0])[:240] if text else "empty log: killed or never started",
                 "time": iso(path.stat().st_mtime),
                 "label": (re.search(r"-([0-9a-f]{7})\.log$", path.name) or [None, None])[1],
+                "launch": {
+                    k: launch.get(k)
+                    for k in (
+                        "source",
+                        "slot",
+                        "agent_id",
+                        "cases",
+                        "cases_sha256",
+                        "reps",
+                        "build",
+                    )
+                }
+                if launch
+                else None,
             }
         )
     results.sort(key=lambda r: r["end_ts"])
@@ -588,6 +764,12 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         )
     else:
         flags.append("Tested commit unknown: no build trace, Score log row or file-name label")
+    invalid = [ln for ln in score_log_rows(path.name) if re.search(r"\binvalid\b", ln, re.I)]
+    if invalid:
+        flags.append(
+            "The Score log marks this run invalid (human note; the raw result is still shown): "
+            + invalid[0][:200]
+        )
     human_all = score_log_refs(path.name)
     if (
         human_all
@@ -624,22 +806,42 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
                 f"Saved spec {deploy['spec']} was rewritten after this deploy: the deployed spec is not on disk"
             )
 
-    # case set, style, expected cases
+    # case file, style, case set: the launch record first, the file-name convention only without one
     ids = sorted({r["id"] for rep in data["all_rows"] for r in rep})
-    case_file, style = case_file_for(name)
-    style_source = (
-        "case file 'style' field" if case_file and case_file.startswith("styled") else "none"
-    )
-    token = next(
-        (v for k, v in STYLE_TOKENS.items() if re.search(rf"(^|[-_]){k}([-_]|$)", name)), None
-    )
-    if not (case_file and case_file.startswith("styled")) and token:
-        style, style_source = token, "file name (run_cases does not record --style)"
-    if case_file == "extra-b.json" or (case_file or "").startswith("styled-extra"):
-        case_set, cs_src = "extra-B", "file name"
+    launch = launch_record(path)
+    if launch:
+        case_file = case_ref(launch["cases"])
+        file_src = f"launch record {launch['source']}"
+        styled = any(c.get("style") for c in load_cases(case_ref(launch["cases"])).values())
+        style = (
+            "styled case file (one style per case)"
+            if styled
+            else "not recorded (the launch record keeps --cases, not --style)"
+        )
+        style_source = f"case file 'style' field (case file from the {file_src})"
+        recorded = launch.get("cases_sha256")
+        now_sha = sha256_file(ROOT / relpath(launch["cases"]))
+        if recorded and now_sha != recorded:
+            flags.append(
+                "Case file changed since the launch (launch sha256 differs from the current file): "
+                "expected outcomes shown are the current version"
+            )
     else:
-        case_set = "B" if ids and all(i in ("PUB-11", "PUB-12", "PUB-13") for i in ids) else "A"
-        cs_src = "case ids"
+        case_file, style = case_file_for(name)
+        file_src = (
+            "file-name convention"
+            if case_file
+            else "default (no launch record; run_cases records no --cases)"
+        )
+        style_source = (
+            "case file 'style' field" if case_file and case_file.startswith("styled") else "none"
+        )
+        token = next(
+            (v for k, v in STYLE_TOKENS.items() if re.search(rf"(^|[-_]){k}([-_]|$)", name)), None
+        )
+        if not (case_file and case_file.startswith("styled")) and token:
+            style, style_source = token, "file name (run_cases does not record --style)"
+    case_set, cs_src = case_set_for(case_file, ids)
     if brief is None and case_set != "extra-B":
         brief = case_set
     expected_total = EXPECTED_TOTAL[case_set]
@@ -648,15 +850,56 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         case_file if case_file else ("extra-b.json" if case_set == "extra-B" else None)
     )
 
-    # agent kind and identity
-    slot = (deploy or {}).get("slot") or slot_by_agent.get(agent)
-    if deploy:
+    # agent kind: the deployed spec's max_products when its content is verified, else name heuristics
+    slot = (deploy or {}).get("slot") or (launch or {}).get("slot") or slot_by_agent.get(agent)
+    spec_rel = (launch or {}).get("spec") or (deploy or {}).get("spec")
+    products, kind_src = (
+        spec_products(
+            ROOT / relpath(spec_rel),
+            (launch or {}).get("spec_sha256"),
+            (deploy or {}).get("created", {}).get("ts") if deploy else None,
+        )
+        if spec_rel
+        else (None, "no spec recorded")
+    )
+    if products is not None:
+        kind = "multi-product" if products > 1 else "A-only"
+        kind_src = f"spec meta.max_products={products} ({kind_src})"
+    elif deploy:
         kind = "multi-product" if deploy["multi_product_build"] else "A-only"
+        kind_src = f"brief file names in the build trace (heuristic; {kind_src})"
     elif slot:
         kind = "multi-product" if ("ab" in slot.split("-") or "brief-b" in slot) else "A-only"
+        kind_src = f"slot name (heuristic; {kind_src})"
     else:
-        kind = "unknown"
+        kind, kind_src = "unknown", kind_src
     panel = next((p for p, k, cs in PANELS if k == kind and cs == case_set), "Other")
+    if deploy and deploy.get("variants"):
+        flags.append(
+            "In-memory experiment variant applied at build time (in the trace, not in git): "
+            + "; ".join(deploy["variants"])
+        )
+    if launch:
+        build_label = str(launch.get("build") or "")
+        named = re.findall(r"\b[0-9a-f]{7}\b", build_label)
+        if build_label and commit and named and not any(c.startswith(commit[:7]) for c in named):
+            flags.append(
+                f"Launch record says build '{build_label[:120]}'; the build trace says git={commit}"
+                + (" (dirty)" if (deploy or {}).get("dirty") else "")
+            )
+        if launch.get("agent_id") and launch["agent_id"] != agent:
+            flags.append(
+                f"Launch record agent {launch['agent_id']} differs from the result's agent"
+            )
+        lv, dv = (
+            str(launch.get("workflow_version") or ""),
+            (deploy or {}).get("created", {}).get("version")
+            or (deploy or {}).get("published_version"),
+        )
+        if lv.isdigit() and dv is not None and int(lv) != dv:
+            flags.append(f"Launch record version {lv} differs from the deploy trace's version {dv}")
+        if str(launch.get("exit", "0")) not in ("0", ""):
+            flags.append(f"Launcher recorded exit {launch.get('exit')} for this run")
 
     # repetition-level strict scoring from all_rows
     per_case: dict[str, dict] = {}
@@ -755,6 +998,11 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         "case_set_source": cs_src,
         "case_file": case_file
         or ("kit/public-test-set.json" if case_set != "extra-B" else "extra-b.json"),
+        "case_file_source": file_src,
+        "launch_record": (launch or {}).get("source"),
+        "launch_build": (launch or {}).get("build"),
+        "launch_cases_sha256": (launch or {}).get("cases_sha256"),
+        "agent_kind_source": kind_src,
         "style": style,
         "style_source": style_source,
         "agent_kind": kind,
@@ -843,7 +1091,10 @@ def case_detail(runs: list[dict], run_id: str, case_id: str) -> dict | None:
         },
         "case": {k: case[k] for k in ("id", "family", "style", "reps", "strict", "category")},
         "expected": cdef.get("expected"),
-        "expected_source": f"{run['case_file']} (current version of the case file)",
+        "expected_source": f"{run['case_file']} (current version of the case file; chosen by "
+        f"{run.get('case_file_source', 'file-name convention')})",
+        "script_and_checks_source": "current version of the case file; the Config Comparison tab uses "
+        "the version committed when the run started",
         "script": cdef.get("script"),
         "checks": cdef.get("checks"),
         "reps": reps,
@@ -918,6 +1169,14 @@ def working_state() -> dict:
 # ---------------------------------------------------------------- processes
 
 
+SIM_OUT = re.compile(r"--out\s+(\S*runs/\S+\.json)")  # any script writing a result under runs/
+EXECUTES = re.compile(
+    r"(?i)python[0-9.]*(\s+-\S+)*\s+\S*(run_cases\w*\.py|builder/build\.py|smoke\w*\.py)\b"
+    r"|(?i:python)[0-9.]*(\s+-\S+)*\s+\S+\.py\b.*\s--out\s+\S*runs/\S+\.json"
+    r"|(^|/)(ba|z)?sh\s+\S*(chain\d*|qrun\w*|scratchpad/\S+)\.sh\b"
+)
+
+
 def running_tests() -> list[dict]:
     """Verified only by a live process: run_cases.py, builder/build.py or a chain script."""
     try:
@@ -927,27 +1186,38 @@ def running_tests() -> list[dict]:
     except (OSError, subprocess.TimeoutExpired):
         return []
     found = []
-    executes = re.compile(
-        r"python[0-9.]*\s+(-u\s+)?\S*(run_cases\w*\.py|builder/build\.py)\b"
-        r"|(^|/)(ba|z)?sh\s+\S*(chain\d*|scratchpad/\S+)\.sh\b"
-    )
     for line in out.splitlines()[1:]:
         parts = line.strip().split(None, 2)
         if len(parts) < 3:
             continue
         pid, etime, cmd = parts
-        if re.match(r"\S*(ba|z)?sh\s+-l?c\b", cmd) or not executes.search(cmd):
+        if re.match(r"\S*(ba|z)?sh\s+-l?c\b", cmd) or not EXECUTES.search(cmd):
             continue  # wrapper shells, editors, viewers and linters that merely name the file
-        if "run_cases" in cmd:
+        if "run_cases" in cmd or re.search(r"smoke\w*\.py", cmd) or SIM_OUT.search(cmd):
             out_file = re.search(r"--out\s+(\S+)", cmd)
-            agent = re.search(r"run_cases\w*\.py\s+([0-9a-f]{8})", cmd)
-            kind = "simulation (run_cases.py)"
+            agent = re.search(r"\s([0-9a-f]{8})[0-9a-f-]*(\s|$)", cmd)
+            script = re.search(r"(\w+)\.py\b", cmd)
+            kind = f"simulation ({script.group(1) if script else 'script'}.py)"
             what = f"agent {agent.group(1) if agent else '?'} -> {Path(out_file.group(1)).name if out_file else 'no --out'}"
+            if out_file:
+                what += " · " + _progress(ROOT / relpath(out_file.group(1)))
         elif "build.py" in cmd:
             slot = re.search(r"--slot\s+(\S+)", cmd)
             kind, what = "build", f"slot {slot.group(1) if slot else '(default)'}"
         else:
             script = re.search(r"(\S+\.sh)\b", cmd)
             kind, what = "chain/queue script", Path(script.group(1)).name if script else "script"
+        if any(f["kind"] == kind and f["what"] == redact(what) for f in found):
+            continue  # a launcher wrapper (uv run, caffeinate) and its python child
         found.append({"pid": pid, "elapsed": etime, "kind": kind, "what": redact(what)})
     return found
+
+
+def _progress(out: Path) -> str:
+    """Reps finished so far, from the run's console log next to its --out file (read-only)."""
+    try:
+        text = out.with_suffix(".log").read_text(errors="replace")
+    except OSError:
+        return "no console log yet"
+    done = re.findall(r"^-- run (\d+) of (\d+):", text, re.M)
+    return f"rep {done[-1][0]} of {done[-1][1]} finished" if done else "no rep finished yet"

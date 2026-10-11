@@ -1,0 +1,257 @@
+[
+ {
+  "id": "PUB-11",
+  "case_key": "N10",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "One product paid, holiday after the late deadline for the others",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "2288",
+    "past_due": 220.0,
+    "days_late": 9,
+    "minimum_payment": 66.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 640.0,
+    "days_late": 9,
+    "instalment_amount": 213.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 75.0,
+    "days_late": 3,
+    "instalment_amount": 25.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay all three today. Says the car loan's overdue amount is already paid. Says she can pay the full amounts of the credit card and the personal loan on Monday the 26th. Accepts whatever dates the agent proposes instead. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 220.0,
+     "date": "2026-10-23"
+    },
+    {
+     "product_id": "p2",
+     "amount": 640.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p3",
+     "reason": "paid"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "all three products stated before any ask",
+   "the agent says payments can take one business day to appear and takes no promise on the car loan",
+   "the agent says the latest date it can record for the credit card and the personal loan is Friday 23 October; 26 and 27 October are not recorded",
+   "one read-back for both promises, naming Friday 23 October, and one confirmation",
+   "one create_promise per promised product and an add_note with reason paid for the car loan"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A20",
+    "A23",
+    "A39",
+    "B2",
+    "B3",
+    "B4",
+    "B6",
+    "B7",
+    "B8",
+    "B9",
+    "B-Closing"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card days_late 9 -> late, deadline 2026-10-23; p2 personal loan days_late 9 -> late, deadline 2026-10-23; p3 car loan days_late 3 -> early, deadline 2026-11-02. p3: already paid this past-due amount -> A39 + B9: no promise, add_note p3 paid. Named date Mon 2026-10-26 is a holiday AND after the p1/p2 deadline (10-23) -> A20 second sentence sends it to A23 (not to the next business day 10-27, which is also past the deadline) and B6 records each on its own deadline -> p1 220.0 and p2 640.0 on 2026-10-23. B closing: at least one promise -> outcome promise.",
+   "ambiguities": "'already paid' is read as payment of this past-due amount (A39 -> note paid), not a past payoff of the product (A40 -> dispute); the script says 'overdue amount' to fix this."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-12",
+  "case_key": "N11",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "Pays one today, floor on one, refuses one",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Can pay only the car loan today, in full. For the credit card, says the full amount is too much, then accepts the agent's next offer. Flatly refuses every offer for the personal loan without giving a reason. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 153.0,
+     "date": "2026-10-16"
+    },
+    {
+     "product_id": "p3",
+     "amount": 140.0,
+     "date": "2026-10-14"
+    }
+   ],
+   "notes": [
+    {
+     "product_id": "p2",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "all three products stated before any ask; paying today is asked once, not again per product",
+   "for the credit card the minimum payment of 153 is offered once, with the note that the rest stays overdue",
+   "personal loan: the full 1320 on Friday 16 October, then 440 on Friday 23 October, and no further offer",
+   "one read-back naming the credit card at 153 and the car loan at 140 today, and one confirmation",
+   "one create_promise per promised product and an add_note with reason refused for the personal loan"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A25",
+    "A26",
+    "A30",
+    "A31",
+    "B2",
+    "B3",
+    "B4",
+    "B5",
+    "B7",
+    "B8",
+    "B-Closing"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card days_late 16 -> late, deadline 2026-10-23, floor minimum_payment 153.0; p2 personal loan days_late 16 -> late, deadline 2026-10-23, floor 440.0; p3 car loan days_late 7 -> early, deadline 2026-11-02. p3: full 140.0 today 2026-10-14 (today allowed, A19). p1: B4 starts at attempt 1 = last BD of this week Fri 2026-10-16; full amount too much -> A26 floor 153.0, rest stays overdue; A30 'attempt 1 ... the floor if the customer already said the full amount is too much' -> 153.0 on 2026-10-16, accepted. p2: attempt 1 full 1320.0 on 2026-10-16 refused; attempt 2 (late) floor 440.0 on 2026-10-23 refused -> A31 stop, B8 add_note p2 refused. Outcome promise.",
+   "ambiguities": "A26 does not name the date of the floor offer. Read with A30 (attempt 1 = last business day of this week; attempt 1 is the floor once 'too much' was said) and PUB-06 (floor for this Friday) it is Fri 10-16. An agent that offers the floor on the deadline (10-23) would ledger p1 on 2026-10-23; A26 'Attempt 2 may name the floor again, on the deadline' implies attempt 1's floor is not on the deadline."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-13",
+  "case_key": "N12",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "A Saturday after one deadline, before the holiday for the other",
+  "variables": {
+   "first_name": "Elena",
+   "last_name": "Rossi",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1991-01-08",
+   "phone_last4": "6604"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "6604",
+    "past_due": 300.0,
+    "days_late": 4,
+    "minimum_payment": 90.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 900.0,
+    "days_late": 20,
+    "instalment_amount": 300.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Wants to pay the full amounts of both products on Saturday the 24th. Accepts whatever dates the agent proposes instead. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 300.0,
+     "date": "2026-10-27"
+    },
+    {
+     "product_id": "p2",
+     "amount": 900.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "both products stated before any ask",
+   "the credit card is not recorded on Saturday 24 October or Monday 26 October; the agent offers Tuesday 27 October",
+   "the personal loan is recorded on its deadline, Friday 23 October",
+   "one read-back naming both dates and one confirmation",
+   "one create_promise per product"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A20",
+    "A23",
+    "B3",
+    "B4",
+    "B6",
+    "B7"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card days_late 4 -> early, deadline 2026-11-02; p2 personal loan days_late 20 -> late, deadline 2026-10-23. Named Sat 2026-10-24: for p2 it is after the deadline -> A23/B6: record p2 on 2026-10-23. For p1 it is a weekend day not after 11-02 -> A20 next business day: Sun 10-25 weekend, Mon 10-26 holiday, Tue 2026-10-27 (BD8) -> p1 on 2026-10-27. Amounts full: p1 300.0, p2 900.0.",
+   "ambiguities": "B6 says 'the other products keep the date the customer named', but a Saturday can never be recorded (A19) and B does not replace A20, so p1 moves to the next business day, skipping the 10-26 holiday."
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]

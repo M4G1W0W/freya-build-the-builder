@@ -6,6 +6,12 @@ The requirements come from `docs/hackathon_notes.md` → Submission (official pa
 
 - [ ] **15:30 freeze.** `make verify` is green, then `git tag freeze-final`. After this, only generic crash and bug
       fixes are allowed.
+- [ ] **Which code is submitted: the commit tagged `freeze-final`.** The user decides which candidate gets the tag
+      (on 11 Oct morning the candidate is branch `cand-final`, ca80d52; not yet merged to `main`). Build from a
+      checkout of that commit and check it before step 2: `git describe --tags` prints `freeze-final`
+      (`git tag --points-at HEAD` if the commit has several tags; after a generic fix, step 4, it prints
+      `freeze-final-N-g<commit>`), `git status --porcelain` prints nothing, and each trace's START line then shows
+      `git=<that commit> dirty=False`.
 - [ ] `git status` is clean. `date -u` is checked.
 - [ ] `set -a && source .env && set +a`. FREYA_API_KEY and OPENAI_API_KEY are set (BUILDER_MODEL and
       BUILDER_MODEL_FALLBACKS are optional: the chain gpt-6.1-sol → gpt-5.5 → gpt-5.4 is in code).
@@ -35,9 +41,11 @@ python3 builder/build.py ~/hidden/<brief-1> ~/hidden/<api-1> --slot hidden-1 --e
 python3 builder/build.py ~/hidden/<brief-2> ~/hidden/<api-2> --slot hidden-2 --export submission/hidden-2.workflow.json 2>&1 | tee traces/hidden-2.log
 ```
 
-   Each build takes about 2 minutes. Run them **one after the other** in one terminal. The explicit `--slot` names
-   keep the two agents in separate workflows.
-3. Read each trace. These greps must each print a line:
+   Each build takes about 2 minutes (longer while Freya is degraded: the builder then retries its platform calls
+   itself, see step 3). Run them **one after the other** in one terminal. The explicit `--slot` names keep the two
+   agents in separate workflows.
+3. Read each trace. These greps must each print a line (except END and the smoke test after an exit 3 with only a
+   503/504 smoke failure: see the table):
 
 ```bash
 grep -E "END +ok=True" traces/hidden-N.log
@@ -58,9 +66,18 @@ grep -E "CREATED +workflow_id=" traces/hidden-N.log   # steps= and tools= are on
    - `engine call: … sent without required field(s)`: the bank's API requires a field that engine-run calls do not
      send. This is a builder gap; decide quickly whether a generic fix is possible.
    - `falling back to`: the primary model was unavailable; fine, but note it.
-4. If a build fails or looks wrong, **re-run the same command.** That updates the same slot in place and the new
-   trace replaces the old one. Never edit the agent by hand. If it fails again, read the error. A **generic** fix to
-   the builder is allowed: commit it, then **re-run both briefs**, so both agents come from the same commit.
+   - `attempt N failed (…); retrying in Ns`: a Freya platform call (dry run, save, export or the smoke chat) got a
+     429, 5xx or network error and the builder retried it (5–60 s waits, up to about 6 min of waiting per call; the
+     smoke chat waits only 5 and 15 s; it stops retrying when the 30-minute limit is near: `giving up: 30-minute
+     build limit near`). Fine if the step then passed.
+   - `this retry can leave a stray workflow`: a failed first create may have been processed, so one unrecorded
+     extra workflow can exist. Harmless (one of 200); ignore it.
+4. If a build fails or looks wrong, **re-run the same command.** Exception: **exit 3 with only a 503/504 smoke
+   test** (see the table) means the agent is deployed; do not re-run. After an `ERROR` on a platform call, check
+   Freya first (outage row in the table), wait a few minutes and re-run **once**. A re-run updates the same slot
+   in place and the new trace replaces the old one. Never edit the agent by hand. If it fails again, read the
+   error. A **generic** fix to the builder is allowed: commit it, then **re-run both briefs**, so both agents come
+   from the same commit.
    Every trace's START line has `git=<commit> dirty=<flag>` (the flag covers `src`, `builder` and
    `pyproject.toml` only). Before submitting, both traces must show `dirty=False`, and the builder code of the
    form's commit must equal theirs. The submission commit only adds traces and exports, so for each trace's commit
@@ -89,9 +106,10 @@ git tag submission-final
 |---|---|
 | LLM error or timeout | The fallback chain (gpt-5.5, gpt-5.4) runs automatically. Re-run the same command. |
 | `spec check` still has problems after 2 repair rounds | Read the problem list. If it is a builder bug, make a generic fix and re-run. |
-| Freya 5xx or 429 | Wait a minute and re-run. Do not hammer the platform. |
+| Freya 5xx or 429 | The builder already retried it (`attempt N failed … retrying in Ns` WARN lines). If the trace still ends with an `ERROR` on a platform call (dry run, save, export): check Freya with one GET (next row), wait a few minutes and re-run **once**. Do not hammer the platform. |
+| Freya outage? | Before blaming the builder, send **one** GET: `.venv/bin/python scripts/credits.py "outage check"` (or `make credits`). If it also hangs and returns 504, the platform is down: wait and re-run once it answers. The 11 Oct 09:38–10:08 UTC outage looked like this: GETs and POSTs returned 504 after about 60 s each. The chat endpoint can be degraded on its own (11 Oct morning: `/chat/message` 504 while other calls worked). |
 | `build time budget` in the trace | Model calls stop after 25 min (the page allows 30 per brief). A skipped repair round deploys the best spec so far; `build time budget used up` fails the build. Re-run; the fallback models are tried when one stalls (`timed out after`). |
-| `END ok=False`, exit code 3 | The agent was saved and exported, but its chat smoke test failed (the TEST line says why). Re-run the same command; if it fails again, read the reply in the TEST line. |
+| `END ok=False`, exit code 3 | **Agent saved, smoke test failed.** The agent was saved and exported, but its chat smoke test failed (the TEST line says why). If the trace shows `CREATED` and `saved slot`, `platform dry-run validation: PASS`, and the only failure is `chat smoke test: workflow starts: FAIL` with a 503/504, the agent **is deployed: do not re-run** (build time is a tie-break; a re-run adds nothing). Otherwise (a wrong or empty opening reply, `forbidden=[…]`, a 500, or any other failure in the trace) re-run the same command; if it fails again, read the reply in the TEST line. |
 | `python3` is 3.9 | Run `export PATH="$PWD/.venv/bin:$PATH"` (`build.py` exits with a clear message on < 3.10). |
 | A brief seems to depend on another document | The FAQ says each hidden brief is one file and `{brief_path}` is that file. Build from that one file only. If in doubt, ask the organisers by replying to the login mail. |
 

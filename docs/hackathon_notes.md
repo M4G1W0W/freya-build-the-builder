@@ -355,6 +355,74 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   documents no other way to send it. A layout module was written and tested, then removed (dead code). On the
   dashboard, ⋮ → Organize gives the readable view. The organisers load our exported JSON, so they get their own
   editor's layout either way.
+- 2026-10-11 03:35 (00:35 UTC) — **Approved overnight plan v2: measurement first, no B or C before the freeze.**
+  The plan is `docs/plans/2026-10-11-overnight-plan-v2.md`.
+  - *Alternatives weighed:*
+    - (A) refining prompts and FACTS;
+    - (B) code controls dates, attempts, precedence and recording;
+    - (C) a conversational state-machine redesign.
+  - *Decision:* ship F2 plus the measured PUB-06 winner, backed by matched case-level 3/3 measurement: a bounded
+    PUB-06 comparison, the first A+B baseline on F2, and fresh raw-A and single-file A+B builds. The bounded "ending
+    wins" precedence fix (review gap 7) is optional and isolated behind three gates. B-date is deferred. Full B and
+    C are rejected for this event.
+  - *Reasons:*
+    - In 18 of 18 local transcripts the `create_promise` arguments equalled the last confirmed read-back.
+    - The dominant failure, PUB-06 (6 of 12 calls since F1), is offer sequencing, not recording.
+    - B's per-turn Freya mechanisms (date-part extraction in negotiate, node re-entry with a fresh line, a baked
+      numeric amount) are documented but unverified.
+    - Code control turns an off-schema hidden-brief rule into a hard failure of a whole family of cases.
+    - C cannot be measured before 15:30.
+  - *What keeps B-date open:* "this Friday" was resolved as Saturday 17 Oct three times before F2, and exp07 showed
+    that experimental-5's date choice is sensitive to unrelated FACTS lines.
+  - *The user's conditions:* any newly failing agent-caused or unexplained case blocks promotion; 340 calls is the
+    absolute overnight cap; the precedence fix needs 3/3 variant-C extractions plus the negative checks and a
+    fresh-build regression.
+- 2026-10-11 04:16 (01:16 UTC) — **M1 picks W = G1 (measured, not yet merged).** Under the plan's rule an arm qualifies
+  only with PUB-06 at 3/3 and no newly failing agent-caused or unexplained case against the F2 control in the same
+  block. G1 (cand-g1 83f8263): PUB-06 3/3, nothing newly failing; G2 (cand-g2 0bc83c4): PUB-06 2/3 and PUB-07 newly
+  failing (rule 21 re-ask). G1's caveats (unmeasured: PUB-07 pieces, customer-proposed date/amount, Brief B) are in
+  `runs/dev/r4/g1-review.md`; merging waits for the user.
+- 2026-10-11 04:53 (01:53 UTC) — **Overnight simulations stopped (plan stop condition).** Simulation a36c1d01 (M2
+  rep 2) stayed `running` from 01:21:29 UTC after all its calls ended and blocked the workspace for 30 min. Per the
+  user's rule no PUT/pause/stop; offline work continued (derivations, reviews, identity-fix design v2). Details and
+  the resume queue: `docs/plans/2026-10-11-overnight-report.md`.
+- 2026-10-11 14:30 (11:30 UTC) — **User picks `cand-eng.4` (cfa4d9d) to deploy and measure FIRST (not a final selection).** Alternatives:
+  `cand-final.1` (ca80d52) and `cand-eng.5` (27f5647). Reason: cand-eng.4 is cand-final.1 plus 8 commits (ancestry
+  checked) that make the builder follow a hidden brief's own rules (all-at-once identity check, the brief's own
+  "too much" rule, "this <weekday>", percentage floor half-up). Its `--dry` renders of the saved A and A+B specs
+  differ from cand-final.1 only in the 3 FACTS code nodes, so the public-brief prompts are unchanged. cand-eng.5
+  changes Brief B FACTS (PUB-12) and needs about 6 more reps, which the degraded platform (~33 min per rep) can't
+  fit before the freeze. Evidence still required: measured styled-a and A+B results (queue E4-*).
+- 2026-10-11 14:50 (11:50 UTC) — **User: no automatic freeze and no automatic selection of an unmeasured
+  candidate.** The 18:30 Istanbul (15:30 UTC) freeze is an internal target; submission closes 23:00 Istanbul
+  (20:00 UTC). The evidence and the fallback options go to the user before the final selection.
+- 2026-10-11 16:50 (13:50 UTC) — **Internal simulation-call cap raised 500 -> 705 (user authorized 13:45 UTC a bounded
+  raise computed from the remaining needs; it authorizes no suite and no unlimited retries).** Cumulative usage is kept
+  (`runs/dev/r4/calls.tsv`, 333 before E4-A rep 3). 705 = 343 (used incl. rep 3) + 60 (rest of the E4 queue:
+  E4-AB-all 39, E4-AB-xb 9, E4-VE 12) + 222 (dossier §10 matched comparison T1 66, T2 60, T3 96; T4 dropped) + 30
+  (retry reserve, ~10% of planned validation: runs use maxRetries 0 and no reruns, so extra calls come only from a
+  stopped/resumed rep, conservative ledger booking or a user-approved repeat) + 50 (hidden-brief reserve: 2 regression
+  checks after a generic fix, styled-a 10 + styled-ab-all 13 each, + 2 smokes per hidden agent). Every item still
+  needs its own user go. Credits do not bind (393 USD; ~0.15-0.25 USD/call -> 55-90 USD). Applied to `qrun4.sh` and
+  this session's `run_one.sh`.
+- 2026-10-11 17:15 (14:15 UTC; corrected 14:20 after a 3-lens read-only check) — **Challenger arm of the proposed
+  comparison eng.6 -> eng.8 (4267bb0); eng.4 stays the comparison candidate. E4-A-styledA completed and dequeued.
+  Cap 705 -> 789 (housekeeping, user ~14:05; nothing built, deployed or run).** eng.8's bar (dossier §11.3 Primary,
+  201 calls): T1 66 + T3 96 + E1 transfer-path cases 30 + D8 9 (the engine-required eng.8 `--spec
+  fix1_audit_spec_ab4.json` PUB-05 defect path); T2 raw-A 60 strongly preferred; eng.6 stays only as the control of E2,
+  the closing-fix isolation on the same saved spec (39 calls), which runs only on explicit approval. Recalculated
+  from cum 343 (kept; it includes 10 phantom calls booked for E4-A attempt 1's POST 504): + E4 queue remainder 60 +
+  201 + 60 + 39 = 360 planned, + 36 retry reserve (~10%) + 50 hidden-brief reserve = **789**, applied under the
+  user's 13:45 bounded-raise authorization (dossier §11.4). Found: the Brief-A-ledger PUB-05 cases would fail the
+  ledger on the A+B ab4 agent (Brief B rule 8 note; prediction); only `styled-ab-a.json` PUB-05 fits today. Run
+  items only through `run_one.sh` + `suite_once.py` (`qrun4.sh` reruns slow reps and uses platform retries).
+- 2026-10-11 17:40 (14:40 UTC) — **Final comparison pre-registered (user go 14:35): eng.4 vs challenger on FRESH
+  builds.** A arm from `raw-a.md` (raw-material hidden shape; clean brief-a covered by Methodology's repeated `--dry`
+  extractions), A+B arm from `ab-single.md`; per round styled-ab-all + styled-a + path cases (E1-AB in every round: user amendment 14:37, +8 calls);
+  rounds alternate arms; harness `run_one.sh`/`suite_once.py` via `plan_run.sh` (maxRetries 0, no reruns, gate stop ->
+  health-check and continue, never repeat). Challenger = Methodology's narrow closing protection if tagged with green
+  tests by 15:00 UTC, else eng.8. D8 replaced by the dry goodbye metric + live path cases; E2 deferred. 168 calls planned.
+  Plan, thresholds and decision rule: `docs/plans/2026-10-11-final-comparison-plan.md`.
 
 ## Score log
 
@@ -422,3 +490,7 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
 | 11-10 01:42 | **a069dd2 (F3)** (slot exp-f3-a, 35098a88) | F3 = F2 + the too-much rule on the attempt-1 line ("either amount only on this date (not today, unless today is this date)") and the OFFER PLAN item ("1) <full> (or floor <floor> after \"too much\") on <date>") | A | 3 | PUB-06 talkative **1/3** | exp-f3-a / 35098a88 | | **F3 does not fix PUB-06**: both failures still "I can offer a minimum payment of 637.50 ... Can you pay that today?" right after "too much". The model does not consult the FACTS date at that turn; the old trigger-style line ("IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH ...") had made it 8/8. `runs/dev/r3/F3a069dd2-p06-talkative-bd4da7c.json`, `F3P06-<call>.txt` |
 | 11-10 01:46 | a069dd2 (F3) | PUB-07 asks_back + pieces | A | 3 + 3 | asks 2/3, pieces 3/3 | exp-f3-a / 35098a88 | | **dates right in 6/6** (echo holds with F3). The asks failure: the asks_back customer cut in with "Which account is this about?"; the agent answered and re-asked the exact day in the same message; the judge counts two asks. Generic fix idea (not done): the identity step's "answer a question back, do not repeat your question in that message" made global. `runs/dev/r3/F3a069dd2-p07-{asks,pieces}-bd4da7c.json` |
 | 11-10 01:54 | G1 / G2 | PUB-06 talkative x3: G1 done; G2 cancelled for the context save (not run) | A | 3 | **G1 2/3** (r1 failed: \"the minimum payment was offered twice\", call bfe80eb8; not yet read) | exp-g1-a 31f79439 / exp-g2-a efb690fd | | **G1** = F3 + the old too-much FACTS line restored (dirty build; patch `runs/dev/exp07/g1-on-a069dd2.patch`). **G2** = F3 + ATTEMPTS sentence "Each offer of yours names its amount and its date as written in FACTS (...); the only \"today\" question is the opening one." (`exp07 offerdate`). Results: `runs/dev/r3/G1-p06-talkative-bd4da7c.json`, `G2-...`. The winner then needs PUB-07 asks + pieces (the too-much line once interacted with PUB-07). |
+| 11-10 04:16 | **G1 83f8263** / G2 0bc83c4 / F2 bd4da7c (control) | overnight M1: `block-p06.json` (PUB-06 talkative, PUB-07 asks_back, PUB-09 talkative, PUB-03 corrects), `--reps 1` x3 per arm, interleaved | A | 3 | cases at 3/3: **G1 3/4**, G2 2/4, F2 1/4 | exp-g1-a 31f79439 / exp-g2-a efb690fd / dev-a-llm2 2485fc27 | | Per case G1/G2/F2: PUB-06 3/3, 2/3, 0/3; PUB-07 3/3, 2/3, 3/3; PUB-09 3/3, 3/3, 2/3; PUB-03 1/3, 3/3, 2/3. PUB-03 failures are the common identity defect (G1 both LEDGER: d10044ef promise after 3 wrong DOBs, d41ea98c 40-turn loop). F2 r3 PUB-06 was a customer hang-up. `runs/dev/r4/M1-*.json`, `analysis-m1.md` |
+| 11-10 04:21 | bd4da7c (F2) | overnight M2: A+B control dev-ab-llm v14 on `styled-ab-all.json`, **interrupted** | A+B | 2 of 3 | reps 12/13, 10/13 | f8f9b203 / b867b809 | | **platform**: rep-2 simulation a36c1d01 stuck `running` from 01:21:29 UTC; rep 3 never ran (sims stopped 01:53 UTC). Failures: r1 PUB-03 in_words (identity defect, ledger); r2 PUB-05 silent hang-up, PUB-12 corrects artefact (judge), PUB-13 asks_back "Why do you need that?" counted as 2nd decline (NEW identity defect, ledger). `runs/dev/r4/M2-ABv14-all.log`, `analysis-m2.md` |
+| 11-10 13:39 | **cand-eng.4 cfa4d9d** (`--spec spec-a-llm`) | E4-A-styledA (`styled-a.json`), maxRetries 0, no reruns; **stopped after rep 2** (platform error in rep 1, see Notes) | A | 2 of 3 | raw reps **4/10, 10/10**; strict 3/3 at most 4/10 (PUB-01/03/04/06/08/10 failed rep 1) | exp-eng4-a 66db0b41 / f166447e | 11 s, 28 s (control M3 G1: 4/4/8 s) | Rep 1 (sim 56096a1e): 5 silent hang-ups (PUB-01/03/04/08/10: no platform event for ~60 s after the customer's first answer in the `opening` node, customer-ended-call) + PUB-06 `extraction_error` on who_answered (model then asked DOB from the opening node, 'technical issue' x2, closed not_verified/declined). The `opening` node is byte-identical to G1's. Rep 2 (sim 5407adea): 10/10, all run verdicts, slow (5-35 s turns). Smoke 3 before it: PASS, 50 s turns. `runs/dev/r4/E4-A-styledA.{log,attempts.jsonl,meta.json}`, calls in `E4-A-styledA.calls/` |
+| 11-10 13:50 | **cand-eng.4 cfa4d9d** (`--spec spec-a-llm`) | E4-A-styledA **rep 3** (user D3 13:45: one more rep, same slot/cases; maxRetries 0, no reruns, corrected platform-error gate) | A | 1 (3rd) | **10/10**; **three-rep raw strict 3/3 = 4/10** (reps 4, 10, 10; PUB-01/03/04/06/08/10 = 2/3, failed only in rep 1) | exp-eng4-a 66db0b41 / f166447e | 7 s | Sim 51c4a5e0 13:45 UTC, 264 s, worst turn 25 s, no hang-ups; only error event = PUB-10's injected create_promise failure (excused). Credits 393.20 -> 391.96. `runs/dev/r4/E4-A-styledA-r3.{log,attempts.jsonl,meta.json}` |

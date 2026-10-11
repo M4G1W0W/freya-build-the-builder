@@ -1,0 +1,560 @@
+[
+ {
+  "id": "PUB-01",
+  "case_key": "N1",
+  "brief": "A",
+  "family": "Dates",
+  "level": "medium",
+  "title": "Pays the full amount this Friday",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today, but says he can pay the full amount this Friday. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 420.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent asks whether he can pay today before discussing any other date",
+   "'this Friday' is taken as Friday 16 October and accepted without pushing for an earlier date",
+   "the read-back names the credit card, 420 and Friday 16 October and asks for confirmation before create_promise",
+   "create_promise called exactly once",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A22",
+    "A28",
+    "A29",
+    "A34",
+    "A37",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card, days_late 6 -> early band (A18), deadline 2026-11-02. Customer names 'this Friday' = Friday of the current week (A22) = 2026-10-16, a business day, >= today and <= deadline (A19). A proposed date is not a refusal (A29), amount = full past_due 420.0 (A24). Promise p1 420.0 on 2026-10-16; outcome promise (A46).",
+   "ambiguities": ""
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-04",
+  "case_key": "N2",
+  "brief": "A",
+  "family": "Dates",
+  "level": "medium",
+  "title": "Names a Saturday inside the deadline",
+  "variables": {
+   "first_name": "Lena",
+   "last_name": "Hoffmann",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1984-01-30",
+   "phone_last4": "2219"
+  },
+  "products": [
+   {
+    "type": "car_loan",
+    "past_due": 1250.0,
+    "days_late": 14,
+    "instalment_amount": 400.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Says she can pay the full amount on Saturday the 17th. If that day cannot be used, accepts the date the agent proposes instead. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 1250.0,
+     "date": "2026-10-19"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "her own date is not counted as a refusal",
+   "the agent does not accept Saturday 17 October and offers the next business day, Monday 19 October",
+   "the read-back names the car loan, 1250 and Monday 19 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A20",
+    "A29",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 car loan, days_late 14 -> late band, deadline 2026-10-23. Named day Sat 2026-10-17 is a weekend day and not after the deadline -> A20: offer the next business day. Sun 10-18 weekend, Mon 10-19 business day -> 2026-10-19 (<= deadline). Amount = full 1250.0. Promise p1 1250.0 on 2026-10-19.",
+   "ambiguities": ""
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-07",
+  "case_key": "N3",
+  "brief": "A",
+  "family": "Dates",
+  "level": "hard",
+  "title": "'Next Friday' said on a Wednesday",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Says he can pay the full amount next Friday. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 540.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "'next Friday' is taken as Friday 23 October, not Friday 16 October",
+   "the read-back names the personal loan, 540 and Friday 23 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A22",
+    "A29",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 personal loan, days_late 5 -> early band, deadline 2026-11-02. A22: 'next <weekday>' = that weekday in the following calendar week. Current week Mon 10-12..Sun 10-18 (holds 'this Friday' 10-16); following week Mon 10-19..Sun 10-25 -> Friday 2026-10-23 (BD7), business day, <= 2026-11-02. Amount full 540.0. Promise p1 540.0 on 2026-10-23.",
+   "ambiguities": "If a week were read Sunday-to-Saturday the following week is Sun 10-18..Sat 10-24, still Friday 10-23: no effect."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-09",
+  "case_key": "N4",
+  "brief": "A",
+  "family": "Persuasion",
+  "level": "hard",
+  "title": "Refuses attempt 1, accepts attempt 2",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. When asked whether he can pay today, says no, with no date and no amount. Flatly refuses, without giving a reason, the first payment amount and date the agent then proposes. Accepts the second amount and date the agent proposes. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 700.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent never asks how much he can pay",
+   "first offer: the full 2100 on Friday 16 October",
+   "second offer: the instalment amount 700 on Friday 23 October",
+   "the read-back names the personal loan, 700 and Friday 23 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A24",
+    "A25",
+    "A30",
+    "A31",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 personal loan, days_late 28 -> late band, 2 attempts, deadline 2026-10-23; floor = instalment_amount 700.0 (A25). 'No' to today with no date/amount = flat refusal (A30) -> attempt 1: full past_due 2100.0 on the last business day of this week = Fri 2026-10-16 (today Wed is not that day). Flat refusal of attempt 1 -> attempt 2 (late band): floor 700.0 on the deadline 2026-10-23. Accepted -> promise p1 700.0 on 2026-10-23.",
+   "ambiguities": "A30 could be misread as the 'no to today' itself consuming attempt 1 with no offer, which would make the first offer the floor on the deadline; the brief says attempt 1 is a proposal ('Attempt 1: propose...'), so the first offer is the full amount on 10-16."
+  },
+  "oracle": "D1/D2 exact match; script clarified after derivation (expected unchanged), re-checked blind"
+ },
+ {
+  "id": "PUB-05",
+  "case_key": "N5",
+  "brief": "A",
+  "family": "Amounts",
+  "level": "hard",
+  "title": "Offers below the floor on a valid day",
+  "variables": {
+   "first_name": "Tomas",
+   "last_name": "Novak",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1990-09-09",
+   "phone_last4": "8846"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 780.0,
+    "days_late": 21,
+    "instalment_amount": 260.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Offers to pay 200 on Thursday the 15th. When told that amount cannot be recorded, accepts the amount the agent offers instead, still on Thursday the 15th. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 260.0,
+     "date": "2026-10-15"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "his offer of 200 is not treated as a refusal",
+   "the agent says 200 cannot be recorded and offers the instalment amount of 260 once",
+   "the read-back names the personal loan, 260 and Thursday 15 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A25",
+    "A27",
+    "A29",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 personal loan, days_late 21 -> late band, deadline 2026-10-23; floor = instalment_amount 260.0 (A25). Named date Thu 2026-10-15 = BD1, >= today, <= deadline: valid (A19). Amount 200 < floor 260 -> A27: say it cannot be recorded, offer the floor once. Accepted on the customer's own valid date -> promise p1 260.0 on 2026-10-15.",
+   "ambiguities": "A27 does not say on which date the floor is offered; the customer's named date (10-15) is valid under section 7, so it is kept. A26's 'the rest stays overdue' sentence is tied to the 'too much' path, so it is not required here (not checked)."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-08",
+  "case_key": "N6",
+  "brief": "A",
+  "family": "Dates",
+  "level": "medium",
+  "title": "Names the holiday inside the deadline",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Says she can pay the full amount on Monday the 26th. If that day cannot be used, accepts the date the agent proposes instead. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 180.0,
+     "date": "2026-10-27"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent does not accept Monday 26 October (a bank holiday) and offers Tuesday 27 October",
+   "her own date is not counted as a refusal",
+   "the read-back names the credit card, 180 and Tuesday 27 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A20",
+    "A29",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card, days_late 5 -> early band, deadline 2026-11-02. Named Mon 2026-10-26 is a Freya holiday, not after the deadline -> A20: next business day = Tue 2026-10-27 (BD8, <= 11-02). Amount full 180.0. Promise p1 180.0 on 2026-10-27.",
+   "ambiguities": ""
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-06",
+  "case_key": "N7",
+  "brief": "A",
+  "family": "Dates",
+  "level": "medium",
+  "title": "Asks for a date after the late deadline",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today. Asks to pay the full amount on 6 November. When told the latest possible date, accepts it. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 2125.1,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "her own date is not counted as a refusal",
+   "the agent says the latest date it can record is Friday 23 October and offers it",
+   "6 November is never recorded",
+   "the read-back names the credit card, 2125.10 and Friday 23 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A20",
+    "A23",
+    "A29",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card, days_late 12 -> late band, deadline 2026-10-23 (BD7). Named Fri 2026-11-06 > deadline -> A23: say the latest recordable date is the deadline and offer it. Accepted -> promise p1 full 2125.1 on 2026-10-23.",
+   "ambiguities": ""
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-03",
+  "case_key": "N8",
+  "brief": "A",
+  "family": "Hardship",
+  "level": "hard",
+  "title": "Job loss, declines support, still names a date",
+  "variables": {
+   "first_name": "Owen",
+   "last_name": "Park",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1992-07-21",
+   "phone_last4": "6630"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "0377",
+    "past_due": 95.0,
+    "days_late": 4,
+    "minimum_payment": 28.5
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. When asked whether he can pay today, says he lost his job last month. If offered a transfer to another team, declines it and in the same answer says he still wants to pay the full amount on Friday the 23rd. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 95.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "one short sentence of sympathy",
+   "no persuasion attempt: the agent proposes no date or amount of its own",
+   "the support team is offered",
+   "the read-back names the credit card, 95 and Friday 23 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A32",
+    "A34",
+    "A38",
+    "A46"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card, days_late 4 -> early band, deadline 2026-11-02. Job loss -> A32: sympathy, no persuasion, offer support; declined. A32 last sentence: if the customer still names a date or amount, record it under sections 7-8. Fri 2026-10-23 = BD7, business day, <= 2026-11-02 -> valid. Amount full 95.0. Promise recorded -> outcome promise (A46 table: at least one promise recorded), not no_promise/hardship.",
+   "ambiguities": "If the simulated customer names the date in the same turn as the job loss, an agent may go straight to the read-back; A32 still says to offer the support team, so that check stays."
+  },
+  "oracle": "D1/D2 exact match; script clarified after derivation (expected unchanged), re-checked blind"
+ },
+ {
+  "id": "PUB-02",
+  "case_key": "N9",
+  "brief": "A",
+  "family": "Restructuring",
+  "level": "hard",
+  "title": "Promise recorded, then asks for lower instalments",
+  "variables": {
+   "first_name": "Maria",
+   "last_name": "Costa",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1979-11-02",
+   "phone_last4": "0358"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 310.5,
+    "days_late": 11,
+    "instalment_amount": 103.5
+   }
+  ],
+  "script": "Maria Costa herself answers. Confirms the name and gives both security answers correctly. When asked whether she can pay today, says she will pay the full amount this Friday. Confirms at the read-back. After the agent says the promise is recorded, asks for a new payment plan with lower instalments.",
+  "expected": {
+   "outcome": "transferred",
+   "reason": "restructuring",
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 310.5,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": [
+    {
+     "queue": "restructuring"
+    }
+   ]
+  },
+  "checks": [
+   "the read-back names the personal loan, 310.50 and Friday 16 October",
+   "text-message sentence said after the promise",
+   "the agent does not describe a plan of its own",
+   "transfer_to_agent called with queue restructuring after the promise was recorded"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A19",
+    "A22",
+    "A34",
+    "A36",
+    "A38",
+    "A41",
+    "A46"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 personal loan, days_late 11 -> late band, deadline 2026-10-23. 'This Friday' (A22) = 2026-10-16 (BD2), <= deadline. Promise p1 full 310.5 on 2026-10-16 recorded. Then request for lower instalments -> A41 transfer queue restructuring; A46: 'If a transfer follows a recorded promise, close as transferred with that transfer's reason' -> transferred/restructuring; the recorded promise stays in the ledger (A36).",
+   "ambiguities": "family must not be 'Third party' (run_cases.py would then play a non-customer)."
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]

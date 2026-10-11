@@ -320,7 +320,7 @@ def test_non_historical_definition_is_never_comparable():
     )
     e = base["entries"][0]
     assert not e["comparable"] and "not verifiable" in e["not_comparable_because"][0]
-    assert e["row"].split("|")[2].startswith("unverified:")
+    assert e["row"].split("|")[1].startswith("unverified:")
 
 
 def test_partial_log_drops_a_discarded_attempt():
@@ -340,3 +340,33 @@ def test_redacted_json_stays_parseable():
     body = C.D.dumps({"error": "unknown case 'password=abcdefgh'", "x": ["Bearer abcdefghijk"]})
     parsed = json.loads(body)  # redacting serialised JSON used to swallow the closing quote
     assert "abcdefgh" not in body and parsed["x"] == ["[REDACTED]"]
+
+
+def test_same_definition_in_two_case_files_is_one_row():
+    # verification finding: styled-ab-a.json and styled-ab-all.json hold identical PUB-01..10
+    def same(path, cid, s, e):
+        return {**fake_definition(path, cid, s, e), "hash": "h-" + cid}
+
+    base = C.build(
+        [
+            run("x1", "old", {"PUB-01": [True] * 3}, T0, case_file="styled-ab-a.json"),
+            run(
+                "x2",
+                "new",
+                {"PUB-01": [True, False, True]},
+                T0 + 600,
+                case_file="styled-ab-all.json",
+            ),
+        ],
+        [],
+        [trace("old", "aaaaaaa"), trace("new", "bbbbbbb")],
+        [],
+        definition_of=same,
+    )
+    cm = diff(base)
+    assert cases_in(cm, "newly_failing") == ["PUB-01"]
+    row = C.view(base, {})["rows"][0]
+    assert row["definition"]["files"] == [
+        C.CASES_DIR + "styled-ab-a.json",
+        C.CASES_DIR + "styled-ab-all.json",
+    ]

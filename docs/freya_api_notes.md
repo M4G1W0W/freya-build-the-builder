@@ -266,6 +266,23 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
     status still `running` at 21:55). It blocks every new simulation ("concurrent simulations"), and the kit's
     `run_simulation` polls with no timeout. `PUT /simulations/{id}` with `{"status": "paused"}` (live spec; not in the
     kit) set it to `paused`, keeping its data, and the next queued simulation started 1 s later [C, user-approved].
+  - **Pause does not stop the platform's own retries** (11 Oct, 6d0c9464): runs carry `attempts`/`maxAttempts`
+    (`maxAttempts` 4 = 3 retries, the default; the kit's `run_simulation` does not set `maxRetries`). During the
+    09:38-12:07 UTC degradation a simulation paused at 11:22 restarted runs 11:38-12:06, and after a second
+    `PUT status=paused` (12:08:11, status read back `paused`) it still started a retry at 12:09:28. Retries stop only
+    when each run reaches `maxAttempts`. The live spec's PUT also accepts `status: completed` and `maxRetries`;
+    their effect on queued retries is [ND] (untested) [C: GET /simulations/{id}/iterations/{it} 12:14 UTC,
+    `runs/dev/r4/6d0c9464-iteration-1214.json`].
+  - **`maxRetries: 0` on `POST /simulations` gives `maxAttempts` 1** (one attempt, no platform retry) [C: smoke
+    188b9156, 11 Oct 12:37 UTC; live spec range 0-10]. The kit's `run_simulation` does not send it (default 3).
+  - **The judge verdict is also on the call record** (`GET /call/{id}` -> `successCriteriaResult {success, reason}`)
+    and can be there while the run still reads `analyzing` or ends `error`/`inconclusive` 'analysis never arrived'
+    [C: 94c9e350 call 6af560aa; 6d0c9464 calls ed7f5328, babc4608]. Run verdict == call-record verdict on 50/50
+    calls where both exist (43 from M3/M2 r3, 7 from 6d0c9464) [C, 11 Oct 12:20-12:29 UTC].
+  - **Outcomes can change after a simulation is `completed`**: the platform re-judges runs with no new calls
+    (6d0c9464: completed 12:26:29; updatedAt 12:34:43 -> 12:40:20 -> 12:51:11; outcomes pass 5/fail 1/error 6/
+    inconclusive 1 at 12:36 -> pass 8/fail 1/error 4 at 12:51; runs error->pass and inconclusive->pass) [C, Service
+    Check reads 11 Oct]. A score read right at completion during an outage is provisional.
   - `GET /simulations/{id}/iterations` gives passed, failed, inconclusive, error and analyzing counts, `passRate` and `agentVersionId`.
   - `GET /simulations/version-checks` and `GET /simulations/version-persona-runs` take `workspaceId` and `entityVersionId`.
   - `POST /simulations/{id}/rerun` starts a new iteration [C].
