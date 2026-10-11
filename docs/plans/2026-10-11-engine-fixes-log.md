@@ -12,7 +12,8 @@ Candidate tags, all preserved and unmerged; adoption needs the user's separate a
 `cand-eng.4` = cfa4d9d, `cand-eng.5` = 27f5647, `cand-eng.6` = a170935, `cand-eng.7` = a985076,
 `cand-eng.8` = 4267bb0, `cand-eng.9` = b103e21 (14:37 UTC: eng.8 + closing guard; the challenger, see its
 hand-off at the end); `cand-eng.4g` = 44d4efa and `cand-eng.9g` = b40a576 (15:09 UTC: the transfer
-goodbye on each base, see the last section).
+goodbye on each base, see the last section); `cand-eng.4o2` = f12aa3e and `cand-eng.9o2` = 9c87bdf (15:39 UTC: offer 1
+after an early blanket refusal, see the last section; `cand-eng.4o`/`.9o` superseded).
 
 1. **Fix 1 (cand-eng.6/.7) substantially changes fresh-build negotiation instructions.** Its prompt
    sentence moved most of `unmodeled` into rendered `stage_rules` (rendered negotiate stage_rules grew
@@ -613,3 +614,27 @@ Goodbye.": before a hand-off the model fires the transition with no message, so 
   path); the user amended criterion (3) at 15:08 so that counts, judge verdicts decide. If the model also says
   goodbye, it is said twice. Unmeasured on Freya; the Simulation Developer builds it from the measured arms'
   saved specs (`--spec`).
+
+## Hand-off: `cand-eng.4o2` = f12aa3e and `cand-eng.9o2` = 9c87bdf (offer 1 after an early refusal), tagged 15:39 UTC
+
+User-approved for TESTING (15:20 UTC), not adoption. Cause (read-only investigation of eng.9 fresh A+B PUB-12,
+call 58ae997e; 2 refuting skeptics): the customer refused both loans in one unprompted message while the credit
+card's date was still open; the agent never made either loan's offers (FACTS listed them; ATTEMPTS says "never
+skip one"). Not eng.9-specific: the same skip on 676e9df (pre-Fix 1, XB12r3) and item 3's extra-B diagnosis
+(5/5). The ledger miss in that call (2026-10-22 vs 2026-10-15) is a separate simulator date drift ("tomorrow,
+the twenty-second"); a date-conflict sentence is proposed but deferred by the user.
+
+- **Fix (identical on both bases, branches `cand-eng4-offers` / `cand-eng9-offers`, 3 commits each):** the unmeasured
+  item 3 paragraph (4006d5c, cherry-picked), extended: a no given before the agent made a product's offer does not
+  use it; then reworked after a 2-lens adversarial review of `cand-eng.4o` = 8c1a05e / `cand-eng.9o` = ecb4bcb
+  (superseded, kept): a product with no persuasion attempt is closed by a no; the paragraph defers to a brief that
+  counts the opening question; hardship at any point and call-ending rules take precedence. Only multi-product
+  accounts with a `first_ask_multi` get it; prompts unchanged.
+- **Evidence:** 879 / 863 passed, ruff clean; account_facts over 1,200 states: single-product and raw-A specs
+  identical, A+B multi-product facts differ only by the paragraph; render diff over 86 saved specs: only the
+  three code nodes that embed the facts module change, 0 prompt/ENDINGS differences; code node under the
+  40,000-byte guard.
+- **Required checks (Simulation):** tier 1 (12 calls, strict 3/3, `--spec` from spec-ch-fab / spec-eng4-fab vs
+  the base): kit PUB-12 x3 (attempts scored apart from the simulator date drift), styled-extra-b x3, PUB-13 x3;
+  tier 2: PUB-11 x3, rest of styled-extra-b, A set x1. Uncovered by any fixture: multi-product hardship, a
+  0-attempt band, restructuring mid-negotiation.
