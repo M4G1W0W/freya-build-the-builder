@@ -423,6 +423,14 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   health-check and continue, never repeat). Challenger = Methodology's narrow closing protection if tagged with green
   tests by 15:00 UTC, else eng.8. D8 replaced by the dry goodbye metric + live path cases; E2 deferred. 168 calls planned.
   Plan, thresholds and decision rule: `docs/plans/2026-10-11-final-comparison-plan.md`.
+- 2026-10-11 18:51 (15:51 UTC) — **D6 (user): eng.9 selected for `freeze-final`; eng.9g if it passes by 16:40 UTC.**
+  Basis: the pre-registered rule on the matched complete rounds 1-2 (round 3 of both arms lost to a platform model-step
+  outage from ~15:16 UTC): A+B strict 10/13 = 10/13, raw-A 9/10 > 8/10, path cases 2/3 + 2/2 vs 0/3 + 0/2 (eng.4's r2
+  lost to the platform), PUB-06 overdue 4/4 = 4/4, no eng.9-specific agent failure (PUB-12 and PUB-03 classified as
+  simulator drift/truncation, shared), dry battery (a)-(e) met. Results: `docs/reviews/2026-10-11-final-comparison-results.md`.
+  Remaining Freya time goes only to the eng.9g transfer-goodbye evaluation (18 calls, pre-registered rule); the eng.4g
+  evaluation (3 items run: 0/3 stalled, 1/1, 1/2) and the offers-fix test (o2) are dropped, untested. Freeze commits
+  prepared without Freya: `final-eng9` (cand-eng.9 + main) and `final-eng9g` (cand-eng.9g + main).
 
 ## Score log
 
