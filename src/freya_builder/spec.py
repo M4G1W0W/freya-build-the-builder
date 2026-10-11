@@ -409,22 +409,36 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     ident = spec["identity"]
     vt = by["verify_identity"]
     at_once = identity_all_at_once(spec, vt)
+    # empty question and answer fields mean the spec reads the tool as all-at-once: only the keys
+    # are then wrong, and answer_ok_field is unused either way
+    no_answer_ok = at_once or not (ident["question_field"] or ident["answer_field"])
+    qkeys = [q["key"] for q in ident["questions"]]
+    fields = [f.name for f in vt.request]
+    shape = (
+        " (if verify_identity takes every answer in one call, each identity question key is "
+        "the exact request field for that answer, and question_field, answer_field and "
+        'answer_ok_field are ""; request fields: ' + ", ".join(fields) + ")"
+    )
     if at_once:
         cid = customer_field(spec, tools)
-        keys = {q["key"] for q in ident["questions"]}
+        for k in qkeys:
+            if k not in fields:
+                exact = next(f for f in fields if f.lower() == k.lower())
+                p.append(f"identity question key {k!r} must be the exact request field {exact!r}")
         for f in vt.request:
-            if f.required and f.name != cid and f.name not in keys:
+            # an enum field is a setting, not a free-text answer (review of cand-eng.1)
+            if f.required and f.name != cid and not f.enum and f.name.lower() not in _lower(qkeys):
                 p.append(
                     f"verify_identity takes every answer in one call and requires {f.name!r}, "
                     f"but no identity question has key {f.name!r}"
                 )
+    elif not ident["question_field"] and not ident["answer_field"]:
+        p.append(
+            f"identity question keys {[k for k in qkeys if k not in fields]} are not "
+            f"verify_identity request fields" + shape
+        )
     else:
         keys = _enum(by, "verify_identity", ident["question_field"])
-        shape = (
-            " (if verify_identity takes every answer in one call, each identity question key is "
-            "the request field for that answer, and question_field, answer_field and "
-            'answer_ok_field are ""; request fields: ' + ", ".join(f.name for f in vt.request) + ")"
-        )
         if not vt.field(ident["question_field"]):
             p.append(f"verify_identity has no field {ident['question_field']!r}" + shape)
         if not vt.field(ident["answer_field"]):
@@ -432,9 +446,17 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         for q in ident["questions"]:
             if keys and q["key"] not in keys:
                 p.append(f"identity question {q['key']!r} not in API enum {keys}")
+        # a repair round once named two answer fields as question and answer field (P3)
+        named = [x for x in (ident["question_field"], ident["answer_field"]) if x in qkeys]
+        partly = [k for k in qkeys if k.lower() in _lower(fields)]
+        if named or partly:
+            p.append(
+                f"identity question keys {sorted(set(named + partly))} are verify_identity request "
+                f"fields, so the question/answer reading cannot be right" + shape
+            )
     resp_types = {f.name: f.type for f in vt.response}
     for role in ("gate_field", "answer_ok_field", "remaining_field", "hint_field"):
-        if at_once and role == "answer_ok_field":
+        if no_answer_ok and role == "answer_ok_field":
             continue
         if ident[role] and resp_types and ident[role] not in resp_types:
             p.append(f"identity {role} {ident[role]!r} is not a verify_identity response field")
@@ -444,7 +466,7 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         ("gate_field", "is true once EVERY security question has passed"),
         ("answer_ok_field", "is true when the answer just checked was correct"),
     ):
-        if at_once and role == "answer_ok_field":
+        if no_answer_ok and role == "answer_ok_field":
             continue  # one call checks every answer: the gate alone decides
         if not ident[role]:
             p.append(f"identity {role} is empty: name the verify_identity boolean that {meaning}")
@@ -534,12 +556,21 @@ def too_much_separate(spec: dict) -> bool:
     return too_much(spec)["offer"] == "separate"
 
 
+def _lower(names: list[str]) -> set[str]:
+    return {n.lower() for n in names}
+
+
 def identity_all_at_once(spec: dict, tool: Tool) -> bool:
     """verify_identity takes every answer in one call: each identity question key is one of its
-    request fields (perturbed rehearsal P3). question_field, answer_field and answer_ok_field are
-    then unused, whatever the spec names there."""
-    keys = [q["key"] for q in spec["identity"]["questions"]]
-    return bool(keys) and all(tool.field(k) for k in keys)
+    request fields, ignoring case (perturbed rehearsal P3). question_field, answer_field and
+    answer_ok_field are then unused, whatever the spec names there. A question field whose enum
+    lists every key is the per-answer shape, even if a key is also a field name."""
+    ident = spec["identity"]
+    keys = [q["key"] for q in ident["questions"]]
+    selector = tool.field(ident["question_field"]) if ident["question_field"] else None
+    if selector and selector.enum and set(keys) <= set(selector.enum):
+        return False
+    return bool(keys) and _lower(keys) <= _lower([f.name for f in tool.request])
 
 
 def call_var(spec: dict, role: str) -> str:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from freya_builder.nodes import always as nodes_always
 from freya_builder.render import _complete_when, exit_tool_name, render
-from freya_builder.spec import check_spec
+from freya_builder.spec import check_spec, identity_all_at_once
 from freya_builder.toolapi import load_tool_api
 from freya_builder.validate import validate
 
@@ -816,6 +816,53 @@ def test_check_spec_per_answer_missing_field_names_the_all_at_once_shape():
     spec["identity"]["question_field"] = ""
     problems = [x for x in check_spec(spec, TOOLS) if "verify_identity has no field" in x]
     assert len(problems) == 1 and "takes every answer in one call" in problems[0]
+
+
+def _verify_body_tools(tmp_path, props: dict, required: list[str]) -> list:
+    api = json.loads((ROOT / "kit" / "tools" / "openapi.json").read_text())
+    body = api["paths"]["/verify_identity"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    body["properties"] = {"customer_id": {"type": "string"}} | props
+    body["required"] = ["customer_id", *required]
+    path = tmp_path / "api.json"
+    path.write_text(json.dumps(api))
+    return load_tool_api(path)
+
+
+def test_identity_review_findings_on_the_all_at_once_shape(tmp_path):
+    # Review of cand-eng.1 (13 agents): partial or mis-cased keys, a required setting field, a
+    # per-answer selector whose enum lists the keys, and empty fields with keys that are not fields.
+    two = {"date_of_birth": {"type": "string"}, "phone_last4": {"type": "string"}}
+    tools = _verify_body_tools(tmp_path, two, list(two))
+    spec = _invented_mapping()
+    spec["identity"]["questions"][1]["key"] = "phone"
+    found = [x for x in check_spec(spec, tools) if "cannot be right" in x]
+    assert len(found) == 1 and "['date_of_birth']" in found[0]
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["questions"][0]["key"] = "Date_Of_Birth"
+    assert identity_all_at_once(spec, next(t for t in tools if t.name == "verify_identity"))
+    assert any(
+        "must be the exact request field 'date_of_birth'" in x for x in check_spec(spec, tools)
+    )
+    setting = two | {"channel": {"type": "string", "enum": ["voice", "chat"]}}
+    tools = _verify_body_tools(tmp_path, setting, list(setting))
+    assert [x for x in check_spec(SPEC_A, tools) if "identity" in x] == []
+    blank = copy.deepcopy(SPEC_A)
+    blank["identity"].update(question_field="", answer_field="", answer_ok_field="")
+    blank["identity"]["questions"][1]["key"] = "phone"
+    found = [x for x in check_spec(blank, tools) if "identity" in x]
+    assert len(found) == 1 and found[0].startswith("identity question keys ['phone'] are not")
+    selector = two | {
+        "question": {"type": "string", "enum": ["date_of_birth", "phone_last4"]},
+        "answer": {"type": "string"},
+    }
+    tools = _verify_body_tools(tmp_path, selector, ["question", "answer"])
+    per = copy.deepcopy(SPEC_A)
+    per["identity"].update(question_field="question", answer_field="answer")
+    vt = next(t for t in tools if t.name == "verify_identity")
+    assert not identity_all_at_once(per, vt)
+    assert "send question=date_of_birth" in _ident(render(per, tools, BRIEF))
 
 
 def test_negotiate_attempts_clause_follows_the_brief_too_much_rule():

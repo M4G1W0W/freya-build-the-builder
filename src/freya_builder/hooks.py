@@ -516,12 +516,19 @@ _WRONG_ONE = """    _msg = 'Wrong answer; do not say it was correct.'
         _msg = _msg + ' Wrong answers left: ' + str(_rem) + '.'
     _msg = _msg + ' You may ask that same question again.'"""
 
-# One call checked every answer: the gate failed, so at least one is wrong. A response list that
-# holds only question keys (e.g. wrong_fields) names which ones; nothing else is assumed.
+# One call checked every answer: the gate failed, so at least one is wrong. Only a response list
+# whose name says wrong (e.g. wrong_fields) and that holds only question keys names which ones,
+# and only when exactly one list does (a matched_fields list must never read as wrong: review).
 _WRONG_ALL = """    _wrong = []
+    _lists = 0
     for _wk in list(_d.keys()):
         _wv = _d.get(_wk)
-        if isinstance(_wv, list) and _wv:
+        _wn = str(_wk).lower()
+        _says = False
+        for _part in ('wrong', 'incorrect', 'fail', 'invalid', 'mismatch'):
+            if _part in _wn:
+                _says = True
+        if _says and isinstance(_wv, list) and _wv:
             _named = []
             for _w in _wv:
                 for _q in _QUESTIONS:
@@ -529,6 +536,9 @@ _WRONG_ALL = """    _wrong = []
                         _named.append(_q[1])
             if len(_named) == len(_wv):
                 _wrong = _named
+                _lists = _lists + 1
+    if _lists != 1:
+        _wrong = []
     _msg = $WRONG_HEAD
     if _wrong:
         _msg = _msg + $WRONG_NAMED + ' | '.join(_wrong) + '.'
@@ -594,7 +604,10 @@ def verify_post(spec: dict, failed_row_id: str | None = None, all_at_once: bool 
         ),
         "WRONG_NAMED": lit(" The bank marked as wrong: "),
         "ASK_NAMED": lit(" You may ask again for those answers only,"),
-        "ASK_ALL": lit(" You may ask again for every answer,"),
+        "ASK_ALL": lit(
+            " Ask again for the answers the BANK BRIEF says to ask for after a failed check (if it "
+            "does not say, every answer),"
+        ),
         "WRONG_TAIL": lit(
             " then CALL verify_identity again with every answer, each new answer in place of the "
             "old one."

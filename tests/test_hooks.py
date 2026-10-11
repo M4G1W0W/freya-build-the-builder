@@ -366,7 +366,7 @@ def test_verify_all_at_once_wrong_answer_is_never_correct(answer_ok, split):
     msg = what(post(_all_at_once_post(answer_ok), envelope(data), split))
     assert not msg.startswith("Correct")
     assert msg.startswith("The check did not pass: at least one answer is wrong.")
-    assert "Failed checks left: 2." in msg and "You may ask again for every answer," in msg
+    assert "Failed checks left: 2." in msg and ASK_ALL in msg
     assert msg.endswith("each new answer in place of the old one.")
 
 
@@ -377,10 +377,23 @@ def test_verify_all_at_once_names_the_answers_the_bank_marked_wrong(split):
     assert "You may ask again for those answers only," in msg and Q1 not in msg
 
 
-def test_verify_all_at_once_ignores_lists_that_are_not_question_keys(split):
-    data = {"ok": True, "all_verified": False, "wrong_fields": ["phone_last4", "pin"]}
+ASK_ALL = "Ask again for the answers the BANK BRIEF says to ask for after a failed check (if it "
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"wrong_fields": ["phone_last4", "pin"]},  # not only question keys
+        {"matched_fields": ["date_of_birth"]},  # review of cand-eng.1: a right answer named wrong
+        {"correct_fields": ["date_of_birth"], "failed": ["phone_last4"], "wrong": ["phone_last4"]},
+        {"wrong_fields": "phone_last4"},  # not a list
+        {"wrong_fields": []},
+    ],
+)
+def test_verify_all_at_once_names_answers_only_from_one_list_that_says_wrong(data, split):
+    data = {"ok": True, "all_verified": False, **data}
     msg = what(post(_all_at_once_post(), envelope(data), split))
-    assert "marked as wrong" not in msg and "You may ask again for every answer," in msg
+    assert "marked as wrong" not in msg and ASK_ALL in msg
 
 
 def test_verify_all_at_once_gate_failed_and_unreadable_paths_are_unchanged(split):
