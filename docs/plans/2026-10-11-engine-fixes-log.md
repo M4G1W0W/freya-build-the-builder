@@ -10,7 +10,9 @@ Context-save handoff for a restored engine-fixes session: `docs/plans/2026-10-11
 
 Candidate tags, all preserved and unmerged; adoption needs the user's separate approval:
 `cand-eng.4` = cfa4d9d, `cand-eng.5` = 27f5647, `cand-eng.6` = a170935, `cand-eng.7` = a985076,
-`cand-eng.8` = 4267bb0.
+`cand-eng.8` = 4267bb0, `cand-eng.9` = b103e21 (14:37 UTC: eng.8 + closing guard; the challenger, see its
+hand-off at the end); `cand-eng.4g` = 44d4efa and `cand-eng.9g` = b40a576 (15:09 UTC: the transfer
+goodbye on each base, see the last section).
 
 1. **Fix 1 (cand-eng.6/.7) substantially changes fresh-build negotiation instructions.** Its prompt
    sentence moved most of `unmodeled` into rendered `stage_rules` (rendered negotiate stage_rules grew
@@ -559,3 +561,55 @@ labelled); HU-PRE asks for a person before any security question. Stand-in judge
 verdicts as intended on 26 synthetic transcripts. Simulation hand-off with E1 (eng.4 vs eng.8 overall) vs E2
 (closing fix isolated: the same ab4 spec on eng.6 and eng.8), cost 15 calls per candidate:
 `docs/plans/2026-10-11-path-cases-sim-handoff.md`.
+
+## Hand-off: `cand-eng.9` = b103e21 (cand-eng.8 + closing guard; branch `cand-eng-guard`), tagged 14:37 UTC
+
+User-approved after the audit of Simulation's findings (14:20 UTC; no fallback transfer goodbye, by
+instruction). The Simulation Developer took it as the challenger (inside the 15:00 UTC gate).
+
+- **Defect (latent on eng.8):** `spec.early_lines` kept a sentence in the endings only when it was common to
+  every ending of one step. Fresh extractions list the human-transfer row in every step, so one extraction
+  that drops or rewords the goodbye in that row left no step fully covered: the goodbye became an early line
+  in the other 15 rows and the render said "never again in the goodbye". Standalone re-implementation over 74
+  saved specs: 42 of 932 single-row variants hit it on eng.8, 0 on eng.9.
+- **Fix:** a non-question sentence in more than half of ALL endings is a closing line (one condition in
+  `early_lines`, spec.py). Questions stay early unconditionally; offers and sympathy shared by a few endings
+  still move. In saved specs the highest-coverage early non-question line is the sympathy line at 2/16 rows;
+  closing lines cover 16/16.
+- **Tests:** `tests/test_closing_guard.py`, 6 tests: goodbye dropped or reworded in the every-step row (fail
+  on eng.8); negative tests that still move a question at most endings, a repeated offer or sympathy line at
+  exactly half the endings, an offer at a majority of a small step only (2 of identity's 3), and the audit
+  fixture's moves. 875 passed, ruff clean.
+- **Renders:** 89 unique saved specs rendered with eng.8 and eng.9 code: 0 workflows changed (6 old specs fail
+  to render on both). eng.9 differs from eng.8 only on a fresh extraction whose every-step row loses or rewords
+  the goodbye.
+- **Merge trial (untagged):** branch `merge-main-eng9` = c1cbeb7 (main bccf825 into cand-eng.9), merge-tree
+  clean, `src/` and `builder/` identical to cand-eng.9, `make verify` 922 passed with no file changed.
+- **Fresh-clone `--dry`** of `merge-main-eng9`: `END ok=True`, `git=c1cbeb7 dirty=False`, no secret in the trace.
+- **Dry battery** (eng.4 vs eng.9, 24 builds, metrics (a)-(e)): `docs/plans/2026-10-11-dry-battery-eng4-vs-eng9.md`.
+- **Review (read-only, 2 agents):** no correctness problem. Optional test hardening, not done (the tag stays as
+  measured): one assertion in the reworded-goodbye test is vacuous, and a "more than two-thirds" mutant survives
+  (no 9-of-16 case).
+
+## Hand-off: `cand-eng.4g` = 44d4efa and `cand-eng.9g` = b40a576 (transfer goodbye), tagged 15:09 UTC
+
+User decision relayed by the Simulation Developer (15:00 UTC) after round 1: HA-A (hardship accepted, support
+transfer) failed on BOTH arms for one reason, no thanks/goodbye before close_call (eng.4 7a2c4d79, eng.9
+80dd9551), and PUB-09 restructuring transfers miss it 6/6. In 80dd9551 the support row already listed "Thank you.
+Goodbye.": before a hand-off the model fires the transition with no message, so ending text cannot fix it.
+
+- **Fix (identical on both bases, branches `cand-eng4-bye` / `cand-eng9-bye`, 2 commits each):** every transfer
+  path ends in end_call node `hang_up_transferred` with `message_mode` custom (kit workflow-format: several end-call
+  nodes with different farewells). The close node routes `xfer_queue != none` there; `cl_<row>` literal transfer
+  closes route there too. `spoken_message` = `render.closing_line(spec)`: a goodbye that is the last sentence of
+  more than half of all endings, else the existing `GOODBYE` ("Thank you for your time. Goodbye.", already spoken
+  on the notes path). No Brief A text in code; non-transfer paths keep the silent `hang_up`.
+- **Evidence:** `tests/test_transfer_goodbye.py` (3 tests, fail on both bases); cand-eng.9g 878 passed, cand-eng.4g
+  862, ruff clean. Node-level render diff over 92 unique saved specs, both pairs: 86 change only by
+  `+hang_up_transferred` and the close node's routing, 6 old specs fail to render on both, 0 `cl_*` changed;
+  system prompt and every task/ENDINGS text byte-identical. Farewells: spec-ch-fr/-fab "Thank you. Goodbye.",
+  spec-eng4-fr/-fab "Thank you for your time. Goodbye.".
+- **Caveats:** the farewell is spoken at hang-up, logged after transfer_to_agent and close_call (like the notes
+  path); the user amended criterion (3) at 15:08 so that counts, judge verdicts decide. If the model also says
+  goodbye, it is said twice. Unmeasured on Freya; the Simulation Developer builds it from the measured arms'
+  saved specs (`--spec`).
