@@ -3,7 +3,7 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 19:20 Istanbul (16:20 UTC Sun). Last commit: see `git log`. The final case opens **17:00 UTC**
+**Snapshot:** 2026-10-11 21:40 Istanbul (18:40 UTC Sun): submission candidate pushed; see the SIMULATION CHAT HANDOFF (18:40) below. Last commit: see `git log`. The final case opens **17:00 UTC**
 (20:00 Istanbul, ~40 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
 `cand-f3` = a069dd2 (F3; no longer main's builder code), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, **`freeze-final` b9756fe** (= main 8e251fe's builder code).
@@ -25,6 +25,45 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
   service contract and redeploy (`cd mock && CI=1 npx --yes wrangler@4.149.0 deploy`; secrets persist).
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
+
+## SIMULATION CHAT HANDOFF (18:40 UTC, context save; READ FIRST)
+
+**State: SUBMISSION CANDIDATE BUILT, COMMITTED AND PUSHED. Nothing running.** Final case (inbound Turkish credit card
+statement-debt line) in `/Users/atlasdenizakbulut/Desktop/Freya Final case` (19 files, user-confirmed complete 18:06;
+fingerprint `10ffe8464f3eb5de`, unchanged at 18:36).
+
+- **Submitted build (user D12):** builder `cand-final.8` = **279a15a1c822810284ab84f6c1b89ea35135b7c5** (generic
+  general-agent path D6 + cut-off line in call language D9 + 30 s tool timeout D10 + deterministic URL join D11), run
+  18:21:24-18:26:04 UTC, slot `final-r3`, workflow **77ef2498-60e8-4253-9c00-ceb1f7067084**, agent
+  **c9adee73-ba73-46c7-91cd-bf71ad6467fa**, mock_url **https://teampistalogic.atlasreyiz.workers.dev/voice/v1**. Round 3
+  (6 example scenarios): **5/6** (EX-6 misses the offer after the reading).
+- **Git:** main merged cand-final.8 (8a7bd1b), artifact commit **fa08cd4** (traces/final.log b4db6d52...,
+  submission/final.workflow.json 7a9de328...), doc commit cc15d25; **pushed 18:37 (user "push it"): remote main =
+  cc15d25**; repo https://github.com/M4G1W0W/freya-build-the-builder is **PRIVATE**. `mock/data/services.json` modified
+  locally, NOT committed (its older filled version is on the remote via 00c23f3; user decision open).
+- **Fallback (not submitted):** cand-final.7 build (2efc338; workflow ad052130 v2 / agent 2276b4c7; 3/6 twice; doubled
+  base URLs) preserved in `runs/final/build2/` (sha256 18f1832b... / 996e4e6f...). Build-3 copies + R3 in
+  `runs/final/build3/`. R1/R2/R3 results `runs/final/R*.{json,log,mocklog.json}`.
+- **Mock (KEEP LIVE until results): Cloudflare worker `teampistalogic`, version 0ea3104f**, `GET /health` 200. Serves
+  the 7 contract services (POST `<any base>/<service>`, suffix routing; `data` envelope, dotted/`__`/string-data bodies,
+  alias customerNumber->customerNo), the token path, documented 404/400 errors and the 12 s delay; replay 617/617 exact.
+  Code committed in `mock/` (generic); case data `mock/data/test-customers.json` gitignored; config
+  `mock/data/services.json` local. Redeploy: `cd mock && CI=1 npx --yes wrangler@4.149.0 deploy` (keeps secrets);
+  verify: `.venv/bin/python <scratchpad>/verify_mock_pack.py https://teampistalogic.atlasreyiz.workers.dev/voice/v1
+  mock/data/test-customers.json`; request log `GET /__admin/log` with header x-admin-token = $MOCK_ADMIN_TOKEN.
+- **Roles:** Submission readiness reviewer (session) owns submission.json + final packaging check (has all SHAs, the
+  full run sha, mock_url); the USER sends the e-mail to yavuz@freyavoice.ai before **20:00 UTC** and decides repo
+  visibility (private needs organiser access) and services.json. Methodology (case-blind since 17:22, user D7) stands
+  by; prepared but unadopted: cand-final-dates d1720c3, cand-size 8e9d8be, cand-final-3-work 0f943d4.
+- **Budget:** simulation ledger `runs/dev/r4/calls.tsv` cum 543 / cap 789; credits ~373.7 USD (18:18). Simulations
+  need the user's explicit approval (D8 used: R1+R2; D11: R3).
+- **Rules learned today:** commit by explicit pathspec (never `-a`: other sessions' and case files ride along); no
+  pushes without the user's per-action go; nothing from the case into src/builder/tests/prompts; builder defects go to
+  Methodology only as generic synthetic descriptions; `/chat/message` can't test identity/ids against a mock (model
+  tools use test_variables) - use a simulation.
+- **Scratchpad (may vanish):** `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/8007491a-0d32-44f0-a85d-b87c51abe930/scratchpad/`
+  (final_build*.sh, final_sims.sh, verify_tag.sh, verify_mock_pack.py, scan_history.py, worktrees wt-cand-final.5-.8,
+  synth-inquiry/, rehearse-tr/, review-summary.txt).
 
 ## UPDATE 18:33 UTC: USER D12 = round-3 build (cand-final.8) is the SUBMISSION CANDIDATE; committed locally, not pushed
 
