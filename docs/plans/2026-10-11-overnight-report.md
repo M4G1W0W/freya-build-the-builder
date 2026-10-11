@@ -34,3 +34,18 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 
 ## Results
 (filled in as blocks finish)
+
+## Demonstrated correctness gaps (morning proposals; generic; NOT implemented overnight)
+1. **Identity: a complete security answer inside a cut-off message is not submitted** (LEDGER failures: M1 G1 r3
+   d10044ef promise recorded after 3 wrong DOBs; M2 r1 79778b2e declined instead of failed). Common to every arm.
+   Fix proposal: format-based completeness (day + month + 4-digit year, also a year in words; digits:N) -> call
+   verify_identity at once; a cut-off fragment never counts as a rule-15 refusal; cut-off handling must terminate
+   (identity re-asks the question in short form from the 3rd cut-off); identity max-turn exit gets a spoken line.
+   `runs/dev/r4/analysis-m1.md`, `analysis-m2.md`.
+2. **Identity: "Why do you need that?" after an answer is counted as a 2nd decline** -> not_verified/declined
+   (M2 r2 PUB-13 68d28036, LEDGER; render.py:257 groups "why you need it" with "what the call is about"). New.
+   Needs a real-decline regression case first.
+3. Rule 21 re-ask of the exact day after a question back (G2 r2 PUB-07; also F3). Proposal: global "answer a question
+   back without repeating your question in that message".
+Test/simulator artefacts (do not tune): PUB-12 corrects merges two phone answers; silent customer hang-ups
+(29041b61, 3575e933); leaked simulator reasoning (704c184a).
