@@ -100,3 +100,11 @@ test("configured aliases fill an empty field (the call variable's name for the c
   assert.equal(serve(PACK, cfg, "POST", "/x.list", { data: { customerNumber: "10000001" } }).status, 200);
   assert.equal(serve(PACK, CFG, "POST", "/x.list", { data: { customerNumber: "10000001" } }).status, 400);
 });
+
+test("services and the token match by path suffix (doubled base); '__' flattened keys are read like dotted ones", () => {
+  const cfg = { ...CFG, token: { paths: ["/oauth2/token"], response: { token_type: "Bearer" } } };
+  assert.equal(serve(PACK, cfg, "POST", "/voice/v1/voice/v1/x.list", { data: { customerNo: "10000001" } }).status, 200);
+  assert.equal(serve(PACK, cfg, "POST", "/a/b/oauth2/token", "x").service, "token");
+  assert.equal(serve(PACK, cfg, "POST", "/x.list", { data__customerNo: "10000001", call__lang: "tr" }).status, 200);
+  assert.equal(serve(PACK, cfg, "POST", "/voice/v1/xx.list", {}), null);
+});

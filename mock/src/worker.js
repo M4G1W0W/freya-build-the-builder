@@ -92,7 +92,7 @@ export default {
   // The bank's services: fixtures (data/fixtures.json) first; the practice-kit routes below stay for kit tests.
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === "/") return json(200, { ok: true, service: "mock-bank" });
+    if (url.pathname === "/" || url.pathname === "/health") return json(200, { ok: true, service: "mock-bank" });
     if (url.pathname === "/__admin/log") {
       if (!env.ADMIN_TOKEN || request.headers.get("x-admin-token") !== env.ADMIN_TOKEN) return json(403, { ok: false, error: "forbidden" });
       const op = request.method === "DELETE" ? "clear" : "list";

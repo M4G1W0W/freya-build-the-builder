@@ -2,7 +2,7 @@
 // Pure logic: no Cloudflare APIs, so `npm test` runs it with plain Node.
 //
 // data/services.json (from the service contract and the pack's lookup table):
-//   base: path prefixes the services are served under, e.g. ["/voice/v1", ""]  (POST <base>/<service>)
+//   services are matched by path suffix: POST <any base>/<service>
 //   services: {"<service>": {by: ["customerNo"] | ["cardNumber", "newStatementWeek"?], required: [fields],
 //              notFound: "<404 code>" | null}}
 //   codes: {"<code>": {status, type, message}}; errorOrigin: string
@@ -63,13 +63,15 @@ const asObject = (v) => {
   return v && typeof v === "object" && !Array.isArray(v) ? v : {};
 };
 
-// Fields of a request: the `data` object (also when sent as a JSON string), then dotted top-level keys
-// ("data.cardNumber" -> cardNumber), then plain top-level keys; an empty value never hides a filled one.
+// Fields of a request: the `data` object (also when sent as a JSON string), then dotted or flattened top-level keys
+// ("data.cardNumber" or "data__cardNumber" -> cardNumber), then plain top-level keys; an empty value never hides a
+// filled one.
 export function fieldsOf(body) {
   const top = asObject(body);
   const layers = [asObject(top.data), {}, {}];
   for (const [k, v] of Object.entries(top)) {
-    if (k.includes(".")) layers[1][k.slice(k.lastIndexOf(".") + 1)] = v;
+    const sep = k.lastIndexOf(".") >= 0 ? k.lastIndexOf(".") + 1 : k.lastIndexOf("__") >= 0 ? k.lastIndexOf("__") + 2 : -1;
+    if (sep > 0) layers[1][k.slice(sep)] = v;
     else layers[2][k] = v;
   }
   const out = {};
@@ -82,9 +84,10 @@ export function fieldsOf(body) {
 // -> {status, body, delaySeconds, service} or null when the path is not one of the bank's services.
 export function serve(pack, cfg, method, pathname, body, guid = "0".repeat(32)) {
   const path = pathname.replace(/\/+$/, "");
-  const token = cfg.token && (cfg.base || [""]).some((b) => (cfg.token.paths || []).some((t) => path === `${b}${t}`));
+  // Matched by suffix: any base in front (none, /voice/v1, a doubled base) reaches the same service.
+  const token = cfg.token && (cfg.token.paths || []).some((t) => path.endsWith(t));
   if (token) return { status: 200, body: cfg.token.response, delaySeconds: 0, service: "token" };
-  const service = Object.keys(cfg.services).find((s) => (cfg.base || [""]).some((b) => path === `${b}/${s}`));
+  const service = Object.keys(cfg.services).find((s) => path === `/${s}` || path.endsWith(`/${s}`));
   if (!service) return null;
   const out = (r) => ({ ...r, service });
   if (method.toUpperCase() !== "POST") return out(errorBody(cfg, "INVALID_ARGUMENTS_ERROR", "only POST is supported", guid));
