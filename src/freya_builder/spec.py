@@ -80,7 +80,14 @@ PRECEDENCE = obj(
     {
         "when": {
             "type": "string",
-            "enum": ["transferred", "promise_recorded", "all_notes_reason", "any_note", "always"],
+            "enum": [
+                "transferred",
+                "ending_wins",
+                "promise_recorded",
+                "all_notes_reason",
+                "any_note",
+                "always",
+            ],
         },
         "note_reason": STR,
         "then": {"type": "string", "enum": ["event_row", "row", "first_note_reason_not"]},
@@ -283,6 +290,35 @@ def _engine_field_problems(spec: dict, tools: list[Tool]) -> list[str]:
     return p
 
 
+def _ending_wins_problems(
+    i: int, c: dict, rows: dict, note_reasons: tuple[str, ...], precedence: list[dict]
+) -> list[str]:
+    """Review gap 7: an ending the brief keeps even after a recorded promise. finalize closes with
+    its row when the agent took that ending or a note carries `note_reason`."""
+    where = f"close_precedence[{i}] ending_wins"
+    p: list[str] = []
+    if c["then"] != "row":
+        p.append(f"{where}: then must be 'row'")
+    row = rows.get(c["row"])
+    if row and ("negotiate" not in row["phases"] or row["queue"]):
+        p.append(f"{where}: row {c['row']!r} must be a negotiate-phase ending without a queue")
+    nr = c["note_reason"]
+    taken = {
+        d["note_reason"]
+        for d in precedence
+        if d["when"] == "all_notes_reason" or d["then"] == "first_note_reason_not"
+    }
+    if nr and nr not in note_reasons:
+        known = ", ".join(note_reasons) or "notes are not used"
+        p.append(f"{where}: note_reason {nr!r} is not an add_note reason ({known})")
+    elif nr and nr in taken:
+        p.append(
+            f"{where}: note_reason {nr!r} is already used by an all_notes_reason or "
+            f"first_note_reason_not entry"
+        )
+    return p
+
+
 def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     """Problems that would make the agent send values the bank does not accept, or crash code."""
     by = {t.name: t for t in tools}
@@ -324,9 +360,14 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         elif stage == "negotiate" and rows[rid]["queue"]:
             # turn caps and render's ev_notes end through it; finalize would transfer every such call
             p.append(f"default row for negotiate must not transfer: {rid!r}")
+    note_reasons: tuple[str, ...] = ()
+    if spec["notes"]["used"] and "add_note" in by:
+        note_reasons = _enum(by, "add_note", spec["notes"]["reason_field"])
     for i, c in enumerate(spec["close_precedence"]):
         if c["then"] == "row" and c["row"] not in rows:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
+        if c["when"] == "ending_wins":
+            p += _ending_wins_problems(i, c, rows, note_reasons, spec["close_precedence"])
         if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
             p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
         if c["then"] == "first_note_reason_not" and spec["notes"]["used"] and "add_note" in by:

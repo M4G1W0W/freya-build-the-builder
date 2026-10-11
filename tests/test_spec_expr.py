@@ -126,3 +126,48 @@ def test_floor_percent_is_checked():
     spec = copy.deepcopy(SPEC_A)
     spec["products"]["types"][0]["floor_field"] = ""
     assert any("floor field ''" in p for p in check_spec(spec, TOOLS))
+
+
+SPEC_C = json.loads((ROOT / "tests" / "fixtures" / "spec_variant_c.json").read_text())
+TOOLS_C = load_tool_api(ROOT / "tests" / "fixtures" / "briefs" / "variant-c.openapi.json")
+
+
+def with_ending_wins(**entry) -> dict:
+    """The variant-c spec with an ending_wins entry before promise_recorded (review gap 7)."""
+    spec = copy.deepcopy(SPEC_C)
+    rule = {"when": "ending_wins", "note_reason": "insolvency", "then": "row"}
+    rule |= {"row": "no_commitment_insolvency", "outcome": ""} | entry
+    rules = spec["close_precedence"]
+    rules.insert(next(i for i, c in enumerate(rules) if c["when"] == "promise_recorded"), rule)
+    return spec
+
+
+def test_ending_wins_entry_is_accepted():
+    assert schema_problems(with_ending_wins(), SPEC_SCHEMA) == []
+    assert check_spec(with_ending_wins(), TOOLS_C) == []
+    assert check_spec(with_ending_wins(note_reason=""), TOOLS_C) == []
+
+
+@pytest.mark.parametrize(
+    "entry, needle",
+    [
+        ({"then": "event_row"}, "then must be 'row'"),
+        ({"row": "ghost"}, "unknown row 'ghost'"),
+        ({"row": "transferred_senior"}, "without a queue"),
+        ({"row": "not_verified_failed"}, "negotiate-phase"),
+        ({"note_reason": "bankrupt"}, "not an add_note reason"),
+        ({"note_reason": "already_paid"}, "already used by"),
+    ],
+)
+def test_ending_wins_guards(entry, needle):
+    problems = check_spec(with_ending_wins(**entry), TOOLS_C)
+    assert any(needle in p for p in problems), problems
+
+
+def test_ending_wins_note_reason_needs_notes():
+    spec = copy.deepcopy(SPEC_A)  # Brief A uses no add_note
+    rule = {"when": "ending_wins", "note_reason": "hardship", "then": "row"}
+    spec["close_precedence"].insert(0, rule | {"row": "no_promise_hardship", "outcome": ""})
+    assert any("notes are not used" in p for p in check_spec(spec, TOOLS))
+    spec["close_precedence"][0]["note_reason"] = ""
+    assert check_spec(spec, TOOLS) == []

@@ -746,6 +746,11 @@ def finalize_main(vs, C):
             when = rule.get("when")
             if when == "transferred":
                 hit = bool((rows.get(event_row) or {}).get("queue"))
+            elif when == "ending_wins":
+                # an ending kept even after a recorded promise: the agent took it, or a note
+                # carries its reason (the model noted the products itself)
+                nr = rule.get("note_reason")
+                hit = event_row == rule.get("row") or (bool(nr) and any(r == nr for _, r in notes))
             elif when == "promise_recorded":
                 hit = bool(promises)
             elif when == "all_notes_reason":
