@@ -62,11 +62,11 @@ DEFINITIONS = [
     "structural evidence: no tool call with 0 s turns, or no judge verdict (data.classify).",
 ]
 LIMITATIONS = [
-    "run_cases records neither --cases nor --style. The case file is attributed by the run file's "
-    "name (styled*/extraB prefixes, else the kit's public set). A speech style is known only when that "
-    "case file gives one; name tokens such as '-talkative' are not used, so those runs show 'unknown'.",
-    "Launcher scripts in session scratchpads hold the real --style/--cases arguments, but they live "
-    "outside the repo, use shell variables and are not read.",
+    "run_cases records neither --cases nor --style. The case file comes from the launcher's record "
+    "next to the result (<name>.meta.json with the case file's sha256, or the directory's calls.tsv) "
+    "when there is one, else from the run file's name (styled*/extraB prefixes, else the kit's public "
+    "set). A speech style is known only when that case file gives one; name tokens such as "
+    "'-talkative' are not used, so those runs show 'unknown'.",
     "The case definition is the version committed when the run started. Uncommitted edits to a "
     "case file cannot be detected.",
     "Saved-spec builds: the trace does not hash the spec file, so the deployed spec content cannot be "
@@ -294,7 +294,7 @@ def git_definition(path: str, case_id: str, start_ts: float, end_ts: float, hist
     source = "git version committed at the run's start"
     if not hist:
         commit, source = None, "CURRENT case file (not in git history; not historical)"
-        cases = D.load_cases(path.removeprefix(CASES_DIR) if path.startswith(CASES_DIR) else None)
+        cases = D.load_cases(path)
         flags.append("Case file not in git history: the current file is used (not historical)")
     else:
         before = [h for h in hist if h[1] <= start_ts]
@@ -324,8 +324,49 @@ def git_definition(path: str, case_id: str, start_ts: float, end_ts: float, hist
     }
 
 
+_shas: dict[tuple[str, str], str] = {}
+
+
+def with_launch_hash(d: dict, recorded: str | None) -> dict:
+    """Check a definition against the case file's sha256 that the launcher wrote at launch time."""
+    if not recorded or not d.get("commit"):
+        return d
+    key = (d["commit"], d["file"])
+    if key not in _shas:
+        _shas[key] = hashlib.sha256(
+            D.git("show", f"{d['commit']}:{d['file']}").encode()
+        ).hexdigest()
+    if _shas[key] == recorded:
+        keep = [f for f in d["flags"] if "uncertain" not in f and "first committed" not in f]
+        return {
+            **d,
+            "flags": keep + ["matches the launch record's sha256 (verified)"],
+            "historical": True,
+        }
+    if D.sha256_file(D.ROOT / d["file"]) == recorded:
+        case = D.load_cases(d["file"]).get(d["case"]["id"]) if d.get("case") else None
+        return {
+            **d,
+            "case": case,
+            "hash": case_hash(case) if case else None,
+            "commit": None,
+            "source": "file content at launch (the launch record's sha256 matches the current file, "
+            "not the git version)",
+            "historical": True,
+            "flags": [
+                "the launch record's sha256 matches the current file, not the git version at the run's start"
+            ],
+        }
+    return {
+        **d,
+        "historical": False,
+        "source": "unverified: neither the git version nor the current file matches the launch record's sha256",
+        "flags": d["flags"] + ["case file content at launch is not on disk or in git"],
+    }
+
+
 def _case_path(case_file: str) -> str:
-    return case_file if case_file.startswith("kit/") else CASES_DIR + case_file
+    return case_file if "/" in case_file else CASES_DIR + case_file
 
 
 # ---------------------------------------------------------------- rows and cell entries
@@ -352,8 +393,7 @@ def _row(case: dict, run: dict, d: dict) -> dict:
             "hash": d["hash"],
             "hash_of": "sha256 of the case's JSON in the "
             + d.get("source", "git version committed at the run's start"),
-            "attributed_by": "run file name convention (styled*/extraB prefix, else the kit public set); "
-            "run_cases does not record --cases",
+            "attributed_by": run.get("case_file_source") or "run file name convention",
             "commits": [],
         },
         "style": style,
@@ -530,7 +570,10 @@ def build(
         path = _case_path(run["case_file"])
         start = run["end_ts"] - (run.get("seconds") or 0)
         for case in run["cases"]:
-            d = definition_of(path, case["id"], start, run["end_ts"])
+            d = with_launch_hash(
+                definition_of(path, case["id"], start, run["end_ts"]),
+                run.get("launch_cases_sha256"),
+            )
             new = _row(case, run, d)
             row = rows.setdefault(new["id"], new)
             if d["commit"] and d["commit"] not in row["definition"]["commits"]:

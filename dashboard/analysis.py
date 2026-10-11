@@ -42,6 +42,11 @@ def _score(r: dict | None) -> dict | None:
     }
 
 
+def _code_unclear(r: dict) -> bool:
+    """The commit does not identify the code: a dirty build or an in-memory experiment variant."""
+    return any("dirty" in f or "experiment variant" in f for f in r["flags"])
+
+
 def _fixture(r: dict) -> bool:
     """A hand-written fixture spec (tests/fixtures): renderer-only, not builder output."""
     return bool(r.get("spec")) and r["spec"].startswith("tests/fixtures")
@@ -94,11 +99,16 @@ def panels(runs: list[dict]) -> list[dict]:
         resolvable = bool(
             latest
             and latest["commit"]
+            and not _code_unclear(latest)
             and D.git("rev-parse", "--verify", "--quiet", latest["commit"] + "^{commit}").strip()
         )
         untested = D.code_commits_after(latest["commit"]) if resolvable else None
         if latest and not latest["commit"]:
             notes.append("Latest run has no known tested commit")
+        if latest and _code_unclear(latest):
+            notes.append(
+                "Latest run's build was dirty or an experiment variant: its commit does not identify the code, so staleness is unknown"
+            )
         out.append(
             {
                 "panel": name,
@@ -281,8 +291,10 @@ def overview(
     complete = [r for r in runs if r["complete"]]
     latest = complete[-1] if complete else None
     measured = [
-        r for r in complete if r["commit_order"] is not None and r["official_style"]
-    ]  # 3-rep full sets only
+        r
+        for r in complete
+        if r["commit_order"] is not None and r["official_style"] and not _code_unclear(r)
+    ]  # 3-rep full sets only; dirty or variant builds do not identify a commit
     newest = min(measured, key=lambda r: (r["commit_order"], -r["end_ts"])) if measured else None
     untested = D.code_commits_after(newest["commit"]) if newest else []
     flags = [

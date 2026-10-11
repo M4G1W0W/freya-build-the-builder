@@ -173,8 +173,22 @@ def _load_cases(rel: str) -> list[dict]:
 
 
 def _case_files() -> list[str]:
+    """Official sets, the fixtures, and any other case file a run's launch record names."""
     fixtures = sorted(str(p.relative_to(D.ROOT)) for p in (D.ROOT / FIXTURE_CASES).glob("*.json"))
-    return [OFFICIAL_CASES, PAGE_CASES, *fixtures]
+    referenced = set()
+    for meta in D.RUNS.rglob("*.meta.json"):
+        data = D.load_json(meta)
+        if isinstance(data, dict) and isinstance(data.get("cases"), str):
+            referenced.add(D.relpath(data["cases"]))
+    for calls in D.RUNS.rglob("calls.tsv"):
+        referenced |= {
+            D.relpath(r["casefile"])
+            for r in D._calls_rows(calls.parent).values()
+            if str(r.get("casefile", "")).endswith(".json")
+        }
+    known = {OFFICIAL_CASES, PAGE_CASES, *fixtures}
+    extra = sorted(r for r in referenced if r not in known and (D.ROOT / r).exists())
+    return [OFFICIAL_CASES, PAGE_CASES, *fixtures, *extra]
 
 
 def _case_view(c: dict) -> dict:
@@ -206,8 +220,11 @@ def _briefs(registry: dict[str, dict]) -> list[dict]:
     for p in files:
         rel = str(p.relative_to(D.ROOT))
         meta = source_meta(rel, registry)
-        if meta["label"] == "unregistered":
-            meta["label"] = "locally derived" if rel.startswith(FIXTURE_BRIEFS) else "unregistered"
+        if meta["label"] == "unregistered" and rel.startswith(FIXTURE_BRIEFS):
+            meta["label"], meta["kind"] = (
+                "locally derived",
+                "test fixture brief (no provenance note)",
+            )
         text = p.read_text(errors="replace")
         out.append(
             {
@@ -227,6 +244,7 @@ def _fingerprint(cat: dict) -> str:
     files |= {b["source_file"] for d in cat.get("deadlines", []) for b in d["basis"]}
     files |= {str(p.relative_to(D.ROOT)) for d in (FIXTURE_CASES, OFFICIAL_BRIEFS, FIXTURE_BRIEFS)
               for p in (D.ROOT / d).rglob("*") if p.is_file()}  # fmt: skip
+    files |= set(_case_files())
     parts = [D.git("rev-parse", "HEAD").strip(), str(CATALOG.stat().st_mtime)]
     for rel in sorted(files):
         try:
@@ -259,6 +277,9 @@ def _build(cat: dict) -> dict:
     for rel, meta in sources.items():
         if meta["label"] == "unregistered" and rel.startswith(FIXTURE_CASES):
             meta["label"], meta["kind"] = "locally derived", "test fixture (no provenance note)"
+        elif meta["label"] == "unregistered" and rel.startswith("runs/"):
+            meta["label"] = "locally derived"
+            meta["kind"] = "case file named by a run's launch record (runs/ is gitignored)"
     for it in items:
         if it["category"] in ("source_date", "case_provenance") and it["source_file"] in sources:
             sources[it["source_file"]].setdefault("notes", []).append(

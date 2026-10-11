@@ -598,6 +598,15 @@ def activity(wanted: str | None = None) -> dict:
         state = (
             f"idle for {int(age // 60)} min (turn finished; waiting for the user or a notification)"
         )
+    agents_out = [o for o in open_tasks if o["tool"] in ("Workflow", "Agent", "Task")]
+    if agents_out and not pending and age >= 120:  # they run inside the agent: no child process
+        state = (
+            f"turn finished {int(age // 60)} min ago; {len(agents_out)} background "
+            + ", ".join(sorted({o["tool"] for o in agents_out}))
+            + " launched with no completion recorded yet (may still be running: "
+            + "; ".join(str(o["action"] or o["id"])[:60] for o in agents_out[:3])
+            + ")"
+        )
     helpers = ("tail", "sleep", "ugrep", "grep")  # Monitor plumbing, not work
     n_bg = len([b for b in procs["background_scripts"] if not b["what"].startswith(helpers)])
     if n_bg:

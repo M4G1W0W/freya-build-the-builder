@@ -519,7 +519,8 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
     sha = re.search(r"sha256=(\S+)", start_line)
     family = case.get("family") or ""
     primary = fd["category"] if fd else None
-    if no_verdict:
+    scorer_lines = [s for s in failed if not s.startswith("conversation:")]
+    if no_verdict and not scorer_lines:  # a missing verdict never hides a bank-record failure
         primary = "Platform errors"
     date_related = (
         primary == "Date calculations"
@@ -588,7 +589,7 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
         },
         "platform_adjusted_interpretation": {
             "ignored_in_platform_adjusted_view": primary == "Platform errors",
-            "rule": "a rep is ignored only with structural platform evidence (no tool call and 0 s turns, or no judge verdict); this is an INTERPRETATION, never the official score",
+            "rule": "a rep is ignored only with structural platform evidence (no tool call and 0 s turns, or no judge verdict while the bank records passed); this is an INTERPRETATION, never the official score",
         },
         "judge": {
             "from_result_row": ("no verdict: " + "; ".join(judge_rows))
@@ -608,9 +609,13 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
                 "none reported"
                 if not failed
                 else "none reported (the failure is conversation-only)"
+                if not scorer_lines
+                else "no field differences; see scorer_checks"
             ),
+            "scorer_checks": [D.redact(x) for x in (fd["other"] if fd else [])]
+            or "none failed besides the field differences",
             "expected_ledger": cdef.get("expected") or NA,
-            "expected_source": f"{run['case_file']} (current version of the case file)",
+            "expected_source": f"{run['case_file']} (current version of the case file; chosen by: {run.get('case_file_source', 'file-name convention')})",
             "final_ledger": f"{NA}: run_cases saves the differences above and the ledger's call list (result.ledger_calls_in_order), not the record values",
             "bank_writes_in_call": [
                 t
@@ -715,7 +720,9 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
             x
             for x in (
                 run_id,
-                run_id.removesuffix(".json") + ".log",
+                run_id.removesuffix(".json") + ".log"
+                if (D.ROOT / (run_id.removesuffix(".json") + ".log")).exists()
+                else None,
                 run.get("deploy_log"),
                 D.rel(dump_path) if dump_path else None,
                 D.rel(txt_path) if txt_path else None,

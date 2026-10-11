@@ -32,6 +32,7 @@ REPORTS = D.ROOT / "reports"
 REFRESH_S = 12
 ALLOWED_HOSTS: set[str] = set()
 _state: dict = {}
+_health: dict = {"last_success": None, "last_error": None, "last_error_at": None}
 _lock = threading.Lock()
 
 
@@ -39,8 +40,12 @@ def compute() -> dict:
     git = D.git_state()
     traces = D.all_traces()
     runs, incomplete = D.build_runs(traces, git["commits"])
+    procs = D.running_tests()
+    incomplete = A._mark_in_progress(
+        incomplete, procs
+    )  # a log a live run is writing is in progress
     state = {"runs": runs, "incomplete": incomplete}
-    state["overview"] = A.overview(git, runs, incomplete, D.running_tests(), D.working_state())
+    state["overview"] = A.overview(git, runs, incomplete, procs, D.working_state())
     state["panels"] = A.panels(runs)
     state["failures"] = A.failures(runs)
     state["builder"] = A.builder(traces, runs)
@@ -146,14 +151,22 @@ def refresh_loop() -> None:
             with _lock:
                 _state.clear()
                 _state.update(state)
+                _health.update(last_success=state["refreshed"], last_error=None)
             write_reports(
                 state["snapshot"],
                 state.get("conversation"),
                 state.get("conversations_others"),
                 state.get("claude_sessions"),
             )
-        except Exception:  # keep serving the last good state; the error shows in the console
+        except (
+            Exception
+        ) as exc:  # keep serving the last good state, and say so (/api/overview health)
             traceback.print_exc()
+            with _lock:
+                _health.update(
+                    last_error=D.redact(f"{type(exc).__name__}: {exc}")[:300],
+                    last_error_at=D.iso(time.time()),
+                )
         time.sleep(REFRESH_S)
 
 
@@ -209,8 +222,17 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/api/failures":
             return self._json({"refreshed": st["refreshed"], **st["failures"]})
         if url.path == "/api/overview":
+            with _lock:
+                health = dict(_health)
+            health["data_age_s"] = int(time.time() - D.parse_utc(st["refreshed"]))
+            health["refresh_every_s"] = REFRESH_S
             return self._json(
-                {"refreshed": st["refreshed"], "overview": st["overview"], "panels": st["panels"]}
+                {
+                    "refreshed": st["refreshed"],
+                    "health": health,
+                    "overview": st["overview"],
+                    "panels": st["panels"],
+                }
             )
         if url.path == "/api/builder":
             return self._json({"refreshed": st["refreshed"], **st["builder"]})
@@ -312,6 +334,13 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class Server(ThreadingHTTPServer):
+    # The page fires 8+ requests at once. The default listen backlog (5) overflowed while the refresh
+    # thread held the CPU, and the kernel reset the extra connections ("Failed to fetch" in the page).
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
@@ -331,7 +360,7 @@ def main() -> None:
         return
     threading.Thread(target=refresh_loop, daemon=True).start()
     ALLOWED_HOSTS.update({f"127.0.0.1:{a.port}", f"localhost:{a.port}"})
-    server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)  # loopback only
+    server = Server(("127.0.0.1", a.port), Handler)  # loopback only
     print(f"dashboard on http://127.0.0.1:{a.port} (read-only; Ctrl-C to stop)")
     server.serve_forever()
 
