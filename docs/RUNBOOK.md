@@ -1,8 +1,78 @@
-# RUNBOOK: Sunday 11 Oct, hidden briefs (17:00–20:00 UTC = 20:00–23:00 Istanbul)
+# RUNBOOK: Sunday 11 Oct, final case (17:00–20:00 UTC = 20:00–23:00 Istanbul)
 
-The requirements come from `docs/hackathon_notes.md` → Submission (official page + kit README). Times are UTC.
+The requirements come from `docs/hackathon_requirements.md` → "FINAL FORMAT, 11 Oct" (official page re-read 16:00 UTC).
+Times are UTC. **The section "FINAL (current)" below replaces the older sections, which assumed two hidden briefs.**
 
-## Before 17:00
+## FINAL (current, written 17:10): one Turkish case folder + our own mock
+
+Pre-flight (done 17:05): builder frozen as `freeze-final-2` = cand-final.4 e2635e9, merged into `main` (builder code
+identical); private repo https://github.com/M4G1W0W/freya-build-the-builder (main + tag pushed); mock live at
+`https://teampistalogic.atlasreyiz.workers.dev` (`MOCK_URL`, `MOCK_ADMIN_TOKEN`, `MOCK_TEAM_KEY` in `.env`);
+`pdftotext` installed (Homebrew poppler 26.09). Team: **Pistalogic**.
+
+**HARD RULE: nothing from the case goes into `src/`, `builder/`, `tests/`, fixtures or prompts.** Only generic bug fixes.
+The mock (`mock/`) is not builder code; whether its filled-in version is committed is the user's call.
+
+1. Unzip the case **outside the repo** (e.g. `~/Desktop/FreyaBank-final/`). Read BRIEF.md first, then README, the
+   service contract, the test customers, the Q&A and the 6 example conversations. Note the `now` format: worded Turkish
+   months in upper case or without diacritics need the prepared fix `cand-final-dates` (385b326, user decision).
+2. Adapt the mock from the contract and the test customers: `mock/src/bank.js` (`HANDLERS`, field names, outcomes,
+   errors), `mock/data/customers.json` (`mock/tools/xlsx_rows.py <file.xlsx>` turns a workbook into rows). Every tool
+   URL the builder makes is `mock_url` + the contract's path, with the contract's method and field names: the mock must
+   serve exactly those. `cd mock && npm test && CI=1 npx --yes wrangler@4.149.0 deploy`, then curl-smoke it.
+3. Choose `mock_url`: the base under which the contract's paths sit (paths `/v1/x` -> the bare worker URL; paths `/x`
+   -> the URL the mock serves them under). The same value goes into `submission.json`.
+4. Dry build (no Freya writes), from the repo root:
+
+```bash
+export PATH="$PWD/.venv/bin:$PATH"; python3 --version   # 3.10+
+set -a && . ./.env && set +a
+python3 builder/build.py ~/Desktop/FreyaBank-final/<folder> "<mock_url>" --dry --slot final 2>&1 | tee runs/final-dry.log
+```
+
+   Check: one `tool <name> <METHOD> <url> request=[...]` line per contract operation, each URL served by the mock;
+   `WARN` lines (unreadable files, `consolidated rules are N chars`); `STEP    call language: Turkish`;
+   `BANK BRIEF in the prompt = the consolidated rules`; spec check and local validation PASS.
+5. Real build (the submitted run; keep everything it prints):
+
+```bash
+mkdir -p traces submission && set -o pipefail
+python3 builder/build.py ~/Desktop/FreyaBank-final/<folder> "<mock_url>" --slot final --export submission/final.workflow.json 2>&1 | tee traces/final.log
+grep -E "END +ok=True|spec check .*PASS|validation: PASS|chat smoke test: opening reply: PASS|CREATED +workflow_id=" traces/final.log
+```
+
+   Exit 3 with only a 503/504 smoke failure = deployed (see the table below). A re-run replaces the agent and the trace;
+   submit the agent and trace of ONE run.
+6. Test against our mock: cases written from the 6 example conversations (kept under `runs/`, gitignored; case ids =
+   `customer_id`s in `mock/data/customers.json`), one simulation each via `runs/dev/r4/harness/suite_once.py` with
+   `FREYA_BANK_HOST=https://teampistalogic.atlasreyiz.workers.dev` and `FREYA_BANK_TEAM_KEY=$MOCK_TEAM_KEY`
+   (maxRetries 0, no reruns; the user approves the call count; ledger `runs/dev/r4/calls.tsv`, cap 789).
+7. Secret check, commit, push (user go given for this repo 16:59):
+
+```bash
+.venv/bin/python scripts/check_secrets.py traces/final.log submission/final.workflow.json
+git add traces/final.log submission/final.workflow.json && git commit -m "Submission: final case agent + trace"
+git push origin main && git rev-parse HEAD
+```
+
+8. The user e-mails `submission.json` to the address in the kit e-mail **before 20:00 UTC** (aim for 19:00):
+
+```json
+{
+  "team": "Pistalogic",
+  "members": [{"name": "<name>", "email": "<email>"}],
+  "repo": "https://github.com/M4G1W0W/freya-build-the-builder",
+  "commit": "<git rev-parse HEAD after step 7>",
+  "run_command": "python3 builder/build.py {case_folder} {mock_url}",
+  "workflow": "submission/final.workflow.json",
+  "trace": "traces/final.log",
+  "mock_url": "<the mock_url used in step 5>"
+}
+```
+
+9. Invite the organisers' GitHub account to the private repo. Keep the mock running until the results are out.
+
+## Before 17:00 (STALE: two-brief format)
 
 - [ ] **15:30 freeze.** `make verify` is green, then `git tag freeze-final`. After this, only generic crash and bug
       fixes are allowed.
