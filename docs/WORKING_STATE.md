@@ -26,6 +26,22 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 18:29 UTC: D11 = C: cand-final.8 (URL-join fix) rebuild + round 3 = 5/6 (validated before 19:00)
+
+- Fallback preserved: cand-final.7 build (2efc338; ad052130 v2 / agent 2276b4c7) in `runs/final/build2/` (final.log
+  sha256 18f1832b..., final.workflow.json 996e4e6f..., R1/R2 results).
+- **cand-final.8 = 279a15a** (cand-final.7 + `contract.join_mock`: strip mock_url's own path once from an operation path,
+  keep only the path of a full URL); 987 tests, collections byte-identical, 0 case words. NOT merged into main.
+- **Round-3 build (slot final-r3)** from a worktree at the tag: START 18:21:24Z, END 18:26:04Z, git=279a15a
+  dirty=False, ok=True 280 s, 4 model calls; workflow 77ef2498 / agent c9adee73; all 7 tool URLs = POST
+  `/voice/v1/<service>` on the mock host = the contract's paths exactly; timeoutMs 30000, maxRetries 0. traces/final.log
+  b4db6d52..., submission/final.workflow.json 7a9de328... (copies in runs/final/build3/).
+- **Round 3: 5/6** (EX-1..5 PASS; EX-6 FAIL: no additional-transaction offer after the reading). No regressions vs R2
+  (3/6). No English line; 21 mock requests all 200 on single-base paths. Ledger 543/789; credits ~373.7 USD.
+- Pending user decisions: candidate (recommended: R3 / cand-final.8 -> then merge cand-final.8 into main locally before
+  the artifact commit), artifact commit (pathspec), push + public visibility, mock/data/services.json (on the remote via
+  00c23f3; local changes uncommitted).
+
 ## UPDATE 18:18 UTC: SELECTED build (cand-final.7 on the complete folder) + round 2 (3/6)
 
 - User 18:06: case folder complete (19 files; fingerprint 10ffe8464f3eb5de, gated in the build script). New files after
