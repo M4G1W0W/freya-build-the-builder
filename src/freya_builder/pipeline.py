@@ -7,7 +7,7 @@ only generic instructions (with invented, generic examples).
 import json
 import time
 
-from . import language, platform
+from . import general, language, platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
 from .llm import LLMError, budget_left, chat_json
@@ -192,6 +192,13 @@ def extract_spec(trace: Trace, rules_text: str, tools: list[Tool]) -> dict:
 
 
 def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
+    missing = general.missing_roles(tools)
+    if missing:  # the collections flow cannot be built without these (spec.check_spec)
+        trace.step(
+            f"the tools have no {', '.join(missing)}: the collections flow does not apply; "
+            "building a general agent from the documents (general.py)"
+        )
+        return general.extract(trace, brief_text, tools)
     c = consolidate(trace, brief_text, tools)
     rules_text = brief_text if c["kind"] == "clean" else c["consolidated_rules"]
     spec = extract_spec(trace, rules_text, tools)
@@ -214,6 +221,8 @@ def render(spec: dict, tools: list[Tool]) -> dict:
     from .render import render as render_workflow
 
     clean = {k: v for k, v in spec.items() if not k.startswith("_")}
+    if "general" in clean:
+        return general.render(clean, tools, spec.get("_prompt_brief", ""))
     return render_workflow(clean, tools, spec.get("_prompt_brief", ""))
 
 

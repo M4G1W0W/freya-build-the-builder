@@ -8,7 +8,7 @@ every tool's URL is the mock URL plus the contract's path.
 
 import json
 
-from . import llm
+from . import casefolder, llm
 from .toolapi import Field, Tool, parse_tool_api
 from .trace import Trace
 
@@ -22,16 +22,29 @@ ROLES = (
     ("close_call", "record the call's final outcome"),
 )
 
-SYSTEM = (
+REQUIRED = ("verify_identity", "get_account", "create_promise", "close_call")  # spec.check_spec
+_INTRO = (
     "You turn a bank's service contract into the HTTP tools of a phone agent. Report only the "
     "operations the documents define. Copy every path, field name, type, enum value and required "
-    "flag exactly as the contract writes them; never invent an operation or a field. Name each "
-    "operation with the role name below whose purpose it serves (each role name at most once); "
-    "an operation that fits no role keeps the contract's own operation name in snake_case.\n"
-    + "\n".join(f"- {name}: {purpose}" for name, purpose in ROLES)
-    + "\npath: the operation's path below the service base URL, starting with '/'. request: the "
+    "flag exactly as the contract writes them; never invent an operation or a field. "
+)
+_SHAPE = (
+    "\npath: the operation's path below the service base URL, starting with '/'. request: the "
     "JSON body fields (for GET, the query parameters). response: the fields of a successful "
     "response body; children: the fields of an object, or of an array's items."
+)
+SYSTEM = (
+    _INTRO
+    + "Name each operation with the role name below whose purpose it serves (each role name at "
+    "most once); an operation that fits no role keeps the contract's own operation name in "
+    "snake_case.\n" + "\n".join(f"- {name}: {purpose}" for name, purpose in ROLES) + _SHAPE
+)
+# When the role reading misses a role the collections flow needs, the call is another kind of call
+# (general.py): read again with the contract's own names, so no operation is forced into a role.
+SYSTEM_OWN_NAMES = (
+    _INTRO
+    + "List EVERY operation the contract defines. Name each with the contract's own operation "
+    "name in snake_case (if it has none, the last segment of its path)." + _SHAPE
 )
 
 _TYPES = ["string", "number", "integer", "boolean", "array", "object"]
@@ -179,11 +192,33 @@ def contract_tools(trace: Trace, files: list[tuple[str, str]], mock_url: str) ->
         tools = on_mock(doc, mock_url)
         trace.step(f"tool API from {rel} (OpenAPI), every URL on the mock: {len(tools)} tools")
     else:
-        text = "\n\n".join(f"===== FILE: {rel} =====\n{body}" for rel, body in files)
+        text = "\n\n".join(
+            f"===== FILE: {rel} =====\n{casefolder.capped(rel, body)}" for rel, body in files
+        )
         out = llm.chat_json(
             trace, "read the tool API out of the service contract", SYSTEM, text, SCHEMA, "tools"
         )
         tools = tools_from_operations(out.get("operations") or [], mock_url)
+        missing = [r for r in REQUIRED if r not in {t.name for t in tools}]
+        if missing:
+            trace.step(
+                f"no operation for {', '.join(missing)}: reading the contract with its own names"
+            )
+            try:
+                out = llm.chat_json(
+                    trace,
+                    "re-read the contract with its own operation names",
+                    SYSTEM_OWN_NAMES,
+                    text,
+                    SCHEMA,
+                    "tools",
+                )
+            except llm.LLMError as e:  # an optional second reading: keep the first one
+                trace.warn(f"own-names reading failed ({str(e)[:120]}); keeping the role reading")
+            else:
+                own = tools_from_operations(out.get("operations") or [], mock_url)
+                if len(own) >= len(tools):
+                    tools = own
         trace.step(f"tool API read from the documents, every URL on the mock: {len(tools)} tools")
     if not tools:
         raise ValueError("no service operations found in the case folder")

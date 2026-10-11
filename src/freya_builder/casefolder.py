@@ -166,6 +166,18 @@ def read_file(path: Path) -> str:
     return reader(path)
 
 
+MAX_DOC_CHARS = 60_000  # a data dump (thousands of records) would swamp every model call
+
+
+def capped(name: str, text: str, warn: Callable[[str], None] = lambda _: None) -> str:
+    """A document's text for the model calls: an oversized one keeps its first MAX_DOC_CHARS."""
+    if len(text) <= MAX_DOC_CHARS:
+        return text
+    warn(f"{name}: {len(text)} chars; the model reads the first {MAX_DOC_CHARS}")
+    cut = len(text) - MAX_DOC_CHARS
+    return text[:MAX_DOC_CHARS] + f"\n[... cut by the builder: {cut} more chars]"
+
+
 def case_files(folder: Path) -> list[Path]:
     """Every file below the folder: BRIEF.md, then README.md, then the rest by path."""
     files = [
