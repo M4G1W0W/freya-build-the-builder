@@ -45,8 +45,8 @@ stays isolated (gate 4 not run).
 **Calls and credits:** 62 simulation calls of the 340 cap (M1 36, M2 26); credits 433.89 at 00:37 -> 428.93 at 02:04
 UTC (~0.08 per call incl. builder smoke tests). Sunday reserve (155 calls) untouched.
 
-**Running now:** no simulation of ours (only the stuck platform one). A read-only watcher polls it every 5 min, logs only
-changes to `runs/dev/r4/stuck-sim-watch.log`, and exits at 07:55 UTC. Offline review agents may be finishing (see the log below).
+**Running now:** no simulation of ours (only the stuck platform one). The read-only watcher stopped at its 2-hour
+background limit (03:54 UTC); a manual GET at 03:54 still showed `running` (updatedAt 01:21:29). Nothing watches it now. Offline review agents may be finishing (see the log below).
 
 ### Resume (once the simulation is freed; all slots built and provenance recorded in `<scratchpad>/sim/slots.tsv`)
 `<scratchpad>/sim/queue.txt` is pre-loaded; to resume: `rm <scratchpad>/sim/STOP; bash <scratchpad>/sim/qrun.sh >>
