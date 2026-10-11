@@ -4,6 +4,25 @@ Brief: `docs/plans/2026-10-11-engine-fixes-brief.md`. Branch `cand-eng` (worktre
 `<scratchpad>/wt-eng`, off `cand-final.1` = ca80d52). No simulation, run_cases, deploy or non-`--dry`
 build was run by this chat. `<scratchpad>` = `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/0ff87ea7-15f5-4256-b709-1c128c353294/scratchpad`.
 
+## READ FIRST: status for the Simulation Developer (12:05 UTC; user-confirmed)
+
+Candidate tags, all preserved and unmerged; adoption needs the user's separate approval:
+`cand-eng.4` = cfa4d9d, `cand-eng.5` = 27f5647, `cand-eng.6` = a170935, `cand-eng.7` = a985076.
+
+1. **Fix 1 (cand-eng.6/.7) substantially changes fresh-build negotiation instructions.** Its prompt
+   sentence moved most of `unmodeled` into rendered `stage_rules` (rendered negotiate stage_rules grew
+   ~4.5x: 565 -> 2,570 chars for A/raw-A, 752 -> 3,254 for multi-product). The "byte-identical render"
+   results below were measured on SAVED specs: they prove only that the render code is unchanged, not
+   that a fresh build behaves the same. Validate cand-eng.6/.7 as broader behaviour changes: full A and
+   B sets x3 on fresh builds, strict 3/3, and investigate every difference from cand-eng.4/.5.
+2. **The "rest stays overdue" sentence** (Fix 3, not implemented) is present in rendered guidance in
+   16/16 inspected cand-eng.6/.7 fresh extractions; whether the agent actually says it is
+   **unmeasured** (check PUB-06 speech in the A set). Behaviour for a brief that does not require the
+   sentence (absence case) is **untested**.
+3. Items 1, 2, 4 (identity all-at-once, too-much separate offer, "this <weekday>") and the floor
+   rounding are unmeasured until the variant-e cases run; the identity path cannot run on the kit mock.
+4. Fix 2 (too-much own date) is deferred with unresolved design issues (section near the end).
+
 ## Hand-off: `cand-eng.2` = 17eddb0 (items 1 + 2), tagged 10:45 UTC
 
 Commits on top of cand-final.1: 6c80c5d (item 1, tag cand-eng.1), 0267b60 + 17eddb0 (item 2).
