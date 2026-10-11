@@ -289,13 +289,18 @@ Tests: `uv run pytest dashboard/test_rules.py`.
   3. a guess from the name against the kinds the official page lists.
 
   Guesses are labelled as guesses.
-- **Review status.** In order of preference:
-  1. an optional team record `reports/final_case_review.json`, written by people, never by the dashboard:
-     `{"<rel path>": {"status", "by", "at", "notes", "sha256": "<reviewed prefix>", "contradictions": [..]}}`.
-     A sha that differs from the current file marks the review STALE.
-  2. Handoff and chat lines that name the file after it arrived: repo docs use the line's git-blame time,
-     chat exports use the message time.
-  3. Otherwise "not reviewed".
+- **Review status.** Only a team record in `reports/final_case_review.json` that carries the current file's
+  sha256 prefix counts as a review. People write that file; the dashboard never does. Its shape:
+  `{"<rel path>": {"status", "sha256": "<first 10+ hex of the current file>", "by", "at", "notes",
+  "kind", "purpose", "contradictions": [..]}}`.
+  - Without a sha256, or with an older one, the file stays "not reviewed" (the second case is STALE).
+  - Malformed entries are ignored.
+  - Chat lines in `reports/` that name the file by its whole name or path after it arrived are shown as
+    evidence. They are not a review.
+- **Case content in the repo.** Tracked files outside `traces/` and `submission/` that name a case file
+  (read-only `git grep`) appear as a flag on the document and as a readiness item. The user decides
+  whether docs and `mock/` may hold them. Names named on the official page, or that the repo already uses
+  as its own file names, are skipped.
 - **Flags.**
   - NEW: first seen in the last 20 min.
   - AMENDED: the content changed after it was first seen.
@@ -314,9 +319,10 @@ Tests: `uv run pytest dashboard/test_rules.py`.
   - its input-document snapshot, reconstructed from the ledger at the build's start time (the builder
     logs only a document count);
   - any documents that changed after the build.
-- **Final testing.** A result file counts as final testing when its workflow or agent id was created by a
+- **Final testing.** `run_cases` results and `scripts/sim_scenarios.py` results. A result file counts as final testing when its workflow or agent id was created by a
   final build, its slot starts with `final`, or it ran non-`PUB-` case ids after 17:00 UTC. Everything else
-  stays under "Historical practice results".
+  stays under "Historical practice results": final tests are kept out of the practice panels.
+  Readiness needs a complete, fully passing test of the submitted build, run after it was created.
 - **Submission readiness** checks:
   - the case documents and the builder version;
   - the final build and final testing;

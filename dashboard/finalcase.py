@@ -80,7 +80,7 @@ ROLES = [  # areas each engineer owns; the evidence line is looked up in the han
     ),
 ]
 
-_hash_cache: dict[str, tuple[int, int, str]] = {}
+_hash_cache: dict[str, tuple[tuple, str]] = {}
 _text_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -108,11 +108,12 @@ def scan(folder: Path) -> list[dict]:
         st = p.stat()
         key = str(p)
         cached = _hash_cache.get(key)
-        if cached and cached[:2] == (st.st_size, st.st_mtime_ns):
-            digest = cached[2]
+        stamp = (st.st_size, st.st_mtime_ns, st.st_ino, st.st_ctime_ns)
+        if cached and cached[0] == stamp:
+            digest = cached[1]
         else:
             digest = hashlib.sha256(p.read_bytes()).hexdigest()
-            _hash_cache[key] = (st.st_size, st.st_mtime_ns, digest)
+            _hash_cache[key] = (stamp, digest)
         out.append(
             {
                 "rel": str(rel),
@@ -127,8 +128,12 @@ def scan(folder: Path) -> list[dict]:
     return out
 
 
-def load_ledger(path: Path = LEDGER) -> dict:
-    data = D.load_json(path)
+def load_ledger(path: Path | None = None) -> dict:
+    """A private copy of the ledger (never data.load_json's shared cache object)."""
+    try:
+        data = json.loads((path or LEDGER).read_text())
+    except (OSError, ValueError):
+        data = None
     return data if isinstance(data, dict) and "folders" in data else {"folders": {}}
 
 
@@ -161,7 +166,8 @@ def update_ledger(ledger: dict, folder: Path, files: list[dict], now: float) -> 
     return changed
 
 
-def save_ledger(ledger: dict, path: Path = LEDGER) -> None:
+def save_ledger(ledger: dict, path: Path | None = None) -> None:
+    path = path or LEDGER
     path.parent.mkdir(exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(ledger, indent=1))
@@ -292,8 +298,8 @@ def stem_key(rel: str) -> str:
 PHRASES = [  # the official page's category names, matched in the pack README's line for a file
     ("test customers", ("test customer",)),
     ("service contract", ("service contract",)),
-    ("example conversations", ("example call", "example conversation")),
-    ("flow drawing", ("flow drawing", "call-flow", "call flow")),
+    ("example conversations", ("example conversation",)),
+    ("flow drawing", ("flow drawing",)),
     ("questions and answers", ("questions and answers",)),
     ("announcements", ("announcement",)),
     ("analysis", ("analysis",)),
@@ -379,12 +385,28 @@ def chats() -> list[dict]:
 
 
 def handoff_sources() -> list[tuple[str, Path]]:
-    docs = [D.WORKING_STATE, D.ROOT / "docs" / "RUNBOOK.md"]
-    docs += sorted((D.ROOT / "docs" / "plans").glob("*.md"))
-    docs += sorted((D.ROOT / "docs" / "reviews").glob("*.md"))
-    out = [(f"doc {D.rel(p)}", p) for p in docs if p.exists()]
-    out += [(f"chat '{c['title']}'", D.ROOT / c["file"]) for c in chats()]
-    return out
+    """Review evidence: the monitored chats' exports under reports/ (gitignored)."""
+    return [(f"chat '{c['title']}'", D.ROOT / c["file"]) for c in chats()]
+
+
+def committed_case_mentions(names: list[str]) -> dict[str, list[str]]:
+    """Tracked files (outside traces/ and submission/) that name a case file: case content in the
+    repo. Read-only git grep over the working tree of tracked files."""
+    names = [n for n in names if n]
+    if not names:
+        return {}
+    args = ["grep", "-n", "-I", "-F", "-i"]
+    for n in names:
+        args += ["-e", n]
+    out = D.git(*args, "--", ".", ":!traces", ":!submission")
+    hits: dict[str, list[str]] = {}
+    for ln in out.splitlines():
+        path, _, rest = ln.partition(":")
+        line_no = rest.partition(":")[0]
+        for n in names:
+            if n.lower() in ln.lower():
+                hits.setdefault(n, []).append(f"{path}:{line_no}")
+    return hits
 
 
 STAMP = re.compile(r"^### (YOU|CLAUDE) · (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)")
@@ -421,34 +443,34 @@ def line_times(path: Path) -> list[float | None]:
     return out
 
 
+def _name_pattern(names: list[str]) -> re.Pattern:
+    alts = "|".join(re.escape(n) for n in sorted(set(names), key=len, reverse=True) if n)
+    return re.compile(rf"(?<![\w.\-/])(?:{alts})(?![\w\-])", re.I)
+
+
 def mentions(needles: list[str], since: float) -> list[dict]:
-    """Lines in the handoffs and chat transcripts that name a document, written after `since`."""
+    """Chat lines that name a document (whole name or relative path), written after `since`."""
     found = []
-    low = [n.lower() for n in needles if n]
+    pat = _name_pattern(needles)
     for label, path in handoff_sources():
         text = _cached_text(path)
-        if not any(n in text.lower() for n in low):
+        if not pat.search(text):
             continue
-        chat = label.startswith("chat ")
-        times = [] if chat else line_times(path)
         stamp, who = None, None
         for i, ln in enumerate(text.splitlines(), 1):
             m = STAMP.match(ln)
             if m:
                 who, stamp = m.group(1), D.parse_utc(m.group(2) + "Z")
                 continue
-            if not any(n in ln.lower() for n in low):
-                continue
-            when = stamp if chat else (times[i - 1] if i - 1 < len(times) else None)
-            if when is None or when < since:
+            if stamp is None or stamp < since or not pat.search(ln):
                 continue
             found.append(
                 {
                     "source": label,
                     "line": i,
-                    "speaker": who if chat else None,
-                    "time": D.iso(when),
-                    "time_basis": "message time" if chat else "line commit time (git blame)",
+                    "speaker": who,
+                    "time": D.iso(stamp),
+                    "time_basis": "message time",
                     "text": D.redact(ln.strip())[:220],
                 }
             )
@@ -457,22 +479,41 @@ def mentions(needles: list[str], since: float) -> list[dict]:
 
 
 def review_records() -> dict:
+    """The optional team review file, normalised: one bad entry never breaks the view."""
     data = D.load_json(REVIEW_FILE)
-    return data if isinstance(data, dict) else {}
-
-
-# ---------------------------------------------------------------- documents view
+    out = {}
+    for k, r in data.items() if isinstance(data, dict) else []:
+        if not isinstance(r, dict):
+            r = {"status": str(r)} if isinstance(r, str) else {}
+        c = r.get("contradictions")
+        out[str(k)] = {
+            "status": str(r["status"]) if r.get("status") else None,
+            "by": str(r.get("by") or "") or None,
+            "at": str(r.get("at") or "") or None,
+            "notes": str(r.get("notes") or ""),
+            "sha256": str(r.get("sha256") or ""),
+            "kind": str(r.get("kind") or "") or None,
+            "purpose": str(r.get("purpose") or "") or None,
+            "contradictions": [str(x) for x in c] if isinstance(c, list) else [],
+        }
+    return out
 
 
 def documents(now: float, ledger: dict, write: bool = True) -> dict:
     folders = []
     changed = False
     reviews = review_records()
+    page = _cached_text(D.ROOT / "docs/reference/hackathon_page_live_2026-10-11.md")
     for folder in case_dirs():
         files = scan(folder)
         changed |= update_ledger(ledger, folder, files, now)
         entry = ledger["folders"][str(folder)]
         readme, purposes, absent = readme_purposes(files)
+        own = {Path(t).name for t in D.git("ls-files").splitlines()}  # names the repo itself uses
+        public = {n for n in {Path(x["rel"]).name for x in files} if n in page or n in own}
+        leaks = committed_case_mentions(
+            [Path(x["rel"]).name for x in files if Path(x["rel"]).name not in public]
+        )
         by_hash: dict[str, list[str]] = {}
         for x in files:
             by_hash.setdefault(x["sha256"], []).append(x["rel"])
@@ -487,13 +528,14 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
             kind = guess_kind(x["rel"], meta.get("title"), purposes.get(x["rel"]))
             versions = e["versions"]
             first = e["first_seen"]
-            # earliest plausible arrival, never before the case opened (the page named BRIEF.md and
-            # README.md earlier); creation dates can be the sender's, and change times move later
-            since = max(D.parse_utc(OPENS_UTC), min(first, x["landed"], x["mtime"]))
+            # observed arrival; files already present when the ledger started: the case opening
+            # (file dates can be the sender's, and change times move on metadata edits)
+            opens = D.parse_utc(OPENS_UTC)
+            since = opens if e["seen_at_ledger_start"] else max(opens, first - 15)
             rec = reviews.get(x["rel"]) or reviews.get(Path(x["rel"]).name) or {}
-            stem = Path(x["rel"]).stem
-            needles = [Path(x["rel"]).name] + ([stem] if len(stem) >= 6 else [])
-            ment = mentions(needles, since)
+            kind = rec.get("kind") or kind
+            ment = mentions([x["rel"], Path(x["rel"]).name], since)
+            leaked = leaks.get(Path(x["rel"]).name, [])
             flags = []
             if now - versions[-1]["first_seen"] < NEW_WINDOW_S and not e["seen_at_ledger_start"]:
                 flags.append(("new", "NEW: first seen " + D.iso(versions[-1]["first_seen"])))
@@ -530,23 +572,23 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
                 flags.append(("amended", "announcements may change rules in other documents"))
             for c in rec.get("contradictions") or []:
                 flags.append(("contradiction", f"team note: {c}"))
-            rec_sha = str(rec.get("sha256") or "")
-            if rec.get("status"):
-                status = rec["status"]
-                basis = f"team review file ({_rel(REVIEW_FILE)})"
-                if rec_sha and not x["sha256"].startswith(rec_sha):
-                    status += " (STALE: file changed after this review)"
-                    flags.append(
-                        ("contradiction", "reviewed version differs from the current file")
-                    )
-            elif ment:
-                status = f"mentioned by engineers ({len(ment)} line(s); not a review record)"
-                basis = "handoff and chat lines naming the file after it arrived"
-                last_ment = D.parse_utc(ment[-1]["time"])
-                if len(versions) > 1 and last_ment < versions[-1]["first_seen"]:
-                    status += " (file changed after the last mention)"
+            if leaked:
+                flags.append(("leak", f"named in tracked repo files: {', '.join(leaked[:4])}"))
+            rec_sha = rec.get("sha256") or ""
+            if rec.get("status") and rec_sha and x["sha256"].startswith(rec_sha):
+                status, basis = f"reviewed: {rec['status']}", f"team record ({_rel(REVIEW_FILE)})"
+            elif rec.get("status") and rec_sha:
+                status = "not reviewed (STALE: the file changed after the team's review)"
+                basis = f"team record ({_rel(REVIEW_FILE)}) for an older version"
+                flags.append(("contradiction", "reviewed version differs from the current file"))
+            elif rec.get("status"):
+                status = f"not reviewed (team record '{rec['status']}' has no sha256)"
+                basis = f"team record ({_rel(REVIEW_FILE)}) without the file's sha256"
             else:
-                status, basis = "not reviewed", "no review record and no engineer mention found"
+                status = "not reviewed" + (
+                    f" (mentioned in {len(ment)} chat line(s))" if ment else ""
+                )
+                basis = "only a team record with the file's sha256 counts as a review"
             docs.append(
                 {
                     "rel": x["rel"],
@@ -573,11 +615,14 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
                     },
                     "purpose": {
                         "readme": purposes.get(x["rel"], []),
+                        "team": rec.get("purpose"),
                         "title": meta.get("title"),
                         "sheets": meta.get("sheets"),
                         "pages": meta.get("pages"),
                         "kind_guess": kind,
-                        "basis": "README"
+                        "basis": "team record"
+                        if rec.get("purpose")
+                        else "README"
                         if purposes.get(x["rel"])
                         else (
                             "title"
@@ -635,6 +680,7 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
                 "expected_missing": [x["label"] for x in expected if not x["seen"]],
                 "conversations_seen": convs,
                 "contradictions": contradictions,
+                "leaks": {k: v[:8] for k, v in leaks.items()},
                 "last_change": D.iso(last),
                 "seconds_since_last_change": int(now - last) if last else None,
                 "counts": {
@@ -642,7 +688,10 @@ def documents(now: float, ledger: dict, write: bool = True) -> dict:
                     "new": sum(any(f["kind"] == "new" for f in d["flags"]) for d in docs),
                     "amended": sum(any(f["kind"] == "amended" for f in d["flags"]) for d in docs),
                     "contradictions": len(contradictions),
-                    "not_reviewed": sum(d["review"]["status"] == "not reviewed" for d in docs),
+                    "not_reviewed": sum(
+                        d["review"]["status"].startswith("not reviewed") for d in docs
+                    ),
+                    "leaks": sum(any(f["kind"] == "leak" for f in d["flags"]) for d in docs),
                     "kinds_matched": len(kinds - {None}),
                 },
                 "completeness": "NOT confirmed complete: more documents may still arrive; the "
@@ -662,19 +711,26 @@ def _final_trace_paths() -> list[Path]:
     return [p for p in paths if p.is_file()]
 
 
+def _commit(ref: str | None) -> str | None:
+    """The full commit a ref names, or None when git does not know it (never fail-open)."""
+    if not ref:
+        return None
+    return D.git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").strip() or None
+
+
 def builder_version(commit: str | None, freeze: str | None) -> dict:
-    if not commit:
-        return {"commit": None, "tags": [], "same_code_as_freeze": None, "same_code_as_head": None}
-    tags = D.git("tag", "--points-at", commit).split()
+    full = _commit(commit)
+    tags = D.git("tag", "--points-at", full).split() if full else []
 
     def same(ref: str | None) -> bool | None:
-        if not ref:
+        other = _commit(ref)
+        if not (full and other):
             return None
-        diff = D.git("diff", "--name-only", commit, ref, "--", *D.CODE_PATHS)
-        return None if diff.startswith("ERROR") else not diff.strip()
+        return not D.git("diff", "--name-only", full, other, "--", *D.CODE_PATHS).strip()
 
     return {
         "commit": commit,
+        "known_to_git": bool(full),
         "tags": tags,
         "freeze_tag": freeze,
         "same_code_as_freeze": same(freeze),
@@ -687,9 +743,15 @@ def latest_freeze_tag() -> str | None:
     return tags[0] if tags else None
 
 
+def _folder_key(folder: str) -> str:
+    p = Path(folder).expanduser()
+    return str(p if p.is_absolute() else (D.ROOT / p).resolve())
+
+
 def final_builds(ledger: dict, freeze: str | None) -> list[dict]:
     """Builder runs in the final form (START tool_api is a URL: our mock)."""
     out = []
+    watched = {_folder_key(str(d)) for d in case_dirs()}
     for p in _final_trace_paths():
         t = D.parse_trace(p)
         if not t:
@@ -699,21 +761,22 @@ def final_builds(ledger: dict, freeze: str | None) -> list[dict]:
         api = re.search(r"\btool_api=(\S+)", start_line)
         if not api or not re.match(r"https?://", api.group(1)):
             continue
-        read = next((re.search(r"read (\d+) document", ln) for ln in lines
-                     if re.search(r"read \d+ document", ln)), None)  # fmt: skip
-        folder = t["briefs"][0] if t["briefs"] else None
-        entry = ledger["folders"].get(str(Path(folder).expanduser())) if folder else None
-        snap = (
-            snapshot_at(entry, t["start_ts"])
-            if entry
-            else {
-                "id": None,
-                "files": [],
-                "basis": "folder not watched by the dashboard: set FREYA_FINAL_CASE_DIR to include it",
-            }
+        read = next(
+            (re.search(r"read (\d+) document", ln) for ln in lines if "document(s)" in ln), None
         )
-        docs_read = int(read.group(1)) if read else None
+        folder = t["briefs"][0] if t["briefs"] else None
+        key = _folder_key(folder) if folder else None
+        entry = ledger["folders"].get(key) if key in watched else None
         notes = []
+        if entry:
+            snap = snapshot_at(entry, t["start_ts"])
+        else:
+            snap = {"id": None, "files": [], "basis": "folder not watched by the dashboard"}
+            notes.append(
+                f"case folder {folder} is not a watched folder: documents unchecked "
+                "(set FREYA_FINAL_CASE_DIR to include it)"
+            )
+        docs_read = int(read.group(1)) if read else None
         if docs_read is not None and snap["id"] and docs_read != len(snap["files"]):
             notes.append(
                 f"the builder read {docs_read} document(s); the ledger shows "
@@ -721,14 +784,29 @@ def final_builds(ledger: dict, freeze: str | None) -> list[dict]:
             )
         newer = []
         if entry:
+            early = t["start_ts"] < entry["first_watched"]
             for rel, e in entry["files"].items():
-                if any(v["first_seen"] > t["start_ts"] for v in e["versions"]):
+                vs = e["versions"][1:] if early and e.get("seen_at_ledger_start") else e["versions"]
+                if any(v["first_seen"] > t["start_ts"] for v in vs):
                     newer.append(rel)
         if newer:
             notes.append(f"documents new or changed since this build: {', '.join(sorted(newer))}")
         if t["dirty"]:
             notes.append("dirty=True: the builder code had uncommitted changes")
         created = t["created"] or {}
+        platform_test = any(x["name"].startswith("platform dry-run") for x in t["tests"])
+        kind = (
+            "real"
+            if created
+            else "real, no agent created"
+            if platform_test or (t["end"] and not t["end"]["ok"])
+            else "dry"
+            if t["end"]
+            else "running or killed"
+        )
+        bv = builder_version(t["git"], freeze)
+        if not bv["known_to_git"]:
+            notes.append(f"builder commit {t['git']} is unknown to this repo: version unverified")
         out.append(
             {
                 "file": t["file"],
@@ -736,11 +814,13 @@ def final_builds(ledger: dict, freeze: str | None) -> list[dict]:
                 "start": t["start"],
                 "start_ts": t["start_ts"],
                 "end": t["end"],
-                "dry": not created,
+                "kind": kind,
+                "dry": kind == "dry",
                 "mock_url": api.group(1),
                 "case_folder": folder,
+                "folder_watched": bool(entry),
                 "dirty": t["dirty"],
-                "builder": builder_version(t["git"], freeze),
+                "builder": bv,
                 "models": len(t["models"]),
                 "tests": t["tests"],
                 "created": created or None,
@@ -757,21 +837,53 @@ def final_builds(ledger: dict, freeze: str | None) -> list[dict]:
 PRACTICE_ID = re.compile(r"^PUB-\d+$")
 
 
+def scenario_results() -> list[dict]:
+    """Result files of scripts/sim_scenarios.py ({agent_id, simulation_id, started, rows}), which
+    test on our mock without the kit's ledger shape (no all_rows)."""
+    out = []
+    for p in sorted(D.RUNS.rglob("*.json")):
+        data = D.load_json(p)
+        if not (isinstance(data, dict) and "rows" in data and "simulation_id" in data):
+            continue
+        if "all_rows" in data or not isinstance(data.get("rows"), list):
+            continue
+        rows = [r for r in data["rows"] if isinstance(r, dict)]
+        out.append(
+            {
+                "id": D.rel(p),
+                "agent_id": data.get("agent_id"),
+                "start": data.get("started"),
+                "end": D.iso(p.stat().st_mtime),
+                "cases": [{"id": str(r.get("id", ""))} for r in rows],
+                "strict_passed": sum(bool(r.get("pass")) for r in rows),
+                "total": len(rows),
+                "reps": 1,
+                "complete": bool(rows),
+                "source": "scripts/sim_scenarios.py result",
+            }
+        )
+    return out
+
+
 def final_tests(runs: list[dict], builds: list[dict]) -> list[dict]:
     """Result files that test a final agent: built by a final build, a 'final' slot, or non-practice
     case ids run after the final opened. Everything else stays historical practice."""
     opens = D.parse_utc(OPENS_UTC)
-    by_wf = {}
+    by_id: dict[str, list[dict]] = {}
     for b in builds:
         if b["created"]:
-            by_wf.setdefault(b["created"].get("workflow_id"), []).append(b)
-            by_wf.setdefault(b["created"].get("agent_id"), []).append(b)
+            for k in ("workflow_id", "agent_id"):
+                if b["created"].get(k):
+                    by_id.setdefault(b["created"][k], []).append(b)
     out = []
     for r in runs:
         ids = [c.get("id", "") for c in r.get("cases", [])]
-        start = D.parse_utc(r["start"]) if r.get("start") else r.get("end_ts", 0)
-        linked = by_wf.get(r.get("workflow_id")) or by_wf.get(r.get("agent_id")) or []
-        slot = str(r.get("slot") or (r.get("launch_record") or {}).get("slot") or "")
+        try:
+            start = D.parse_utc(r["start"]) if r.get("start") else float(r.get("end_ts") or 0)
+        except ValueError:
+            start = float(r.get("end_ts") or 0)
+        linked = by_id.get(r.get("workflow_id") or "") or by_id.get(r.get("agent_id") or "") or []
+        slot = str(r.get("slot") or "")
         why = (
             "agent built by a final build"
             if linked
@@ -783,15 +895,21 @@ def final_tests(runs: list[dict], builds: list[dict]) -> list[dict]:
         )
         if not why:
             continue
-        build = max((b for b in linked if b["start_ts"] <= start), key=lambda b: b["start_ts"],
-                    default=None)  # fmt: skip
+        build = max(
+            (b for b in linked if b["created"] and b["created"]["ts"] <= start),
+            key=lambda b: b["created"]["ts"],
+            default=None,
+        )
         out.append(
             {
                 "run": r["id"],
+                "source": r.get("source", "run_cases result"),
                 "why_final": why,
                 "start": r.get("start"),
+                "start_ts": start,
                 "end": r.get("end"),
                 "strict": f"{r.get('strict_passed')}/{r.get('total')}",
+                "all_passed": bool(r.get("total")) and r.get("strict_passed") == r.get("total"),
                 "reps": r.get("reps"),
                 "complete": r.get("complete"),
                 "cases": ids,
@@ -801,9 +919,11 @@ def final_tests(runs: list[dict], builds: list[dict]) -> list[dict]:
                 "build": build["file"] if build else None,
                 "builder_commit": build["builder"]["commit"] if build else r.get("commit"),
                 "snapshot": build["snapshot"]["id"] if build else None,
-                "link_basis": "workflow/agent id matched to a final build trace"
+                "link_basis": "agent/workflow id matched to the newest final build created before "
+                "the test"
                 if build
-                else "no final build trace matched: builder version and documents unknown",
+                else "no final build created before this test matched: builder and documents "
+                "unknown",
             }
         )
     return out
@@ -856,6 +976,51 @@ def _item(name, status, owner, detail, evidence=None) -> dict:
             "evidence": evidence or []}  # fmt: skip
 
 
+def _committed(path: str) -> bool:
+    """Tracked and the working copy equals HEAD."""
+    return bool(_git_ok("ls-files", "--", path)) and not D.git("status", "--porcelain", "--", path)
+
+
+def _pushed(path: str) -> bool:
+    """origin/main holds exactly the working copy's content (as of the last fetch or push)."""
+    local = _git_ok("hash-object", "--", path)
+    remote = _git_ok("rev-parse", f"origin/main:{path}")
+    return bool(local and remote and local == remote)
+
+
+def _env_secret_values() -> list[str]:
+    """Values of .env keys that look secret (never shown; only counted)."""
+    vals = set(D._SECRETS)
+    try:
+        for ln in (D.ROOT / ".env").read_text().splitlines():
+            m = re.match(r"\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)$", ln)
+            if m and re.search(r"KEY|TOKEN|SECRET|PASSWORD", m.group(1)):
+                v = m.group(2).strip().strip("'\"")
+                if len(v) >= 8:
+                    vals.add(v)
+    except OSError:
+        pass
+    return [v for v in vals if v]
+
+
+def _deploy_evidence(after_ts: float | None) -> dict | None:
+    """The newest WORKING_STATE line reporting a finished mock deploy, if newer than after_ts."""
+    times = line_times(D.WORKING_STATE)
+    best = None
+    neg = re.compile(r"\bnot\b|\bnext\b|pending|\bto deploy\b|todo|\bwill\b|redeploy needed", re.I)
+    for i, ln in enumerate(_cached_text(D.WORKING_STATE).splitlines(), 1):
+        if re.search(r"\bdeployed\b", ln, re.I) and re.search(r"mock|worker|wrangler", ln, re.I):
+            if neg.search(ln):
+                continue
+            t = times[i - 1] if i - 1 < len(times) else None
+            if t and (best is None or t > best["ts"]):
+                best = {"source": D.rel(D.WORKING_STATE), "line": i, "ts": t, "time": D.iso(t),
+                        "text": D.redact(ln.strip())[:240]}  # fmt: skip
+    if best and after_ts and best["ts"] >= after_ts:
+        return best
+    return None
+
+
 def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | None) -> list[dict]:
     items = []
     head = _git_ok("rev-parse", "--short", "HEAD")
@@ -878,30 +1043,43 @@ def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | N
                 "Case documents",
                 status,
                 sim,
-                f"{c['files']} file(s) in {f['folder']}; {c['not_reviewed']} not reviewed; "
-                f"{c['new']} new, {c['amended']} amended, {c['contradictions']} to check; kinds not "
-                f"seen yet: {', '.join(f['expected_missing']) or 'none'}. {f['completeness']}.",
+                f"{c['files']} file(s) in {f['folder']}; {c['not_reviewed']} without a team review "
+                f"record for the current version; {c['new']} new, {c['amended']} amended, "
+                f"{c['contradictions']} to check; kinds not seen yet: "
+                f"{', '.join(f['expected_missing']) or 'none'}. {f['completeness']}.",
             )
         )
+        named = sorted({p.split(":")[0] for v in f.get("leaks", {}).values() for p in v})
+        if named:
+            items.append(
+                _item(
+                    "Case content in the repo",
+                    "warn",
+                    user,
+                    f"{len(f['leaks'])} case file name(s) appear in tracked files outside traces/ and "
+                    f"submission/: {', '.join(named[:8])}. The hard rule allows nothing from the case "
+                    "in the builder; whether docs and mock/ may hold it is the user's call.",
+                )
+            )
 
     # builder
-    fv = builder_version(_git_ok("rev-parse", "HEAD"), freeze)
+    fv = builder_version("HEAD", freeze)
     items.append(
         _item(
             "Builder version",
             "ok" if fv["same_code_as_freeze"] else "warn",
             "Methodology Developer",
             f"HEAD {head}: builder code (src/, builder/) "
-            + ("identical to " if fv["same_code_as_freeze"] else "DIFFERS from ")
+            + ("identical to " if fv["same_code_as_freeze"] else "DIFFERS from or unknown vs ")
             + f"{freeze or 'no freeze-final* tag'}",
         )
     )
 
-    # final build
+    # final build: the submission trace first, then the newest real build, then the newest dry run
     official = [b for b in builds if b["official"]]
-    real = [b for b in builds if not b["dry"]]
-    b = official[-1] if official else (real[-1] if real else None)
-    if not builds:
+    real = [b for b in builds if b["kind"].startswith("real")]
+    b = (official or real or builds or [None])[-1]
+    if not b:
         items.append(
             _item(
                 "Final build",
@@ -912,60 +1090,61 @@ def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | N
             )
         )
     else:
-        ok = bool(b and b["end"] and b["end"]["ok"])
+        ok = b["kind"] == "real" and b["end"] and b["end"]["ok"]
+        clean = ok and not b["docs_changed_since"] and b["folder_watched"] and not b["dirty"]
         items.append(
             _item(
                 "Final build",
-                "ok" if ok and not b["docs_changed_since"] else "warn" if b else "blocker",
+                "ok" if clean else ("warn" if b["kind"].startswith("real") else "blocker"),
                 sim,
-                (
-                    f"{b['file']} started {b['start']}, END ok={b['end']['ok'] if b['end'] else '?'}, "
-                    f"documents snapshot {b['snapshot']['id']}"
-                    if b
-                    else f"only dry runs so far ({len(builds)})"
-                )
-                + ("; " + "; ".join(b["notes"]) if b and b["notes"] else ""),
+                f"{b['file']} ({b['kind']}) started {b['start']}, END ok="
+                f"{b['end']['ok'] if b['end'] else '?'}, documents snapshot {b['snapshot']['id']}"
+                + ("; " + "; ".join(b["notes"]) if b["notes"] else ""),
             )
         )
 
-    # final testing
+    # final testing: a complete, fully passing test of the submitted agent after it was created
+    ob = official[-1] if official else None
+    good = [t for t in tests if ob and ob["created"] and t["build"] == ob["file"]
+            and t["start_ts"] >= ob["created"]["ts"] and t["complete"]]  # fmt: skip
+    passed = [t for t in good if t["all_passed"]]
     items.append(
         _item(
             "Final testing on our mock",
-            "ok" if any(t["complete"] for t in tests) else "warn",
+            "ok" if passed else "warn",
             sim,
-            f"{len(tests)} final test result file(s)"
-            if tests
-            else "no test result on a final agent yet (practice results do not count)",
+            (
+                f"{len(good)} complete test(s) of the submitted build; fully passing: "
+                + (", ".join(f"{t['run']} {t['strict']}" for t in passed) or "none")
+                + (
+                    f"; others: {', '.join(t['run'] + ' ' + t['strict'] for t in good if t not in passed)}"
+                    if len(good) > len(passed)
+                    else ""
+                )
+            )
+            if ob
+            else f"{len(tests)} final test result(s), but no submission trace ({SUBMIT_TRACE}) to test yet",
         )
     )
 
     # mock
     mock_env = _env_value("MOCK_URL")
-    mock_dirty = _git_ok("status", "--porcelain", "--", "mock")
+    mock_dirty = D.git("status", "--porcelain", "--", "mock").strip()
     adapted = _git_ok("log", "-1", f"--since={OPENS_UTC}", "--format=%h %ct %s", "--", "mock")
     adapted_ts = float(adapted.split()[1]) if adapted else None
-    deployed = _handoff_line(r"deploy(ed)?\b.*(mock|worker|wrangler)|(mock|worker).*\bdeploy")
-    deployed_after = bool(deployed and adapted_ts and (deployed["ts"] or 0) >= adapted_ts)
+    deployed = _deploy_evidence(adapted_ts)
     urls_used = sorted({x["mock_url"] for x in builds})
-    mock_detail = (
-        f"MOCK_URL in .env: {mock_env or 'not set'}; latest mock/ commit since the case opened: "
-        + (
-            f"{adapted.split()[0]} at {D.iso(adapted_ts)} ({' '.join(adapted.split()[2:])[:80]})"
-            if adapted
-            else "none"
-        )  # fmt: skip
-        + f"; uncommitted mock/ changes: {'yes' if mock_dirty else 'no'}; a deploy noted in "
-        f"WORKING_STATE after that commit: {'yes' if deployed_after else 'not evidenced'}; mock "
-        f"URLs used by final builds: {', '.join(urls_used) or 'none yet'}. Live status is not "
-        "checked (the dashboard makes no network calls)."
-    )
     items.append(
         _item(
             "Mock (Cloudflare Workers)",
-            "ok" if mock_env and adapted and deployed_after and not mock_dirty else "warn",
+            "ok" if mock_env and adapted and deployed and not mock_dirty else "warn",
             sim,
-            mock_detail,
+            f"MOCK_URL in .env: {mock_env or 'not set'}; latest mock/ commit since the case opened: "
+            + (f"{adapted.split()[0]} at {D.iso(adapted_ts)}" if adapted else "none")
+            + f"; uncommitted mock/ changes: {'yes' if mock_dirty else 'no'}; a finished deploy "
+            f"reported in WORKING_STATE after that commit: {'yes' if deployed else 'not evidenced'}; "
+            f"mock URLs used by final builds: {', '.join(urls_used) or 'none yet'}. Live status is "
+            "not checked (no network calls); the deploy evidence is handoff text.",
             [deployed] if deployed else [],
         )
     )
@@ -973,42 +1152,57 @@ def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | N
     # workflow export
     wf_path = D.ROOT / SUBMIT_WORKFLOW
     export = D.load_json(wf_path) if wf_path.exists() else None
-    tracked = bool(_git_ok("ls-files", "--", SUBMIT_WORKFLOW))
-    pushed = _git_ok("cat-file", "-t", f"origin/main:{SUBMIT_WORKFLOW}") == "blob"
     if not isinstance(export, dict):
         items.append(_item("Workflow export", "blocker", sim, f"{SUBMIT_WORKFLOW} not found"))
     else:
-        bad_urls = sorted({u for u in _urls(export.get("workflow"))
-                           if b and not u.startswith(b["mock_url"].rstrip("/"))})  # fmt: skip
-        match = b and b["created"] and export.get("workflow_id") == b["created"].get("workflow_id")
+        mock = (ob or b or {}).get("mock_url", "").rstrip("/")
+        bad_urls = sorted(
+            {u for u in _urls(export.get("workflow")) if mock and not u.startswith(mock)}
+        )
         problems = []
-        if not match:
-            problems.append("workflow_id does not match the final build's CREATED line")
+        if not ob or not ob["created"]:
+            problems.append(f"no CREATED line in {SUBMIT_TRACE} to match")
+        elif export.get("workflow_id") != ob["created"].get("workflow_id"):
+            problems.append("workflow_id differs from the submission trace's CREATED line")
+        else:
+            try:
+                upd = D.parse_utc(
+                    str(export.get("updated_at", "")).replace("+00:00", "Z")[:19] + "Z"
+                )
+            except ValueError:
+                upd = None
+            if upd is None:
+                problems.append("export has no readable updated_at: cannot tie it to this run")
+            elif upd < ob["start_ts"]:
+                problems.append("export predates the submission trace's run (re-export?)")
         if bad_urls:
             problems.append(f"URLs outside the mock: {', '.join(bad_urls[:4])}")
-        if not tracked:
-            problems.append("not committed")
-        elif not pushed:
-            problems.append("not in origin/main (as of the last fetch/push)")
+        if not _committed(SUBMIT_WORKFLOW):
+            problems.append("not committed (or modified since the commit)")
+        elif not _pushed(SUBMIT_WORKFLOW):
+            problems.append("origin/main does not hold this exact file (as of the last push/fetch)")
+        hard = (
+            bad_urls
+            or not ob
+            or not ob["created"]
+            or (export.get("workflow_id") != ob["created"].get("workflow_id"))
+        )
         items.append(
             _item(
                 "Workflow export",
-                "blocker" if bad_urls or not match else ("warn" if problems else "ok"),
+                "blocker" if hard else ("warn" if problems else "ok"),
                 sim,
                 f"workflow_id {export.get('workflow_id')}, agent_id {export.get('agent_id')}"
                 + (
                     f"; {'; '.join(problems)}"
                     if problems
-                    else "; matches the trace, committed, pushed"
+                    else "; matches the submission trace's run, committed, pushed"
                 ),
             )
         )
 
     # trace
-    tr = official[-1] if official else None
-    t_tracked = bool(_git_ok("ls-files", "--", SUBMIT_TRACE))
-    t_pushed = _git_ok("cat-file", "-t", f"origin/main:{SUBMIT_TRACE}") == "blob"
-    if not tr:
+    if not ob:
         items.append(
             _item(
                 "Matching trace",
@@ -1019,44 +1213,65 @@ def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | N
         )
     else:
         text = (D.ROOT / SUBMIT_TRACE).read_text(errors="replace")
-        leaks = sum(1 for s in D._SECRETS if s and s in text)
+        leaks = sum(1 for v in _env_secret_values() if v in text)
         problems = []
-        if not (tr["end"] and tr["end"]["ok"]):
+        if not (ob["end"] and ob["end"]["ok"]):
             problems.append("END ok is not True")
-        if tr["dirty"] is not False:
+        if ob["dirty"] is not False:
             problems.append("dirty is not False")
-        if not tr["builder"]["same_code_as_head"]:
+        if not ob["builder"]["known_to_git"]:
+            problems.append("its builder commit is unknown to this repo")
+        elif not ob["builder"]["same_code_as_head"]:
             problems.append("its builder commit's code differs from HEAD")
         if leaks:
             problems.append(f"{leaks} secret value(s) from .env found in the trace")
-        if not t_tracked:
-            problems.append("not committed")
-        elif not t_pushed:
-            problems.append("not in origin/main (as of the last fetch/push)")
+        if not _committed(SUBMIT_TRACE):
+            problems.append("not committed (or modified since the commit)")
+        elif not _pushed(SUBMIT_TRACE):
+            problems.append("origin/main does not hold this exact file (as of the last push/fetch)")
         items.append(
             _item(
                 "Matching trace",
-                "blocker" if leaks or not tr["end"] else ("warn" if problems else "ok"),
+                "blocker"
+                if leaks or not ob["end"] or not ob["end"]["ok"]
+                else ("warn" if problems else "ok"),
                 sim,
-                f"git={tr['builder']['commit'] and tr['builder']['commit'][:8]} dirty={tr['dirty']} "
-                f"documents snapshot {tr['snapshot']['id']}"
+                f"git={ob['builder']['commit'] and ob['builder']['commit'][:8]} dirty={ob['dirty']} "
+                f"documents snapshot {ob['snapshot']['id']}"
                 + (f"; {'; '.join(problems)}" if problems else "; ok, committed, pushed"),
             )
         )
 
     # repository access
     origin = _git_ok("remote", "get-url", "origin")
-    ahead = _git_ok("rev-list", "--left-right", "--count", "origin/main...HEAD")
+    counts = (_git_ok("rev-list", "--left-right", "--count", "origin/main...HEAD") or "").split()
+    ahead = int(counts[1]) if len(counts) == 2 and counts[1].isdigit() else None
     invite = _handoff_line(r"invit")
+    granted = bool(invite and re.search(
+        r"\binvited\b|access granted|collaborator (added|accepted)|invitation accepted",
+        invite["text"], re.I) and not re.search(r"\bopen\b|pending|\bto invite\b|todo",
+                                                invite["text"], re.I))  # fmt: skip
+    problems = []
+    if not origin:
+        problems.append("no origin remote")
+    if ahead is None:
+        problems.append("cannot compare HEAD with origin/main")
+    elif ahead:
+        problems.append(
+            f"HEAD has {ahead} commit(s) not in origin/main (as of the last fetch/push)"
+        )
+    if not granted:
+        problems.append(
+            "organiser access not evidenced (the newest WORKING_STATE line about the "
+            "invite does not report it done)"
+        )
     items.append(
         _item(
             "Repository access",
-            "warn"
-            if not origin or (invite and re.search(r"\bopen\b", invite["text"], re.I))
-            else "ok",
+            "ok" if not problems else "warn",
             user,
-            f"origin: {origin or 'none'}; behind/ahead of origin/main (last fetch/push): "
-            f"{ahead or '?'}. Organiser access is not visible to the dashboard; see the evidence line.",
+            f"origin: {origin or 'none'}; "
+            + ("; ".join(problems) if problems else "HEAD pushed; organiser access reported"),
             [invite] if invite else [],
         )
     )
@@ -1076,20 +1291,32 @@ def readiness(builds: list[dict], tests: list[dict], docs: dict, freeze: str | N
             )
         )
     else:
-        sj = D.load_json(draft) or {}
+        sj = D.load_json(draft)
+        sj = sj if isinstance(sj, dict) else {}
         miss = [k for k in ("team", "members", "repo", "commit", "run_command", "workflow",
                             "trace", "mock_url") if not sj.get(k)]  # fmt: skip
         mism = []
-        if tr and sj.get("mock_url") and sj["mock_url"] != tr["mock_url"]:
-            mism.append("mock_url differs from the trace's")
-        if sj.get("commit") and head and not str(sj["commit"]).startswith(head[:7]):
-            mism.append("commit is not HEAD")
+        if (
+            ob
+            and sj.get("mock_url")
+            and str(sj["mock_url"]).rstrip("/") != ob["mock_url"].rstrip("/")
+        ):
+            mism.append("mock_url differs from the submission trace's")
+        commit = str(sj.get("commit") or "")
+        if commit and "origin/main" not in D.git("branch", "-r", "--contains", commit):
+            mism.append("commit is not in origin/main (the organisers cannot clone it)")
+        for k in ("workflow", "trace"):
+            if sj.get(k) and not (D.ROOT / str(sj[k])).exists():
+                mism.append(f"{k} path {sj[k]} does not exist")
+        rc = str(sj.get("run_command") or "")
+        if rc and not ("{case_folder}" in rc and "{mock_url}" in rc):
+            mism.append("run_command lacks {case_folder} or {mock_url}")
         items.append(
             _item(
                 "submission.json",
                 "warn" if miss or mism else "ok",
                 user,
-                f"{D.rel(draft)}: missing {', '.join(miss) or 'nothing'}"
+                f"{_rel(draft)}: missing {', '.join(miss) or 'nothing'}"
                 + (f"; {'; '.join(mism)}" if mism else ""),
             )
         )
@@ -1161,11 +1388,13 @@ def view(runs: list[dict], now: float | None = None) -> dict:
     docs = documents(now, ledger)
     freeze = latest_freeze_tag()
     builds = final_builds(ledger, freeze)
-    tests = final_tests(runs, builds)
+    tests = final_tests(runs + scenario_results(), builds)
     items = readiness(builds, tests, docs, freeze)
     blockers = [i for i in items if i["status"] == "blocker"]
     for f in docs["folders"]:
-        unread = [d["rel"] for d in f["documents"] if d["review"]["status"] == "not reviewed"]
+        unread = [
+            d["rel"] for d in f["documents"] if d["review"]["status"].startswith("not reviewed")
+        ]
         amended = [d["rel"] for d in f["documents"] if any(x["text"].startswith("AMENDED")
                                                             for x in d["flags"])]  # fmt: skip
         if unread:

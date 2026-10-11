@@ -47,8 +47,15 @@ def compute() -> dict:
         incomplete, procs
     )  # a log a live run is writing is in progress
     state = {"runs": runs, "incomplete": incomplete}
-    state["overview"] = A.overview(git, runs, incomplete, procs, D.working_state())
-    state["panels"] = A.panels(runs)
+    try:
+        state["final"] = FC.view(runs)
+    except Exception as exc:  # the final-case view must never break the rest of the dashboard
+        traceback.print_exc()
+        state["final"] = {"error": f"final-case view error: {type(exc).__name__}: {exc}"}
+    final_ids = {t["run"] for t in state["final"].get("tests", [])}
+    practice = [r for r in runs if r["id"] not in final_ids]  # final tests are not practice
+    state["overview"] = A.overview(git, practice, incomplete, procs, D.working_state())
+    state["panels"] = A.panels(practice)
     state["failures"] = A.failures(runs)
     state["builder"] = A.builder(traces, runs)
     try:
@@ -62,11 +69,6 @@ def compute() -> dict:
         state["claude"] = CA.activity()
     except Exception as exc:  # the monitor must never break the testing dashboard
         state["claude"] = {"available": False, "reason": f"monitor error: {type(exc).__name__}"}
-    try:
-        state["final"] = FC.view(runs)
-    except Exception as exc:  # the final-case view must never break the rest of the dashboard
-        traceback.print_exc()
-        state["final"] = {"error": f"final-case view error: {type(exc).__name__}: {exc}"}
     state["snapshot"] = A.snapshot(state)
     state["snapshot"]["claude_session"] = CA.summary(state["claude"])
     state["snapshot"]["final_case"] = FC.compact(state["final"])
@@ -132,7 +134,7 @@ def write_reports(
         ("latest_snapshot.json", D.dumps(snap, indent=2)),
         (
             "latest_snapshot.md",
-            A.snapshot_markdown(snap) + FC.summary_markdown(snap.get("final_case")),
+            D.redact(A.snapshot_markdown(snap) + FC.summary_markdown(snap.get("final_case"))),
         ),
     ]
     if convo is not None:

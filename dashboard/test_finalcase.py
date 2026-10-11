@@ -34,6 +34,7 @@ def case(tmp_path, monkeypatch):
     monkeypatch.setattr(F, "REVIEW_FILE", tmp_path / "review.json")
     chat = tmp_path / "chat.md"
     monkeypatch.setattr(F, "handoff_sources", lambda: [("chat 'Engineer'", chat)])
+    monkeypatch.setattr(F, "committed_case_mentions", lambda names: {})
     F._hash_cache.clear()
     F._text_cache.clear()
     return folder, chat, tmp_path
@@ -82,7 +83,7 @@ def test_name_versions_siblings_and_kind_guesses():
     assert F.name_version("policy rev 3.pdf") == "rev 3"
     assert F.name_version("plain.md") is None
     assert F.stem_key("policy_v2.docx") == F.stem_key("policy-v1.docx") == "policy"
-    assert F.guess_kind("call-flow.pdf", None) == "flow drawing"
+    assert F.guess_kind("flow-drawing.pdf", None) == "flow drawing"
     assert F.guess_kind("x.md", "Customer list") == "test customers"
     assert F.guess_kind("notes.md", None) is None
 
@@ -120,7 +121,7 @@ def test_documents_flags_review_and_mentions(case):
     assert "other version(s) present: spec_v2.md: which is current?" in " ".join(
         f["text"] for f in by["spec_v1.md"]["flags"]
     )
-    assert by["spec_v2.md"]["review"]["status"].startswith("mentioned by engineers")
+    assert by["spec_v2.md"]["review"]["status"] == "not reviewed (mentioned in 1 chat line(s))"
     assert by["spec_v2.md"]["review"]["mentions"][0]["speaker"] == "CLAUDE"
     assert by["copy.md"]["review"]["status"] == "not reviewed"
     assert docs["completeness"].startswith("NOT confirmed complete")
@@ -171,7 +172,7 @@ def test_practice_traces_are_not_final_builds(case, monkeypatch):
 
 def test_final_tests_separate_final_from_practice():
     build = {"file": "traces/final.log", "start_ts": 10.0, "created": {"workflow_id": "wf_1",
-             "agent_id": "ag_1"}, "builder": {"commit": "abc"}, "snapshot": {"id": "s1"}}  # fmt: skip
+             "agent_id": "ag_1", "ts": 10.0}, "builder": {"commit": "abc"}, "snapshot": {"id": "s1"}}  # fmt: skip
     runs = [
         {
             "id": "a",
@@ -196,22 +197,33 @@ def test_compact_and_markdown_survive_an_error():
 
 
 def test_no_case_file_name_is_written_into_dashboard_code():
-    """Guard: nothing from the final case may enter the repo. File names named on the official page
-    (BRIEF.md, README.md) are public and allowed."""
-    page = (F.D.ROOT / "docs/reference/hackathon_page_live_2026-10-11.md").read_text()
-    names = {
-        Path(x["rel"]).name
-        for d in F.case_dirs()
-        for x in F.scan(d)
-        if Path(x["rel"]).name not in page
-    }
-    if not names:
+    """Guard: nothing from the final case may enter the repo. Checks whole file names, folder names
+    and two-word fragments of file names (dates removed) against every dashboard file. Words on
+    the official page (BRIEF.md, README.md, ...) are public and allowed."""
+    page = (F.D.ROOT / "docs/reference/hackathon_page_live_2026-10-11.md").read_text().lower()
+    terms = set()
+    for d in F.case_dirs():
+        for x in F.scan(d):
+            rel = Path(x["rel"])
+            terms.add(rel.name)
+            terms |= {part for part in rel.parts[:-1] if re.search(r"[-_\d]", part)}
+            words = [w for w in re.split(r"[\W_]+", F.DATE_IN_NAME.sub("", rel.stem)) if w]
+            terms |= {
+                f"{a}-{b}" for a, b in zip(words, words[1:], strict=False) if len(a) + len(b) >= 7
+            }
+    terms = {t for t in terms if t.lower() not in page and t.replace("-", " ").lower() not in page}
+    if not terms:
         pytest.skip("no case folder on this machine")
     code = Path(__file__).resolve().parent
-    files = [*code.glob("*.py"), *code.glob("*.json"), code / "static" / "index.html"]
+    files = [
+        *code.glob("*.py"),
+        *code.glob("*.json"),
+        *code.glob("*.md"),
+        code / "static" / "index.html",
+    ]
     for f in files:
-        text = f.read_text(errors="replace")
-        hits = [n for n in names if re.search(re.escape(n), text, re.I)]
+        text = f.read_text(errors="replace").lower()
+        hits = sorted(t for t in terms if t.lower() in text or t.replace("-", " ").lower() in text)
         assert not hits, (f.name, hits)
 
 
@@ -229,7 +241,9 @@ def test_versions_are_per_folder_and_formats_are_pairs(case):
 
 def test_readme_folder_lines_and_phrase_kinds(case):
     folder, _, _ = case
-    _write(folder / "README.md", "- `src/`: background papers\n- talk.md: two example calls\n")
+    _write(
+        folder / "README.md", "- `src/`: background papers\n- talk.md: two example conversations\n"
+    )
     _write(folder / "src/deep/a.md", "x")
     _write(folder / "talk.md", "x")
     _, purposes, _ = F.readme_purposes(F.scan(folder))
@@ -239,3 +253,65 @@ def test_readme_folder_lines_and_phrase_kinds(case):
         F.guess_kind("x.json", None, ["- `x/`: deploy a worker, with a one-endpoint example"])
         is None
     )
+
+
+def test_only_a_team_record_with_the_current_sha_counts_as_reviewed(case):
+    folder, _, tmp = case
+    _write(folder / "a.md", "one")
+    sha = F.hashlib.sha256(b"one").hexdigest()[:10]
+    (tmp / "review.json").write_text(
+        json.dumps(
+            {"a.md": {"status": "read", "sha256": sha, "kind": "analysis", "purpose": "team words"}}
+        )  # fmt: skip
+    )
+    (d,) = F.documents(T0, {"folders": {}}, write=False)["folders"][0]["documents"]
+    assert d["review"]["status"] == "reviewed: read"
+    assert d["purpose"]["kind_guess"] == "analysis" and d["purpose"]["basis"] == "team record"
+
+
+def test_malformed_review_entries_never_break_the_view(case):
+    folder, _, tmp = case
+    _write(folder / "a.md", "one")
+    _write(folder / "b.md", "two")
+    (tmp / "review.json").write_text(json.dumps({"a.md": "ok", "b.md": {"contradictions": "x"}}))
+    docs = F.documents(T0, {"folders": {}}, write=False)["folders"][0]["documents"]
+    assert {d["rel"]: d["review"]["status"] for d in docs} == {
+        "a.md": "not reviewed (team record 'ok' has no sha256)",
+        "b.md": "not reviewed",
+    }
+
+
+def test_chat_lines_before_an_observed_arrival_do_not_count(case):
+    folder, chat, _ = case
+    _write(chat, "### YOU · 2033-05-18T03:00:00.000Z\nwaiting for late.md\n")
+    _write(folder / "late.md", "x")
+    arrival = F.D.parse_utc("2033-05-18T04:00:00Z")
+    ledger = {"folders": {str(folder): {"first_watched": arrival - 3600, "files": {}}}}
+    (d,) = F.documents(arrival, ledger, write=False)["folders"][0]["documents"]
+    assert d["review"]["mentions"] == []
+
+
+def test_unknown_builder_commit_is_unknown_not_same_code():
+    v = F.builder_version("0000000deadbeef", "HEAD")
+    assert v["known_to_git"] is False
+    assert v["same_code_as_freeze"] is None and v["same_code_as_head"] is None
+
+
+def test_final_tests_tolerate_string_launch_records():
+    runs = [{"id": "x", "slot": None, "launch_record": "runs/x.meta.json",
+             "start": "2026-10-11T18:00:00Z", "cases": [{"id": "PUB-01"}]}]  # fmt: skip
+    assert F.final_tests(runs, []) == []
+
+
+def test_scenario_results_are_read_as_final_tests(tmp_path, monkeypatch):
+    monkeypatch.setattr(F.D, "RUNS", tmp_path)
+    (tmp_path / "s.json").write_text(json.dumps({
+        "agent_id": "ag_1", "simulation_id": "sim", "started": "2026-10-11T18:30:00Z",
+        "rows": [{"id": "C1", "pass": True}, {"id": "C2", "pass": False}]}))  # fmt: skip
+    monkeypatch.setattr(F.D, "rel", lambda p: str(p))
+    (r,) = F.scenario_results()
+    assert (r["strict_passed"], r["total"], r["agent_id"]) == (1, 2, "ag_1")
+    build = {"file": "traces/final.log", "created": {"agent_id": "ag_1", "ts": 0.0},
+             "builder": {"commit": "abc"}, "snapshot": {"id": "s1"}}  # fmt: skip
+    (t,) = F.final_tests([r], [build])
+    assert t["build"] == "traces/final.log" and t["strict"] == "1/2" and not t["all_passed"]
