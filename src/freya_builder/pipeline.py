@@ -16,6 +16,7 @@ from .toolapi import Tool
 from .trace import Trace
 
 REPAIR_ROUNDS = 2
+SMOKE_WAITS = (5, 15)  # the smoke test is optional: a short retry schedule
 REPAIR_MIN_S = (
     300  # a repair call takes about a minute; below this the best spec so far is deployed
 )
@@ -217,6 +218,11 @@ def _example(var: dict) -> str:
     return time.strftime("%Y-%m-%dT%H:%M", time.gmtime()) if var["role"] == "now" else "x"
 
 
+def _smoke_retry(e: Exception) -> bool:
+    """A bare 500 from /chat/message is final: the workflow cannot start (kit/docs/api.md)."""
+    return platform.transient(e) and platform.status_of(e) != 500
+
+
 def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     """Smoke test on the published workflow: it starts, says the opening line, leaks nothing."""
     freya = platform.kit()
@@ -227,9 +233,11 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
             trace,
             "POST /api/v2/chat/message",
             lambda: freya.api("POST", "/api/v2/chat/message", body),
+            _smoke_retry,
+            SMOKE_WAITS,
         )
     except (RuntimeError, *platform.NETWORK_ERRORS) as e:
-        trace.test("chat smoke test: workflow starts", False, str(e)[:200])
+        trace.test("chat smoke test: workflow starts", False, platform.describe(trace, e))
         return False
     reply = str(r.get("response") or "")
     forbidden = [

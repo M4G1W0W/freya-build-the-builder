@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timezone
 from typing import TextIO
 
-SECRET_ENV = ("FREYA_API_KEY", "FREYA_BANK_TEAM_KEY", "OPENAI_API_KEY")
+SECRET_ENV = ("FREYA_API_KEY", "FREYA_BANK_TEAM_KEY", "OPENAI_API_KEY", "FREYA_WORKSPACE_ID")
 
 
 def utc_now() -> str:
@@ -25,13 +25,13 @@ class Trace:
         self.model_calls = 0
         self.secrets = [v for k in SECRET_ENV if len(v := os.environ.get(k, "")) >= 8]
 
-    def _redact(self, text: str) -> str:
+    def redact(self, text: str) -> str:
         for secret in self.secrets:
             text = text.replace(secret, "***")
         return text
 
     def line(self, kind: str, message: str) -> None:
-        print(self._redact(f"{utc_now()} {kind:<7} {message}"), file=self.stream, flush=True)
+        print(self.redact(f"{utc_now()} {kind:<7} {message}"), file=self.stream, flush=True)
 
     def start(self, brief_paths: list[str], tool_api_path: str, code: str = "") -> None:
         self.line("START", f"briefs={brief_paths} tool_api={tool_api_path} {code}".rstrip())

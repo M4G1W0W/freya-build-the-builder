@@ -4,18 +4,20 @@ The kit client reads FREYA_API_KEY / FREYA_API_URL at import time; it is importe
 that --dry runs and unit tests need no credentials.
 
 The platform has transient outages (11 Oct 08:40 UTC: 503 "API key validation is temporarily
-unavailable", then 504, then 500 on the dry run), so calls are retried, bounded, on 429/5xx and
-network errors; other 4xx (a rejected workflow) are never retried.
+unavailable", then 504, then 500 on the dry run), so calls are retried on 429/5xx and network
+errors, until the 30-minute build limit is near; other 4xx (a rejected workflow) are never retried.
 """
 
 import http.client
 import json
 import re
+import ssl
 import sys
 import time
 import urllib.error
 from pathlib import Path
 
+from . import llm
 from .trace import Trace
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,10 +27,19 @@ NETWORK_ERRORS = (
     TimeoutError,
     ConnectionError,
     http.client.HTTPException,
+    ssl.SSLError,
 )
-# Seconds before attempts 2-6: at most 230 s of waiting per call, enough for the ~5-minute outage of
-# 11 Oct 08:38-08:43 UTC; three such calls still fit the 30-minute build budget.
-WAITS = (5, 15, 30, 60, 120)
+# Seconds before attempts 2-9: 350 s of waiting per call (outages seen: ~5 min on 11 Oct 08:38-08:43
+# UTC, ~10 min on 10 Oct 19:53-20:03). The 30-minute limit, not this list, bounds the total:
+# call() stops retrying when the time left would not cover the wait plus one more attempt.
+WAITS = (5, 15, 30, 60, 60, 60, 60, 60)
+HARD_LIMIT_S = 30 * 60  # the page: 30 min per brief, including self-tests
+ATTEMPT_S = 150  # one attempt: the kit's urlopen timeout (120 s, kit/freya.py api()) plus margin
+
+
+def time_left() -> float:
+    """Seconds to the 30-minute limit, from the build's LLM budget start (infinite if none)."""
+    return llm.budget_left() + HARD_LIMIT_S - llm.BUILD_BUDGET_S
 
 
 def kit():
@@ -54,23 +65,31 @@ def transient(e: Exception) -> bool:
 def unprocessed(e: Exception) -> bool:
     """Rejected before the platform did anything: 429, or the API-key check's 503."""
     status = status_of(e)
-    return status == 429 or (status == 503 and "temporarily unavailable" in str(e).lower())
+    text = str(e).lower()
+    return status == 429 or (
+        status == 503 and "api key validation is temporarily unavailable" in text
+    )
 
 
-def _describe(e: Exception) -> str:
+def describe(trace: Trace, e: Exception) -> str:
+    """The error's first line for the trace: redacted first, then cut to 200 chars."""
     text = str(e) if isinstance(e, RuntimeError) else f"{type(e).__name__}: {e}"
-    return (text.splitlines() or [""])[0][:200]
+    return (trace.redact(text).splitlines() or [""])[0][:200]
 
 
-def call(trace: Trace, what: str, fn, retry=transient):
-    """fn(), repeated after each wait in WAITS while retry(error) holds; a WARN line per retry."""
-    for attempt, wait in enumerate((*WAITS, None), start=1):
+def call(trace: Trace, what: str, fn, retry=transient, waits=WAITS):
+    """fn(), repeated after each wait while retry(error) holds and the time limit allows it."""
+    for attempt, wait in enumerate((*waits, None), start=1):
         try:
             return fn()
         except (RuntimeError, *NETWORK_ERRORS) as e:
             if wait is None or not retry(e):
                 raise
-            trace.warn(f"{what}: attempt {attempt} failed ({_describe(e)}); retrying in {wait}s")
+            failed = f"{what}: attempt {attempt} failed ({describe(trace, e)})"
+            if time_left() < wait + ATTEMPT_S:
+                trace.warn(f"{failed}; giving up: 30-minute build limit near")
+                raise
+            trace.warn(f"{failed}; retrying in {wait}s")
             time.sleep(wait)
 
 
@@ -95,21 +114,19 @@ def save(trace: Trace, slot: str, workflow: dict) -> dict:
     slot (PUT full replace, GETs, publish the newest version) converges to the same result when
     repeated. Creating one is a single POST whose id is recorded only after it returns, so a
     5xx or a timeout the platform did process leaves a workflow the state never sees, and a
-    repeat creates a second one. Losing the build is worse than one stray workflow out of 200,
-    so such an error gets one retry, with a WARN when it may duplicate. Only an error that was
-    certainly not processed (unprocessed()) uses every retry.
+    repeat creates a second one. Every transient error is retried anyway: refusing does not
+    avoid the duplicate (the operator's re-run sends the same POST), and losing the build is
+    worse than a few stray workflows out of 200. Such a retry gets a WARN.
     """
-    ambiguous_retried = False
 
     def retry(e: Exception) -> bool:
-        nonlocal ambiguous_retried
-        if unprocessed(e):
-            return True
-        if ambiguous_retried or not transient(e):
+        if not transient(e):
             return False
-        ambiguous_retried = True
-        if not _recorded(slot):
-            trace.warn(f"slot '{slot}' has no recorded workflow: a duplicate workflow may result")
+        if not unprocessed(e) and not _recorded(slot):
+            trace.warn(
+                f"slot '{slot}': the failed create may have been processed;"
+                " this retry can leave a stray workflow"
+            )
         return True
 
     saved = call(
