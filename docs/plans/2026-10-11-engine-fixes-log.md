@@ -24,6 +24,12 @@ Candidate tags, all preserved and unmerged; adoption needs the user's separate a
 3. Items 1, 2, 4 (identity all-at-once, too-much separate offer, "this <weekday>") and the floor
    rounding are unmeasured until the variant-e cases run; the identity path cannot run on the kit mock.
 4. Fix 2 (too-much own date) is deferred with unresolved design issues (section near the end).
+5. **Fix 1 audit (12:21-12:36 UTC, last section): CONFIRMED defect on cand-eng.6/.7 fresh builds.**
+   In 6/16 fresh extractions (0/13 pre-Fix-1) the closing rows' `say_before_end` repeats the
+   mid-call support offer question (and in ab4 "Can I help you first?"), so the agent re-asks it in
+   its goodbye message (fails PUB-05 "support team offered once"). Extraction-random: before reading
+   any .6/.7 hardship, support or human-request result, check that build's spec rows for a "?" in
+   `say_before_end`. Not fixed; strict-xfail test on branch `audit-fix1-endings` (dcd9749).
 
 ## Hand-off: `cand-eng.2` = 17eddb0 (items 1 + 2), tagged 10:45 UTC
 
@@ -390,3 +396,75 @@ fresh A build's new stage_rules is a faithful summary of rules 17-47 quoting the
 (nothing invented found), but it is a substantial change to Brief A's rendered negotiate guidance on
 every fresh build. cand-eng.6/.7 must therefore be validated on the full A and B sets x3 as a real
 behaviour change, not as an extraction-only tweak; investigate any A difference against cand-eng.4/.5.
+
+## Fix 1 semantic audit of the new stage_rules (12:21-12:36 UTC; user request, bounded 30 min)
+
+Scope: the 10 existing fresh cand-eng.6 `--dry` extractions (cand-eng.7 extracts identically): A
+(`fresh6/spec-a1`, `a2`), A+B (`ab1`-`ab4`), variant-c (`vc1`-`vc4`), each compared with a pre-Fix-1
+fresh extraction of the same brief (`fresh/spec-a-eng3`, `ab-eng2`, `vc-eng3`), the rendered step
+tasks and runtime FACTS from the eng.6 code. No new extraction, build, Freya call or simulation; no
+builder change; tags untouched. Method: 4 read-only auditors (A, A+B, variant-c, cross-family
+conflicts with FACTS/ATTEMPTS/NOTES/ENDINGS), one adversarial verifier per candidate (11 candidates:
+1 confirmed, 1 plausible, 9 refuted), then the survivors re-checked by hand on the raw specs.
+Evidence packs: `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/cebcf16d-0321-4181-b559-125cc9c8acdd/scratchpad/pack/`
+(may be cleaned by the OS).
+
+### Finding 1: CONFIRMED contradiction (high). Closing rows repeat mid-call questions
+
+- **Source:** Brief A rule 32 (one short sentence of sympathy; offer the support team; "If they
+  accept ... If they decline ..."), rule 42 ("ask once whether you can help first. If they insist
+  ..."). Brief B replaces neither.
+- **Generated:** `spec-ab4` (and `ab3`), rendered negotiate ENDINGS, under the header "say what is
+  listed ... and in the SAME message call the transition tool":
+  `transition_to_ev_transferred_support: ... accepts connection with the customer support team.. First
+  say "I am sorry to hear that." "Would you like me to connect you with the customer support team?"
+  "Thank you. Goodbye."`; `no_promise_hardship` the same. ab4 `transferred_human` (trigger "persists
+  after asking once ...") has `First say "Can I help you first?"` in all four steps.
+- **Prevalence:** a question in a closing row in **6/16** fresh Fix-1 specs (ab3, ab4, raw2, vr2,
+  vc2, vc4); sympathy-only repeat in 3 more (raw1, vr1, p3b1); a1/a2 clean; **0/13** pre-Fix-1 fresh
+  specs (only deceased rows carry a sympathy line there, which is correct). raw-A is hit 2/2.
+- **Cause:** Fix 1's extraction-prompt sentences (the per-product say_before_end sentence and "a
+  sentence the agent must say belongs in a field above") push mid-call sentences into
+  `say_before_end`; `render._endings_text` renders them verbatim as "First say ...".
+- **Conversation:** PUB-05 style. "I lost my job." Agent: sympathy + support offer (per stage_rules).
+  Customer: "No thanks." Agent's goodbye: "I am sorry to hear that. Would you like me to connect you
+  with the customer support team? Thank you. Goodbye." and closes. Ledger right; judge fails "one
+  sentence of sympathy" / "support team offered once". On acceptance the offer is asked again as the
+  transfer fires; ab4 asks "Can I help you first?" a second time after the customer insisted.
+- **Minimal correction (proposal, not built):** narrow the Fix 1 prompt sentences so
+  `say_before_end` holds only closing statements (questions, offers and sympathy said mid-call go in
+  `stage_rules`); `check_spec` guard: a `say_before_end` sentence ending in "?" is a problem (repair
+  round). Keep the paid sentence in its row (Fix 1's purpose).
+- **Validation:** local `--dry` re-extractions of A, raw-A, A+B, variant-c: count "?" in closing
+  rows (target 0) and check the paid sentence is still in its row. Freya (Simulation Developer, user
+  approval): PUB-05 and a Brief B hardship case x3, a human-insist case.
+- **Regression test:** branch `audit-fix1-endings` = dcd9749 (off a170935; cand-eng.6 unchanged),
+  `tests/test_fix1_audit.py` + fixture `tests/fixtures/fix1_audit_spec_ab4.json`: one test proves the
+  fixture reproduces it, one strict xfail asserts no ending asks a question. Lint clean, 862 passed,
+  1 xfailed.
+
+### Finding 2: plausible risk (medium). Vague-period rule next to the PUB-07 guard
+
+- **Source:** Brief A rule 21: vague period, "ask once for the exact day. If they still give none,
+  propose the deadline."
+- **Generated:** a faithful restatement, now in the negotiate task in 10/10 specs (0/3 baselines);
+  ab4 and vc3 drop the "if none" condition (ab4: "ask once for an exact day, then propose that
+  product's deadline").
+- **Tension:** the code DATES line (`render.py`, "Never offer the latest date unless those lines say
+  so.") and the ATTEMPTS non-answer clause (-> attempt 1's date). It predates Fix 1 (rule 21 was always
+  in the system prompt), but Fix 1 puts the competing sentence in the same task as the guard. PUB-07
+  failed before by jumping to the deadline (`docs/hackathon_notes.md` score log, 10-10 15:40 0/3 and
+  17:57 rep 1 recorded 2 Nov).
+- **Conversation:** PUB-07: "the week after next" ... "Monday the 26th" (holiday): should be Tue 27
+  Oct; risk: the agent offers the deadline 2 Nov.
+- **Correction:** none now. If PUB-07 regresses on fresh .6/.7 vs .4: a generic computed FACTS line
+  for the vague-period case. **Validation:** PUB-07 x3 on fresh .6/.7 builds.
+
+### Refuted (not Fix-1 defects, or no ledger/judge effect)
+
+"Too much -> offer the floor once" vs FACTS (pre-existing tension, logged as G1); "I do not have that
+information." in opening/identity steps (the generic HOW TO WORK line already says it); "note and
+continue" timing (same stage_rule also forbids notes on transfer); ab1's widened decline wording (1/4,
+low); variant-c callback-hours line (the same text and the CALLBACK slot list state the window). No
+Brief A/B wording carried into variant-c (online banking, email sentence, "Is that correct?",
+plan_team, hardship team and its scam sentence all kept).
