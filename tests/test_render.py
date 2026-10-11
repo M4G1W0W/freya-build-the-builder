@@ -400,6 +400,17 @@ def test_prompts_handle_customer_speech_styles():
     assert "never repeat the offer, its amount or its date" in nego
     assert "If the customer asks what you offered" in nego
     assert "WAITING" not in ident
+    # cand-idw review: the talkative style's "wedding is on the 30th" must not reach DATES (FACTS
+    # would offer the deadline again); "maybe" is a non-answer; a question back is not a re-ask.
+    assert "is part of the remark, not a date they named" in nego
+    assert "a date or an amount given for paying" in nego
+    assert '"maybe" or "we\'ll see"' in nego
+    assert "a complete reply about paying" not in nego
+    assert (
+        "answer it as the brief says and stop there: do not repeat your question or offer" in nego
+    )
+    assert "a question, a request or a situation" in nego
+    assert "If the BANK BRIEF itself says how to treat small talk" in nego
     assert "only after the customer has described that situation" in nego
     # Voice test 577a2cd4: "can we make it in instalments" got "would you like me to connect you
     # with restructuring?" and a "not right now"; brief A rule 41 says to transfer.
