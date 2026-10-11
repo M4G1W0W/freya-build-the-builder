@@ -107,3 +107,10 @@ before data): adopt only on a clean 3/3 on all three items with no new failure; 
 checker for offers on paid/disputed/hardship products, several products' offers in one turn, or an offer repeated
 after its refusal; the PUB-12 promise-date drift (22 vs 15) is scored separately (simulator drift, not this fix).
 Testing only: adoption is the user's decision.
+
+**Amendment 15:41 UTC (before any offers data): o -> o2.** Methodology superseded cand-eng.4o/9o (kept, untested) with
+cand-eng.4o2 f12aa3e / cand-eng.9o2 9c87bdf after an adversarial review (a product with no persuasion attempt could never
+be closed by a "no"); identical added src lines on both bases (verified); `--spec` builds exp-e4o2-fab / exp-e9o2-fab,
+export vs base: only setup/account_facts/finalize differ. Within the user's approved 24 calls, the regression item
+`offers-pub11-13.json` is replaced by `runs/cases/offers-pub13-xb1.json` (kit PUB-13 asks_back + extra-B X-B1 "refuses
+all three", which exercises the new no-before-offer rule); kit PUB-11 moves to Methodology's Tier 2 (not run).
