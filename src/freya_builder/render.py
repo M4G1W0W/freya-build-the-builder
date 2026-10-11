@@ -306,7 +306,9 @@ def _identity_task(spec: dict, t: Tool) -> str:
         call,
         f"COMPLETE: join the parts the customer gave {since}; if they correct a part, use the "
         "corrected part; after a result that asks for one part again (for example the month as a "
-        "word), the part they give replaces that part of the answer just checked. An answer is "
+        "word), rebuild the answer from the part they now give and their earlier words, read the way "
+        "that result says (if it says two parts were swapped, the number you sent for the part they "
+        "now give belongs in the other part). An answer is "
         'complete when it passes its "complete when" test above, whatever follows it in the '
         "message (a full stop, a complaint, a question, or words that break off)"
         f'{at_once}. Only if "sorry", "I mean", "no", "wait" or "actually" follow it before any '
@@ -321,10 +323,13 @@ def _identity_task(spec: dict, t: Tool) -> str:
     if kinds & {"date", "year"}:
         blocks.append(
             "A full year has four digits: in figures, said one digit at a time, or in words that "
-            'include the century ("nineteen ninety-one", "two thousand and four"). Two digits alone '
-            '("ninety-one", "\'91") are never a full year: do not send such an answer; ask at once '
-            '"Just the year, all four digits, please." (this is not counted under CUT-OFF; if the '
-            "BANK BRIEF says more about it, follow that). A year in words is complete when a full "
+            'include the century ("nineteen ninety-one", "two thousand and four"). Join the parts '
+            'first: a year that still has only its last two digits ("ninety-one.", "\'91", with '
+            "no century said before them) is never a full year: do not send such an answer; ask at "
+            'once "Just the year, all four digits, please." (that ask is not counted under CUT-OFF '
+            "and does not restart it; a year in figures that breaks off before its fourth digit, "
+            'such as "19" or "199" at the end of a message, is a part under CUT-OFF; if the BANK '
+            "BRIEF says more about it, follow that). A year in words is complete when a full "
             "stop or other words follow it, or when it ends on a number word from one to nineteen "
             'after its century ("nineteen ninety-one", "twenty fifteen"); at the very end of a '
             'message, a year in words that ends on its century, on a tens word ("ninety") or on '
@@ -352,8 +357,8 @@ def _identity_task(spec: dict, t: Tool) -> str:
             "If the customer says they already answered, look at their messages since the last "
             "verify_identity result: if they hold a complete answer you did not send, CALL "
             "verify_identity with it now. Never send again an answer from messages you already "
-            "sent it from; an answer the customer gives again after its result, even the same "
-            "value, is a new answer: send it."
+            "sent it from, unless a verify_identity result tells you to send it again; an answer the "
+            "customer gives again after its result, even the same value, is a new answer: send it."
         )
     declining = (
         "DECLINING: what counts as declining the security questions, and how often it ends the "

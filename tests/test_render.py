@@ -683,6 +683,10 @@ def test_identity_task_spec_a_states_complete_tests_and_short_asks():
     assert 'short ask: "Just the 4 digits, please."' in task
     assert T4 in task and T6 in task and T7 in task
     assert T5 not in task
+    # a two-digit year is judged after joining the parts; a year cut off in figures is a part
+    assert "Join the parts first: a year that still has only its last two digits" in task
+    assert "not counted under CUT-OFF and does not restart it" in task
+    assert 'such as "19" or "199" at the end of a message, is a part under CUT-OFF' in task
     nego = wf["nodes"]["negotiate"]["task_message"]
     assert 'but if your previous reply was already "Please go on.", use the cut-off line' in nego
 
@@ -753,7 +757,9 @@ def test_identity_task_declining_and_resend_wording():
         "as the brief says for that question",
         "even the same value, is a new answer: send it",
         "before any full stop",
-        "replaces that part of the answer just checked",
+        "rebuild the answer from the part they now give",
+        "the number you sent for the part they now give belongs in the other part",
+        "unless a verify_identity result tells you to send it again",
     ):
         assert text in task, text
     assert "(why you need it, what the call is about)" not in task
