@@ -47,6 +47,8 @@ binding rule; offer-wait fix targets it). M5 G1 fresh A+B 7/13 vs M2 F2 8/13, bu
 hang-ups at concurrency 13 (re-run pending). M2 A+B control 8/13. PUB-12 extra-B fails on every build (Brief B gap,
 engine item 3).
 
+**11:12 UTC update:** M5r2 rep 1 (sim 3d8c7da4, 10:12-~10:45) had 2 unjudged calls -> discarded and repeated (sim 6d0c9464, running since ~10:46; Freya GETs 504 at 11:12); rep 2 not started. cand-final still not deployed (waiting for the user's go). At ~30 min per 13-call rep, the 78-call cand-final set would take ~3 h.
+
 **Platform:** outage 09:38-10:08 UTC; degraded after (list endpoint 500/504, slow runs, chat 504s). Check with
 `.venv/bin/python scripts/credits.py "check"` before blaming code.
 
