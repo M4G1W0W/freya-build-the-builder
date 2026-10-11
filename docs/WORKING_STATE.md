@@ -3,10 +3,10 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 21:40 Istanbul (18:40 UTC Sun): submission candidate pushed; see the SIMULATION CHAT HANDOFF (18:40) below. Last commit: see `git log`. The final case opens **17:00 UTC**
-(20:00 Istanbul, ~40 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
+**Snapshot:** 2026-10-11 21:40 Istanbul (18:40 UTC Sun): submission candidate pushed; see the SIMULATION CHAT HANDOFF (18:40) below. Last commit: see `git log`. The final case opened 17:00 UTC;
+submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
 `cand-f3` = a069dd2 (F3; no longer main's builder code), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
-ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, **`freeze-final` b9756fe** (= main 8e251fe's builder code).
+ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, `freeze-final` b9756fe, `freeze-final-2` e2635e9 (cand-final.4), `cand-final.5` 01492e0, `.6` ed112fd, `.7` eef48d2, **`cand-final.8` 279a15a = the submitted build's builder** (merged into main 8a7bd1b).
 
 ## UPDATE 16:28 UTC: MOCK DEPLOYED (simulation chat)
 
