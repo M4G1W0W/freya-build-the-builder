@@ -18,6 +18,9 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 01:14 | D1/D2 blind derivation: **15/15 exact matches**; committed b7fe325 (o1-a.json 9 A, o1-b.json 3 B, extra-b-rederived.json); N4/N8 scripts clarified, blind re-check matched |
 | 01:16 | **M1 done (36 calls): W = G1** (cand-g1.1 83f8263). Strict per case, 3 reps each (raw): G1 PUB-06 3/3, PUB-07 3/3, PUB-09 3/3, PUB-03 1/3; G2 2/3, 2/3, 3/3, 3/3; F2 0/3, 3/3, 2/3, 2/3. Newly failing vs F2: G1 none; G2 PUB-07 (rule 21 re-ask after a question back). PUB-03 fails in F2 too (common identity mechanism; see analysis-m1.md, incl. a LEDGER failure G1 r3 d10044ef: a complete wrong DOB in a cut-off message was never submitted). |
 | 01:17 | M4/M5 fresh builds of G1 started (exp-raw-w, exp-ab1-w); precedence ported onto G1 as cand-wp-g1 e1a32d4 (clean cherry-pick, 792 passed, gate-1 render diff on G1 for A and A+B = only the 3 ending_wins lines) |
+| 01:19 | M4/M5 builds ok=True at 83f8263 clean: exp-raw-w a41f58d9 (27 steps, 8 tools), exp-ab1-w 768e75c2 (32 steps, 12 tools); smoke tests PASS. Queued after M3 |
+| 01:21 | Precedence adversarial review: **SHIP-TO-O4** (no FAIL; `runs/dev/r4/precedence-review.md`). Its C1 (ending_wins row must not be the default negotiate row) and C2 (must follow every transferred entry) guards added on cand-wp-g1: **58a7473** (tag cand-wp-g1.1), 794 passed; 19 saved specs: identical (empty) check_spec issues before/after; renders byte-identical |
+| 01:24 | O4 fresh builds of cand-wp-g1.1 started (exp-raw-wp, exp-ab1-wp) |
 
 ## Infrastructure
 - Simulation queue runner (only launcher): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.sh`, queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt`
