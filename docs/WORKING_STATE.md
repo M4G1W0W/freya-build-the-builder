@@ -3,8 +3,40 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 01:52 Istanbul (22:52 UTC Sat). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
-17:00 UTC (about 18 h from now). Tags: `good-pre-f1` = the builder before tonight's FACTS changes.
+**Snapshot:** 2026-10-11 03:45 Istanbul (00:45 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
+`cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
+
+## TONIGHT: execute the APPROVED overnight plan v2 (start here)
+
+**`docs/plans/2026-10-11-overnight-plan-v2.md` is the plan the user approved** (about 00:35 UTC). It carries the
+user's binding conditions, the verified slot provenance, the mechanics, the must-finish blocks M0–M5, the optional
+blocks, the budget, the stop conditions and the approvals. Follow it exactly. The decision is in the hackathon_notes
+Decision log (11-10 00:35).
+
+Execution stopped at 00:40 UTC for a context save. **Nothing is running.**
+
+**Done:**
+- Credits: 433.89 (00:37 UTC).
+- At HEAD: 769 passed, lint clean.
+- Tags `cand-f2` and `cand-f3`.
+- Worktrees `wt-g1`, `wt-g2` and `wt-f2` in the old session's scratchpad:
+  `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/4f150fc6-b7a9-4d54-bc9f-33f85e684098/scratchpad/`.
+  They may be gone; the branches `cand-g1` and `cand-g2` exist at a01a17c.
+- The G1 and G2 edits are untested and uncommitted. They are saved as `runs/dev/r4/cand-g1-uncommitted.patch` and
+  `runs/dev/r4/cand-g2-uncommitted.patch`.
+
+**Next:** finish M0 (plan, "M0"): test and commit G1 and G2 on their branches; write the three case/brief files;
+verify the exports; then M1.
+
+**Binding user conditions** (repeated from the plan):
+1. Any newly failing agent-caused or unexplained case blocks promotion, fresh builds included.
+2. The precedence change stays isolated until it passes 3/3 variant-C extractions, the negative checks and the
+   fresh-build regression.
+3. Export-only fields may be ignored only once verified as harmless defaults.
+4. **No B-date tonight.**
+5. 340 calls is the absolute overnight cap, retries included; keep the Sunday reserve.
+6. If time runs short, M2, M4 and M5 come before optional work.
 
 ## Phase
 
@@ -29,7 +61,7 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 - The user wants careful development, measurement of everything, and a word when something is ready for feedback.
   Ultracode is on: use the Workflow tool for substantive work.
 
-## Running right now (updated 22:52 UTC; the user asked to stop starting new work for a context save)
+## Saturday night's queue (historical; nothing is running now)
 
 - **qrun3** (`<scratchpad>/qrun3.sh`, queue `queue3.txt`, output `qrun3.out`, result names `-bd4da7c` whatever the
   agent): **G1-p06-talkative finished 22:54: 2/3**; the queue runner has stopped and nothing is running. **G2 was NOT run** (removed from the queue at the user's request; run it next session: `exp-g2-a` agent efb690fd, `--only PUB-06 --style talkative --reps 3`). When it
@@ -45,13 +77,14 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 | Name | Commit | What | PUB-07 (6 calls) | PUB-06 talkative | Full sets |
 |---|---|---|---|---|---|
 | HEAD before | c45758f (= aa94ccb code) | | 1/6 | 3/3 (pre-F1 8/8 calls) | styled-a 7/10 (a8b70ea) |
-| F1 | 15bcbad | no DATE TABLE period rows; no separate too-much FACTS line | 4/6 | **1/3 (regression)** | styled-a 6/10 |
-| F2 | bd4da7c | F1 + DATES: "start your reply to a named date with that date as written in FACTS" | **6/6** | 1/3 in styled-a | **styled-a 8/10** (PUB-07 3/3) |
-| F3 = **HEAD code** | a069dd2 | F2 + too-much rule on the attempt-1 line and OFFER PLAN item | dates 6/6 (1 judge fail: re-asked after a question back) | **1/3** (still "floor ... today?") | not run |
+| F1 | 15bcbad | no DATE TABLE period rows; no separate too-much FACTS line | raw 3/6 (adjusted 4/6) | **1/3 (regression)** | styled-a 6/10 |
+| F2 | bd4da7c | F1 + DATES: "start your reply to a named date with that date as written in FACTS" | **6/6** | **2/3** in styled-a (raw JSON; was misrecorded as 1/3) | **styled-a 8/10** (PUB-07 3/3) |
+| F3 = **HEAD code** | a069dd2 | F2 + too-much rule on the attempt-1 line and OFFER PLAN item | raw 5/6; dates 6/6 (1 judge fail: re-asked after a question back) | **1/3** (still "floor ... today?") | not run |
 | G1 (candidate) | a069dd2 + `runs/dev/exp07/g1-on-a069dd2.patch` | F3 + the old trigger line "IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH ... offer exactly the floor X on <date> ... not today" | not run | **2/3** (r1: floor offered twice, call bfe80eb8, not yet read) | |
 | G2 (candidate) | a069dd2 + `exp07 offerdate` | F3 + ATTEMPTS: "Each offer of yours names its amount and its date as written in FACTS; the only today question is the opening one" | not run | **not run (cancelled for the context save)** | |
 
-**Next steps, in order:**
+**Next steps: superseded by `docs/plans/2026-10-11-overnight-plan-v2.md`.** The list below is Saturday's, kept for
+history:
 1. Read G1 and G2 PUB-06. Pick the one that fixes PUB-06 (target 3/3), then run PUB-07 asks + pieces on it (the
    too-much line once interacted with PUB-07, but that needed the period rows, which are gone, and echo-date was
    not there). Adopt the winner into the builder (G1 = apply the patch; G2 = move the sentence into render.py), with
@@ -68,7 +101,9 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 5. Classify the extra-B c45758f reps 1-2 failures (PUB-11 x2, PUB-13, PUB-12; Score log row 11-10 00:54).
 6. Freeze about Sun 15:30 UTC (tag `freeze-final`); from 17:00 UTC follow `docs/RUNBOOK.md`.
 
-**Slots:** dev-a-llm2 = F2 v8 (7cfc34a8 / 2485fc27); dev-ab-llm = F2 v14 (f8f9b203 / b867b809); exp-f3-a 35098a88;
+**Slots** (verified provenance is in the plan; dev-a-llm2 v8 was built at 71add36, which has the same code as bd4da7c;
+dev-ab-llm v14 was built at bd4da7c with `spec-ab-llm-c45758f.json` and is **unmeasured**; the last measured A+B is
+v13 at c45758f): dev-a-llm2 = F2 v8 (7cfc34a8 / 2485fc27); dev-ab-llm = F2 v14 (f8f9b203 / b867b809); exp-f3-a 35098a88;
 exp-g1-a 31f79439 (dirty G1 build); exp-g2-a efb690fd; exp-p07-* (throwaway). About 30 workflows of 200 used.
 dev-a-llm (52b947c v6) and voice-test unchanged.
 
@@ -180,8 +215,9 @@ the ledger was correct in every clean rep. Their styled 3-rep run is in chain4.
 |---|---|---|---|
 | dev-a-llm | 81c14d7a-c622-49e2-98fb-8cd347ef4ac2 | c6a57c76-a3ea-42cc-9cfb-7eb8773b9436 | **FROZEN v6 (user testing)** |
 | voice-test | 39e29145-bb65-47ec-9f95-24bbd2286502 | cdd31f6c-f48c-4a6f-b0e8-3d5323b0f26c | copy of dev-a-llm + test_variables |
-| dev-a-llm2 | 7cfc34a8-5b97-4bfc-a3a8-b4e884c4dd96 | 2485fc27-f1d4-47e1-ab89-a1a86fd12a87 | A LLM spec at HEAD (v2 = 276302f) |
-| dev-ab-llm | f8f9b203-66ae-43e1-9d37-82e76d26b762 | b867b809-5d2b-4e75-935f-1ed6086432c3 | A+B LLM spec at HEAD (v9 = 276302f) |
+| dev-a-llm2 | 7cfc34a8-5b97-4bfc-a3a8-b4e884c4dd96 | 2485fc27-f1d4-47e1-ab89-a1a86fd12a87 | **A control: v8 at 71add36 (= F2 code), spec-a-llm.json. Never overwrite overnight** |
+| dev-ab-llm | f8f9b203-66ae-43e1-9d37-82e76d26b762 | b867b809-5d2b-4e75-935f-1ed6086432c3 | **A+B control: v14 at bd4da7c, spec-ab-llm-c45758f.json, unmeasured. Never overwrite overnight** |
+| exp-g1-a / exp-g2-a / exp-f3-a | 5f39ed9a… / 4d64b871… / c2a1e221… | 31f79439… / efb690fd… / 35098a88… | G1 (dirty build) / G2 (exp07 runtime variant) / F3; all spec-a-llm.json |
 | dev-a-fixture | 349752be-0764-4025-9e5f-4248a6fe6bff | f0354c17-f459-4d7a-bfef-62acea2e5cd7 | v5 (52b947c era) |
 | dev-raw-a | 7286c0bd-223f-4185-a61a-a7fedd43279b | eb321c47-0eb5-4ceb-9624-a3012d3c1957 | fe1d7ef |
 | brief-a, brief-a+brief-b | e2f7b97e… / aab4bc00… | 23c6c141… / 6afab2aa… | kit baseline |

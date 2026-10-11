@@ -355,6 +355,28 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   documents no other way to send it. A layout module was written and tested, then removed (dead code). On the
   dashboard, ⋮ → Organize gives the readable view. The organisers load our exported JSON, so they get their own
   editor's layout either way.
+- 2026-10-11 03:35 (00:35 UTC) — **Approved overnight plan v2: measurement first, no B or C before the freeze.**
+  The plan is `docs/plans/2026-10-11-overnight-plan-v2.md`.
+  - *Alternatives weighed:*
+    - (A) refining prompts and FACTS;
+    - (B) code controls dates, attempts, precedence and recording;
+    - (C) a conversational state-machine redesign.
+  - *Decision:* ship F2 plus the measured PUB-06 winner, backed by matched case-level 3/3 measurement: a bounded
+    PUB-06 comparison, the first A+B baseline on F2, and fresh raw-A and single-file A+B builds. The bounded "ending
+    wins" precedence fix (review gap 7) is optional and isolated behind three gates. B-date is deferred. Full B and
+    C are rejected for this event.
+  - *Reasons:*
+    - In 18 of 18 local transcripts the `create_promise` arguments equalled the last confirmed read-back.
+    - The dominant failure, PUB-06 (6 of 12 calls since F1), is offer sequencing, not recording.
+    - B's per-turn Freya mechanisms (date-part extraction in negotiate, node re-entry with a fresh line, a baked
+      numeric amount) are documented but unverified.
+    - Code control turns an off-schema hidden-brief rule into a hard failure of a whole family of cases.
+    - C cannot be measured before 15:30.
+  - *What keeps B-date open:* "this Friday" was resolved as Saturday 17 Oct three times before F2, and exp07 showed
+    that experimental-5's date choice is sensitive to unrelated FACTS lines.
+  - *The user's conditions:* any newly failing agent-caused or unexplained case blocks promotion; 340 calls is the
+    absolute overnight cap; the precedence fix needs 3/3 variant-C extractions plus the negative checks and a
+    fresh-build regression.
 
 ## Score log
 
