@@ -95,6 +95,7 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   (DOB verified 0.5 s); the MODEL took 54 s (45.1 -> 99.5 s) to emit the tool call and the simulated customer 29 s to
   answer: latency, not agent logic (kit: 'the phone agent was slow'). Latency flaps: 14-37 s (12:01), 0-1.5 s
   (12:10), 14-54 s (12:37). **Queue stays PAUSED** (a rep now would measure hang-ups). Ledger +1: cum **312**.
+- **12:45 UTC USER: keep the queue paused for now.** No latency probes or other simulations until the user says so.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
