@@ -13,6 +13,13 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 (18:30 Istanbul) freeze is an internal target; submission closes 20:00 UTC (23:00 Istanbul). Bring the evidence
 and fallback options to the user before the final selection.**
 
+**USER (12:00 UTC): cand-eng.6/.7 exist (Fix 1; engine log READ FIRST).** Treat Fix 1 as a BROAD fresh-build behaviour
+change (rendered negotiate stage_rules ~4.5x larger), not a paid-sentence fix; saved-spec render equivalence does NOT
+establish fresh-build equivalence. The proposed comparison must include full matched A/B regression coverage and
+PUB-06 'rest stays overdue' speech. **eng.4 stays the comparison candidate; no new tag is adopted automatically; the
+paused queue is preserved; resolve smoke simulation 94c9e350's status before starting any other simulation.** Do not
+restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence review as an addendum when it finishes.
+
 - **Paused on the user's instruction (relayed Service Check note, 11:38):** widespread 500/504. `sim/STOP` is SET
   (11:38:32); the runner exited 11:39:22. No builds or retries are running. The 3 eng.4 slots below stay deployed:
   **do not rebuild them.**
@@ -21,6 +28,30 @@ and fallback options to the user before the final selection.**
   **Service Check (peer session) confirmed at 11:40:34: no simulation created after 11:30 UTC** (no orphan). It polls
   `GET /api/v2/simulations` every 3 min read-only (up to ~2 h), re-checks for late-created simulations, and reports
   recovery after 3 OK answers in a row. This chat does NOT poll in parallel.
+- **11:51-11:57 UTC:** Service Check reported GET recovery (3 OK, 11:45-11:51), then failures again at 11:56 (502).
+  The bounded smoke (exactly 1 simulation, no auto-repeat: scratch wrapper `smoke_once.py`, log
+  `runs/dev/r4/SMOKE-e4a.log`) CREATED simulation **94c9e350-420c-4823-b147-d2856643f5b2** (~11:54, agent f166447e,
+  PUB-01); its result GETs 504 since 11:55. If the client exits without a result, this simulation is the one to
+  check/pause. Not yet in calls.tsv (add 1 call when it ends). Queue still STOPPED.
+- **12:07-12:08 UTC:** API recovered at 12:07:31 (Service Check). **6d0c9464 (M5r2, paused 11:22) had restarted itself
+  during the outage** (iteration ab86141f running, new calls 12:00:43/12:03:35/12:06:20, unwatched). **Re-paused 12:08:11**
+  (PUT status=paused; API confirmed paused 12:08:16). Its extra calls are NOT in calls.tsv (count unknown; check the
+  iteration later). Service Check watches it read-only for another restart. Smoke 94c9e350: progressing late (run
+  started 12:01:07), ran alongside 6d0c9464, so its timing/result may be affected.
+- **USER (12:09 UTC) resume conditions for the EXISTING eng.4 queue:** (1) smoke 94c9e350 has a complete judge verdict;
+  (2) M5r2 6d0c9464 confirmed paused with no continuing new calls; (3) extra usage reconciled against the budget. A
+  judged agent failure is diagnostic: inspect it before broader runs. Missing results / platform errors keep the queue
+  paused. No candidate switch, no eng.6/7 deploy, no select/freeze without the user.
+- **Reconciliation (12:10):** 6d0c9464 status paused (API 12:09); 13 runs: 2 started 10:45 (before the 11:22 pause),
+  11 started/restarted 11:38-12:06:20, none after 12:08:11; 2 still 'running' then (12:00:43, 12:06:20). Iteration dump
+  `runs/dev/r4/6d0c9464-iteration-1210.json`. Credits 401.84 (11:30) -> 397.74 (12:10) = 4.10 USD ~ 16-19 calls at
+  0.22-0.26 USD/call (M3/M4) incl. the smoke: booked **18 calls** to `6d0c9464-restart-reconcile` in calls.tsv
+  (cum **285**; E4-A's 10 counted calls had no simulation, kept conservatively). Re-read credits before resuming.
+- **12:14 UTC: conditions NOT met.** (a) 6d0c9464 started a retry at 12:09:28 despite `paused` (Service Check alert).
+  Runs have attempts/maxAttempts=4: 10 of 13 runs exhausted or done; 3 runs at attempt 3 (12:00:04 error, 12:00:43
+  analyzing, 12:09:28 error) => at most 3 more calls (~0.75 USD). Not using untested PUT completed/maxRetries or
+  DELETE (destroys data); waiting for the retries to exhaust. (b) Smoke 94c9e350: its call 6af560aa ran (started
+  12:01:07) but is stuck in 'analyzing' (no judge verdict) for 10+ min. Queue stays PAUSED.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases

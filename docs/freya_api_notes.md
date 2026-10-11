@@ -266,6 +266,13 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
     status still `running` at 21:55). It blocks every new simulation ("concurrent simulations"), and the kit's
     `run_simulation` polls with no timeout. `PUT /simulations/{id}` with `{"status": "paused"}` (live spec; not in the
     kit) set it to `paused`, keeping its data, and the next queued simulation started 1 s later [C, user-approved].
+  - **Pause does not stop the platform's own retries** (11 Oct, 6d0c9464): runs carry `attempts`/`maxAttempts`
+    (`maxAttempts` 4 = 3 retries, the default; the kit's `run_simulation` does not set `maxRetries`). During the
+    09:38-12:07 UTC degradation a simulation paused at 11:22 restarted runs 11:38-12:06, and after a second
+    `PUT status=paused` (12:08:11, status read back `paused`) it still started a retry at 12:09:28. Retries stop only
+    when each run reaches `maxAttempts`. The live spec's PUT also accepts `status: completed` and `maxRetries`;
+    their effect on queued retries is [ND] (untested) [C: GET /simulations/{id}/iterations/{it} 12:14 UTC,
+    `runs/dev/r4/6d0c9464-iteration-1214.json`].
   - `GET /simulations/{id}/iterations` gives passed, failed, inconclusive, error and analyzing counts, `passRate` and `agentVersionId`.
   - `GET /simulations/version-checks` and `GET /simulations/version-persona-runs` take `workspaceId` and `entityVersionId`.
   - `POST /simulations/{id}/rerun` starts a new iteration [C].
