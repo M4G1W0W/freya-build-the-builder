@@ -94,3 +94,16 @@ exp-e9g-fr / exp-e9g-fab. Export vs base export, all four: added node `hang_up_t
 (transitions only); system prompt, global nodes and every task_message identical. Farewell: eng.4g "Thank you for your time.
 Goodbye." (spec has no closing line; builder GOODBYE), eng.9g "Thank you. Goodbye." (the spec's own closing line).
 Queued after the core in the pre-registered interleaving (E4G, E9G | E9G, E4G | E4G, E9G).
+
+## Addendum (15:29 UTC, user decision, before any data): offers-fix test on both bases (24 calls)
+
+cand-eng.4o 8c1a05e (on cfa4d9d) and cand-eng.9o ecb4bcb (on b103e21) (Methodology; `sandbox/facts.py` only, identical
+added lines on both bases, verified). `--spec` builds from the measured A+B specs: exp-e4o-fab (spec-eng4-fab) and
+exp-e9o-fab (spec-ch-fab); export vs base: only the setup, account_facts and finalize code nodes differ; system prompt
+and every task_message identical. Per base, x3: `runs/cases/offers-pub12-ab.json` (PUB-12 corrects),
+`runs/cases/offers-xb-pub12.json` (extra-B PUB-12 in_words), `runs/cases/offers-pub11-13.json` (PUB-11, PUB-13): 12 calls.
+Runs after the goodbye block, only on a healthy platform, bases interleaved per rep. Rule (Methodology's, adopted
+before data): adopt only on a clean 3/3 on all three items with no new failure; read every transcript plus the
+checker for offers on paid/disputed/hardship products, several products' offers in one turn, or an offer repeated
+after its refusal; the PUB-12 promise-date drift (22 vs 15) is scored separately (simulator drift, not this fix).
+Testing only: adoption is the user's decision.
