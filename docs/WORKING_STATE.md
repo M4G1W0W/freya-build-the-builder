@@ -26,6 +26,35 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 16:52 UTC: cand-final.2 REVIEW + Turkish --dry + pdftotext (simulation chat)
+
+- **Review** (workflow wf_266727cb-c3f, 30 agents, read-only, offline repro + 1 skeptic per medium+ finding): **no
+  blocker**; 24 confirmed (~8 distinct issues), 1 refuted, 12 unverified lows. Summary:
+  `<this scratchpad>/review-summary.txt`; repros `<this scratchpad>/review-tmp/`. Sent to Methodology (prepare fixes on a
+  branch, do NOT tag; the user decides cand-final.3). Ranked:
+  1. HIGH: PDFs without pdftotext (dropped or garbled Turkish). **FIXED in the environment (user D4 16:46): `brew install
+     poppler` -> /opt/homebrew/bin/pdftotext 26.09.0**; the builder's pdf_text now reads Chrome/Quartz Turkish PDFs exactly.
+     The organisers' re-run machine may lack it (trace WARNs).
+  2. MEDIUM (top builder issue for the final): folder input -> when consolidate says kind=clean, `_prompt_brief` = EVERY
+     file (test customers' identity answers + balances, example conversations, contract, Q&A) under "BANK BRIEF (the rules
+     you must follow)" (cli.py:144-147, pipeline.py:196/208, render.py:240). Confirmed live twice (kind=clean, prompts 23.5k
+     and 23.8k chars). Fix: folder/multi-doc input -> `_prompt_brief` = consolidated_rules.
+  3. MEDIUM: verbatim tts lines skip the language step (render.py:611/702/712-723). **Measured: not hit on a Turkish brief**
+     (below).
+  4. MEDIUM: customer_field intersects over ALL tools (spec.py:670-683); xlsx empty/merged cells shift columns, date
+     serials, percentages; unknown extensions skipped (flow drawing .svg/.drawio/.mmd/.html/.rtf).
+  5. Contract shape (GET/path params, double /v1, full-URL paths, no response enums, missing role kills the build late,
+     OpenAPI JSON with non-practice names -> KeyError): absorb by writing the mock to the trace's `tool` lines and choosing
+     mock_url; a missing role is a build failure to watch for.
+- **Turkish --dry (user D3 16:46: --dry only, no synthetic simulation; 0 Freya calls):** folder `<this scratchpad>/rehearse-tr/`
+  (BRIEF.md = own Turkish translation of kit brief A, Turkish README, .docx contract). END ok=True, 144 s, 4 model calls,
+  call language Turkish. Every verbatim spoken line is Turkish (opening, disclosure intro/product/first ask, promise line,
+  identity asks, failed/decline lines, goodbye, product labels, months). account_source offline: disclosure_text fully
+  Turkish; worded now '14 Ekim 2026 Çarşamba 11:00' parses like ISO. Minor: amounts '1850.50' (Turkish 1.850,50);
+  account_facts dates in English for the model (prompt says to speak dates in Turkish). Files: rehearse-tr.spec.json,
+  rehearse-tr.dry.workflow.json, rehearse-tr.dry.trace.log (this scratchpad). The first simulation of the REAL final
+  build is the end-to-end Turkish test.
+
 ## UPDATE 16:38 UTC: cand-final.2 REHEARSAL against our mock PASSED (simulation chat)
 
 - **Build** (live, non-dry, Python 3.12.13 standalone, worktree `<this scratchpad>/wt-cf2` at 3abfd22):
