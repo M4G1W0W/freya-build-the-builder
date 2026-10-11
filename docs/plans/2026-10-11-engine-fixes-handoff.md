@@ -186,3 +186,23 @@ Check `date -u` first. Binding: another chat owns ALL simulations and deploys. Y
 run_cases or non --dry builds. Work only in your own worktree ... Log your work in
 docs/plans/2026-10-11-engine-fixes-log.md, and hand fixes over as tags (cand-eng.N) with a measurement
 request." On restore, add: "then read docs/plans/2026-10-11-engine-fixes-handoff.md".
+
+## FINAL FORMAT ADAPTERS (user D2 16:12 UTC, built 16:13-16:30 UTC): `cand-final.2`
+
+Official page 16:00 UTC: one Turkish case folder (.md/.docx/.pdf/.xlsx), run form
+`build.py {case_folder} {mock_url}`, tools call the team's own mock. Generic changes on freeze-final's builder
+(main 81714cb), nothing from the final case:
+- `casefolder.py`: recursive folder reader (BRIEF.md, README.md first; .docx/.xlsx stdlib zip+XML; .pdf pdftotext or
+  stdlib stream scan); unreadable files WARN, never fatal. The practice form's brief text is byte-identical.
+- `contract.py`: a URL as the last argument = mock. OpenAPI JSON in the folder is used as is; else one model call
+  reads the service contract, naming operations by the builder's 7 roles; URL = mock + contract path.
+- `language.py`: one model call: call language, translated builder goodbye, 12 month names. English renders exactly
+  as before ('Speak English.'); others get a 'Speak <lang>' paragraph; the notes end-node goodbye is translated.
+- `facts.py`: worded `now` with the call language's month names (and non-ASCII letters); +173 bytes per code node
+  (largest 39,128 of the 40,000-byte guard).
+Evidence: 941 tests (10 new, `tests/test_final_format.py`); 42 saved specs re-rendered: only the embedded facts.py
+source differs; live `--dry` (no Freya): kit Brief A old form END ok=True (101 s, 3 model calls); a synthetic folder
+whose only contract is a .docx copy of the kit tool API END ok=True (124 s, 4 calls) with tools identical to the kit
+build (names, paths, fields, enums; only the base URL differs); live language call on a self-written Turkish note:
+Turkish, translated goodbye, correct months. Not done: per-line translation of other verbatim English lines (covered
+only by the prompt instruction), 'outbound' wording, no Freya simulation of a non-English agent.

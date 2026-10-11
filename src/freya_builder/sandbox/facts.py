@@ -57,15 +57,17 @@ def _24h(hour, minute, half):
     return hour, minute
 
 
-def _month(word):
-    """1-12 for a month name or its abbreviation ('oct', 'sept'), else 0."""
-    for i, name in enumerate(MONTH_NAMES):
-        if len(word) >= 3 and name.startswith(word):
-            return i + 1
+def _month(word, extra=()):
+    """1-12 for a month name or its abbreviation ('oct', 'sept'), also in the call's language
+    (extra: its 12 month names, from the builder), else 0."""
+    for names in (MONTH_NAMES, [str(n).lower() for n in extra or ()][:12]):
+        for i, name in enumerate(names):
+            if len(word) >= 3 and name.startswith(word):
+                return i + 1
     return 0
 
 
-def _parse_when(raw, order):
+def _parse_when(raw, order, months=()):
     """datetime of a date-time text, or None. Accepts ISO, 2026/10/14, 14.10.2026 or 10/14/2026
     (order: the spec's numeric date order), 14 October 2026 and Oct 14, 2026, each with an
     optional time such as 11:00, 9.05 or 7pm."""
@@ -85,13 +87,13 @@ def _parse_when(raw, order):
             a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
             ymd = (y, a, b) if order == "mdy" else (y, b, a)
     if ymd is None:
-        m = re.search(r"(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)\.?,?\s+(\d{4})", low)
-        if m and _month(m.group(2)):
-            ymd = (int(m.group(3)), _month(m.group(2)), int(m.group(1)))
+        m = re.search(r"(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([^\W\d_]+)\.?,?\s+(\d{4})", low)
+        if m and _month(m.group(2), months):
+            ymd = (int(m.group(3)), _month(m.group(2), months), int(m.group(1)))
     if ymd is None:
-        m = re.search(r"([a-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})", low)
-        if m and _month(m.group(1)):
-            ymd = (int(m.group(3)), _month(m.group(1)), int(m.group(2)))
+        m = re.search(r"([^\W\d_]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})", low)
+        if m and _month(m.group(1), months):
+            ymd = (int(m.group(3)), _month(m.group(1), months), int(m.group(2)))
     if ymd is None:
         return None
     rest = low[: m.start()] + " " + low[m.end() :]
@@ -111,7 +113,7 @@ def _now(vs, C):
     for raw in (vs.get(C.get("now_var") or "now"), vs.get("today_iso")):
         if raw is None or str(raw).strip() == "":
             continue
-        found = _parse_when(raw, C.get("date_order"))
+        found = _parse_when(raw, C.get("date_order"), C.get("month_words") or ())
         if found is not None:
             return found, "ok"
     return datetime.datetime.now(), "clock"

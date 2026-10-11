@@ -8,7 +8,7 @@ import itertools
 import json
 import re
 
-from . import codegen, hooks, nodes
+from . import codegen, hooks, language, nodes
 from .codegen import OK_FIELD
 from .spec import (
     PLACEHOLDER,
@@ -222,7 +222,7 @@ def _bake_customer(spec: dict, tool: Tool) -> dict[str, str]:
 
 def system_prompt(spec: dict, brief_text: str, engine_tools: list[str]) -> str:
     m = spec["meta"]
-    return f"""You are {m["agent_self_description"]} ({m["bank_name"]}) on an outbound phone call. Speak English. Keep every turn to one or two short sentences.
+    return f"""You are {m["agent_self_description"]} ({m["bank_name"]}) on an outbound phone call. {language.speak_line(spec.get("language"))} Keep every turn to one or two short sentences.
 
 HOW TO WORK
 - Follow the BANK BRIEF below exactly. When a rule says to use a tool, call the tool: saying that you did something is not enough.
@@ -552,7 +552,7 @@ def _slot_tool(
 # ---- graph -----------------------------------------------------------------------------------
 
 
-GOODBYE = "Thank you for your time. Goodbye."
+GOODBYE = language.GOODBYE_EN
 RECORDED_DISCLOSURE = re.compile(r"\b(this|the) call is (being )?recorded\b", re.IGNORECASE)
 
 
@@ -696,7 +696,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     )
     wf_nodes["negotiate"] = nodes.conversation(
         "negotiate",
-        _negotiate_task(spec, k, notes),
+        language.localize_dates(_negotiate_task(spec, k, notes), spec.get("language")),
         wrap + _exit_transitions(spec, "negotiate"),
         tools=neg_tools,
         on_enter={"type": "tts", "text": "{{disclosure_text}}"},
@@ -710,9 +710,10 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         # finalize computes the outcome from what was recorded. The platform speaks a passthrough
         # node's line when the call ends (seen 10 Oct, 14:3x UTC).
         line = spec["success_lines"]["promise"]
+        bye = spec.get("goodbye") or GOODBYE  # the brief's language (language.py); else English
         for name, text in (
-            ("ev_notes_p", (line + " " + GOODBYE) if line else GOODBYE),
-            ("ev_notes", GOODBYE),
+            ("ev_notes_p", (line + " " + bye) if line else bye),
+            ("ev_notes", bye),
         ):
             node = nodes.code_node(
                 name,

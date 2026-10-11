@@ -7,7 +7,7 @@ only generic instructions (with invented, generic examples).
 import json
 import time
 
-from . import platform
+from . import language, platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
 from .llm import LLMError, budget_left, chat_json
@@ -195,6 +195,7 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     c = consolidate(trace, brief_text, tools)
     rules_text = brief_text if c["kind"] == "clean" else c["consolidated_rules"]
     spec = extract_spec(trace, rules_text, tools)
+    spec.update(language.detect(trace, brief_text))  # render.py: prompt language, goodbye
     for u in spec["unmodeled"]:
         trace.warn(f"NOT ENFORCED BY CODE (kept in prompt): {u[:200]}")
     for row_id, says in early_lines(spec).items():
@@ -205,6 +206,7 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
             " slots (the official page: customers have one to three products)"
         )
     spec["_prompt_brief"] = rules_text
+    spec["_consolidated_rules"] = c.get("consolidated_rules", "")  # cli.py: folder input
     return spec
 
 

@@ -13,8 +13,13 @@ export FREYA_API_KEY=fak_...          # Freya workspace key
 export FREYA_API_URL=https://staging-app.freyavoice.ai
 export OPENAI_API_KEY=sk-...          # the builder's own LLM (reads the brief); the phone agent does not use it
 
-python3 builder/build.py <brief file(s)> <tool_api.json> 2>&1 | tee traces/<name>.log
+python3 builder/build.py <case_folder> <mock_url> 2>&1 | tee traces/<name>.log      # final form
+python3 builder/build.py <brief file(s)> <tool_api.json> 2>&1 | tee traces/<name>.log  # practice form
 ```
+
+The final form reads every document in the folder (BRIEF.md and README.md first; .md, .txt, .json,
+.docx, .xlsx, .pdf) and builds the tools from the folder's service contract, each calling
+`<mock_url>` + the contract's path. Files it cannot read are a WARN in the trace, never a stop.
 
 ### Organiser re-run (fresh clone)
 
