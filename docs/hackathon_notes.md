@@ -405,6 +405,17 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   checks after a generic fix, styled-a 10 + styled-ab-all 13 each, + 2 smokes per hidden agent). Every item still
   needs its own user go. Credits do not bind (393 USD; ~0.15-0.25 USD/call -> 55-90 USD). Applied to `qrun4.sh` and
   this session's `run_one.sh`.
+- 2026-10-11 17:15 (14:15 UTC; corrected 14:35 after a 3-lens read-only check) — **Challenger arm of the proposed
+  comparison eng.6 -> eng.8 (4267bb0); eng.4 stays the comparison candidate. E4-A-styledA completed and dequeued.
+  Cap 705 -> 789 (housekeeping, user ~14:05; nothing built, deployed or run).** eng.8's bar (dossier §11.3 Primary,
+  201 calls): T1 66 + T3 96 + E1 transfer-path cases 30 + D8 9 (the engine-required eng.8 `--spec
+  fix1_audit_spec_ab4.json` PUB-05 defect path); T2 raw-A 60 strongly preferred; eng.6 stays only as the control of E2,
+  the closing-fix isolation on the same saved spec (39 calls), which runs only on explicit approval. Recalculated
+  from cum 343 (kept; it includes 10 phantom calls booked for E4-A attempt 1's POST 504): + E4 queue remainder 60 +
+  201 + 60 + 39 = 360 planned, + 36 retry reserve (~10%) + 50 hidden-brief reserve = **789**, applied under the
+  user's 13:45 bounded-raise authorization (dossier §11.4). Found: the Brief-A-ledger PUB-05 cases would fail the
+  ledger on the A+B ab4 agent (Brief B rule 8 note; prediction); only `styled-ab-a.json` PUB-05 fits today. Run
+  items only through `run_one.sh` + `suite_once.py` (`qrun4.sh` reruns slow reps and uses platform retries).
 
 ## Score log
 

@@ -1,6 +1,6 @@
-# Final-selection evidence: builder candidates (11 Oct, as of 12:50 UTC)
+# Final-selection evidence: builder candidates (11 Oct, as of 12:50 UTC; §11 update 14:15 UTC)
 
-Evidence in this dossier runs up to 12:42 UTC: the checkers' corrections plus `docs/WORKING_STATE.md` entries through the 2nd smoke at 12:40. Nothing is selected or frozen here. The user makes the final selection.
+Evidence in this dossier runs up to 12:42 UTC: the checkers' corrections plus `docs/WORKING_STATE.md` entries through the 2nd smoke at 12:40. *(14:35 UTC: §11 adds E4-A-styledA's result (completed, raw strict 4/10), the eng.8 challenger arm and the recalculated plan; ledger cum 343, cap 789.)* Nothing is selected or frozen here. The user makes the final selection.
 
 Source shorthand used in brackets:
 - `r4/` = `runs/dev/r4/`, `r3/` = `runs/dev/r3/`
@@ -201,6 +201,7 @@ Common to all:
 
 - **Ledger: cum 312** of the runner cap 500 → 188 left [r4/calls.tsv last row 12:40:17]. The cap is internal; the organiser rule is only "do not probe or load-test".
 - **Credits:** 391.06 USD at 12:29 [WS]. At 0.21-0.26 USD per call, the 90-call E4 queue costs about 19-23 USD. Credits are not binding.
+- *(14:35 UTC: E4-A-styledA COMPLETED and removed from the queue; cum 343, cap 789; see §11.1, §11.4.)*
 - **E4 queue** [sim/queue.txt]: E4-A-styledA 30, E4-AB-all 39, E4-AB-xb 9, E4-VE 12 = 90 nominal → cum 402. Worst case is 4 simulations per rep (slow re-run x unjudged repeat), which could exceed 500. The runner checks the cap only at item start.
 - **Normal-speed durations** [r4/*.json `seconds`]:
   - styled-a x3: 6-22 min
@@ -231,6 +232,8 @@ SMOKE2 (12:40) was judged but failed on latency, and the user has kept the queue
 - **Transfer:** A and B results on eng.4 also hold for final.1's saved-spec agent (§4).
 
 ### S1: platform recovers by about 13:30 UTC (16:30 Istanbul)
+
+*(14:35 UTC: E4-A-styledA has run and is COMPLETED (raw strict 4/10, §11.1); S1/S2 steps that start with it are done.)*
 
 | Item | Detail |
 |---|---|
@@ -291,8 +294,8 @@ No live measurement is possible. Choose on the existing evidence, preferably bef
 | D7 | Treat a bare chat-smoke 500 with exit 3 as "deployed, do not re-run" (RUNBOOK change) | 17:00 / 20:00 | RUNBOOK unchanged: re-run on 500 |
 | D8 | OpenAI key arrangement for the organisers' re-run (organiser email) | 20:00 / 23:00 | Open; nothing goes into the repo |
 | D9 | Remote, visibility and push | 20:00 / 23:00 | No remote, no push |
-| D10 | eng.6 (and .7, .8) vs eng.4: approve, trim or drop the matched fresh-build comparison in §10 (new deployments: 2-6 workflows for T1-T3, 8 with the optional T4) | Before any deployment; T1 must start by about 14:30 UTC to finish before 15:30 at normal speed | **Not deployed, not adopted.** eng.4 stays the comparison candidate (user 12:00) |
-| D11 | Keep or raise the internal 500-call cap, or trim the E4 queue and the §10 tiers to fit (E4 queue 90 → cum 402; + T1 → 468; + T1+T3 → 564) | Before resume | Cap stays 500; the runner stops before any item that would exceed it; nothing is trimmed or added without the user |
+| D10 | **(Updated 14:35 UTC, §11.3)** Challenger arm now eng.8 (4267bb0): approve, trim or order the Primary items (T1, T3, E1, D8 = eng.8's bar; 5 workflows) and T2; separately approve or drop E2 (eng.6 control on the same ab4 spec, 1 more workflow) | Before any deployment; at today's speed the Primary bar is about 2.5-3 h | **Not deployed, not adopted.** eng.4 stays the comparison candidate; eng.6 runs only as the E2 control if approved |
+| D11 | **(Updated 14:35 UTC, §11.4)** Internal cap: applied 500 → 705 (13:50) → **789** (14:15) under the user's 13:45 bounded-raise authorization (cum 343 + 360 planned + 86 reserve). The user may lower it or trim items | Before resume | Cap 789 applied in `qrun4.sh` and `run_one.sh` (note: `qrun4.sh` pre-checks nominal calls only); nothing runs without the user |
 
 ## 9. Open gaps and unverified items
 
@@ -358,7 +361,9 @@ overdue" behaviour, and adopt nothing automatically. **Nothing below has been de
 - **cand-eng.8 = 4267bb0** (eng.6 + dcd9749 + a render change: lines said before the customer answers move from the
   ENDINGS "First say" lists into the step's rules, "never again in the goodbye"). Commit message: renders of 62 of
   71 saved specs byte-identical to eng.6; the 9 that change are the defective fresh extractions. No hand-off in the
-  engine log yet; **unmeasured; not reviewed here.**
+  engine log yet; **unmeasured; not reviewed here.** *(Update 14:15 UTC: the engine hand-off now exists (EL section committed
+  12:54 UTC, 2ec3406, after this 12:50 addendum; engine handoff 13:45 UTC); see §11.2. eng.8 replaces eng.6 as the
+  challenger arm; eng.4 stays the comparison candidate; §11.3.)*
 
 ### 10.2 Why the deployed eng.4 slots are not the control
 
@@ -370,6 +375,9 @@ too_much, calendar) before simulating, and attribute any behavioural difference 
 Methodology's own bar: investigate every difference, "do not call it noise".
 
 ### 10.3 Proposed matched comparison (eng.4 fresh vs eng.6 fresh), for approval
+
+*(Superseded 14:15 UTC, all of §10.3, by §11.3: the challenger arm is now eng.8; eng.4 stays the comparison
+candidate; eng.6 is kept only as the control of the E2 closing-fix experiment. Kept below unchanged for the record.)*
 
 Shared conditions:
 - concurrency 5, `--rerun-if-slow 1`, strict 3/3 per case;
@@ -421,7 +429,7 @@ style. **Absence check:**
   main-merge trial (about 10 min).
 - **No automatic adoption.**
 
-**Ordering (labelled recommendation, the user decides):**
+**Ordering (labelled recommendation, the user decides):** *(superseded by §11.3; E4-A-styledA completed, §11.1)*
 1. The paused E4 queue first: the user preserved it (12:00) and keeps it paused (12:45), so it runs only when the
    user resumes it (D1). E4-A-styledA is the clean saved-spec comparison against M3, 10/10.
 2. Then T1. Its eng.4 arm is eng.4's first fresh **Brief A** build (no G1 fresh-A control exists). D3's raw-A fresh
@@ -430,3 +438,145 @@ style. **Absence check:**
 
 At normal speed the E4 queue plus T1 is about 1-2 h. With the 12:40 latency (14-54 s turns) none of it produces
 valid reps. Trimming T3 to styled-ab-all only (78 calls) saves 18 calls. Dropping T4 is the default.
+
+## 11. Update (14:15 UTC, verified 14:35): challenger arm eng.6 -> eng.8; E4-A-styledA completed (housekeeping, user ~14:05)
+
+User instruction (housekeeping only): mark E4-A-styledA completed and remove it from the queue; change the
+**challenger arm** of the proposed comparison from eng.6 to **eng.8 (4267bb0)** using Methodology's latest hand-off
+(**eng.4 stays the comparison candidate**, user 12:00); keep eng.6 **only** as the control of an explicitly approved
+closing-fix experiment on the same problematic saved spec; recalculate planned calls and reserve without resetting
+cumulative usage. **No build, deployment, simulation, promotion or freeze is authorized by this section. The queue
+stays paused (`sim/STOP` set).** Sources: EL "Hand-off: `cand-eng.8`" (tag 12:45 UTC; section committed 12:54 UTC,
+2ec3406) and "Regression cases ..." sections; `docs/plans/2026-10-11-engine-fixes-handoff.md` (13:45 UTC);
+`docs/plans/2026-10-11-path-cases-sim-handoff.md` (13:40 UTC). Checked by a 3-lens read-only verification (fidelity,
+numbers, authorization/consistency); its corrections are applied here.
+
+### 11.1 E4-A-styledA: completed (removed from the queue)
+
+- eng.4 saved-spec agent exp-eng4-a, `styled-a.json` x3, maxRetries 0, no reruns, every attempt kept: rep 1
+  56096a1e **4/10**, rep 2 5407adea **10/10**, rep 3 51c4a5e0 **10/10**. **Raw strict 3/3 = 4/10** (PUB-02/05/07/09
+  3/3; PUB-01/03/04/06/08/10 2/3, each failed only in rep 1). Classification (skeptic-checked, separate from the
+  score): 5 rep-1 failures = platform (opening who_answered extraction request hung, 60.3 s silence); PUB-06 = mixed
+  (platform `extraction_error`, then the opening design: latest-message extraction, no tools, improvised close
+  `not_verified/declined`). Latent, judge-unchecked, shared with G1: transfer endings skip rule 47's goodbye (PUB-09),
+  read-back without product when the customer names the date (PUB-10, rule 34). [WS 13:52; hackathon_notes Score log
+  11-10 13:39 and 13:50; `docs/reviews/2026-10-11-e4a-styledA-analysis.md`]
+- Record: `sim/queue-completed.tsv`; `sim/queue.txt` now holds **E4-AB-all, E4-AB-xb, E4-VE** (60 calls nominal);
+  the pre-removal copy is `sim/queue-before-e4a-removal-1409.txt`. Artifacts kept in `runs/dev/r4/` (gitignored):
+  `E4-A-styledA.{log,attempts.jsonl,meta.json}`, `E4-A-styledA-r3.*`, `E4-A-styledA.calls/` (30 call records),
+  `E4-A-styledA.attempt1-post504.*`, `E4-A-styledA.attempt2-bank-nonjson.*`, `analysis-e4a.md`.
+- Ledger booking: E4-A-styledA is booked **40 calls for 30 real calls**. Attempt 1 (11:37, POST /simulations 504) was
+  booked 10 "conservatively" and Service Check confirmed no simulation was created (WS 11:44); it was never corrected
+  (attempt 2's 10 and the post-rep-2 10 were). Kept as booked, since cumulative usage is not reset (user).
+
+### 11.2 What eng.8 is (EL hand-off and engine handoff 13:45 UTC; not re-verified here)
+
+- `cand-eng.8` = **4267bb0** = cand-eng.6 (a170935: eng.4 + Fix 1) + audit test dcd9749 + a deterministic,
+  render-time closing-line fix (`spec.early_lines`, `render._split_early_lines`): a `say_before_end` line that is a
+  question, or is shared by a transfer and a non-transfer ending without being common to every ending of the step,
+  moves from the ENDINGS "First say" lists into the step's rules ("SAID BEFORE THE CUSTOMER ANSWERS ... never again
+  in the goodbye"). Extraction prompt unchanged, so **eng.8 inherits all of Fix 1's broad fresh-build changes and
+  eng.6's risks** (incl. Finding 2: the PUB-07 vague-period rule next to the deadline guard, untouched; the engine
+  asks for PUB-07 x3 on fresh builds).
+- Local evidence claimed by EL: 869 tests; the rule hits exactly the 9 defective of 66 saved specs; 62/71 saved-spec
+  renders byte-identical to eng.6 (the 9 others differ only in ENDINGS + the new block); 5 fresh `--dry` builds rc=0,
+  the fix fired in 3/5 (A, A+B single file, raw-A), paid sentence kept 5/5; adversarial review 0 material.
+- **The fix is active only when the extraction has the pattern** (12/21 fresh builds so far): a fresh eng.8 build
+  exercises it only if its build trace has a STEP line "said before the customer answers". Record it per build.
+- **Unmeasured on Freya.** Engine's required tests (its baseline: "any difference from cand-eng.6 investigated"):
+  (1) fresh eng.8 A and A+B builds, full A set x3 and B set x3; (2) defect path: eng.8 `--spec
+  tests/fixtures/fix1_audit_spec_ab4.json`, PUB-05 x3 + styled PUB-05 variants x3, **optional** control eng.6 on the
+  same spec; (3) paid sentence kept: PUB-08 x3, PUB-12 / `styled-extra-b.json` x3; (4) uncovered paths: hardship
+  accepted -> transferred/support; human insist -> transferred/human (cases now exist, isolated on branch
+  `cases-eng8-paths` = 898223d; never run on Freya).
+- **Baseline change (user 14:05):** with eng.6 restricted to the E2 control, the engine's eng.6 baseline is replaced
+  by eng.4 in T1-T3 and E1. Any T1-T3/E1 difference therefore reflects Fix 1 **plus** the closing fix; only E2
+  isolates the closing fix.
+
+### 11.3 Revised proposed comparison (supersedes all of §10.3), for approval
+
+**Shared conditions.** Concurrency 5, strict 3/3, verdict fallback with every `verdict_source: call` row listed, arms
+interleaved per rep, resume gate first; today's harness rules: POST maxRetries 0, **no reruns because of latency**
+(user 13:15), every attempt kept, stop gate on every platform error event (only PUB-10's injected create_promise
+failure excused). That harness is `run_one.sh` + `suite_once.py` (one item at a time). **`qrun4.sh` as written does
+not follow these rules** (`--rerun-if-slow 1`, platform default retries up to 4 attempts, a repeat of an unjudged rep,
+cap pre-check on nominal calls only); resuming anything through it could overshoot the call numbers below. Fresh
+arms: no `--spec`, built back to back, `--save-spec`, explicit distinct `--slot` each.
+
+**Primary (eng.8's bar): eng.4 fresh vs eng.8 fresh, plus the engine-required eng.8 defect path.**
+
+| Item | Brief file(s) / spec | New workflows | Case sets | Calls | Covers engine test |
+|---|---|---|---|---|---|
+| **T1** Brief A | `kit/briefs/brief-a.md` | 2 (E4-fA, E8-fA) | per arm: styled-a x3 (10) + `owa-p06-asks.json` x3 (1) | 60 + 6 = **66** | 1 (A set), 3 (PUB-08), PUB-07 x3 |
+| **T3** A+B | `tests/fixtures/briefs/ab-single.md` (as M5) | 2 (E4-fAB, E8-fAB) | per arm: styled-ab-all x3 (13) + styled-extra-b x3 (3) | 78 + 18 = **96** | 1 (B set), 3 (PUB-12) |
+| **E1** path cases | the T1 and T3 agents | 0 | HA-A, HU-A, HU-PRE on the A agents; HA-B, HU-B on the A+B agents; x3, both candidates | **30** | 4 |
+| **D8** eng.8 defect path | eng.8 `--spec fix1_audit_spec_ab4.json` | 1 (E8-ab4) | PUB-05 variants x3 | **9** (3 runnable today) | 2 |
+| T2 raw material (strongly preferred) | `tests/fixtures/briefs/raw-a.md` | 2 (E4-fR, E8-fR) | per arm: styled-a x3 | **60** | not in the engine's list; one hidden brief is raw material; the fix fired on the one raw-A build in EL's sample |
+
+- **D8 prerequisite (found here, a prediction, not run):** the ab4 spec carries the A+B brief text, and under Brief B
+  rule 8 PUB-05 expects a `hardship` note. The kit's PUB-05 and `styled-a.json` PUB-05 (in_words) expect none, so
+  they would fail the ledger on a correct A+B agent. Only `styled-ab-a.json` PUB-05 (pieces) has the A+B ledger
+  today (3 calls); A+B-ledger variants of the other styles would have to be made first (not done: housekeeping
+  only). E1's transfer cases are unaffected (Brief B rule 10: no notes on any transfer).
+- E1's case files come from 898223d (`git show`, not merged); case ids are the seed accounts PUB-05/13/01/06/12,
+  distinct across both files.
+
+**E2: closing-fix isolation, eng.6 as control. Runs only on the user's explicit approval.** The same saved spec
+`fix1_audit_spec_ab4.json` (taken from 4267bb0; not in the eng.6 tree) via `--spec`, from detached worktrees of the
+explicit shas `a170935` (eng.6) and `4267bb0` (eng.8; reuse the D8 agent), distinct `--slot`. Locally verified by
+the engine chat: the two renders differ only in the ENDINGS "First say" lists and the new block.
+- E2a: the five path cases x3 on each of the eng.6-ab4 and eng.8-ab4 agents: **30 calls**.
+- E2b: eng.6-ab4 control of D8: PUB-05 variants x3: **9 calls** (same prerequisite as D8).
+- E2 total **39 calls**, 1 new workflow (E6-ab4). Expected direction (engine): eng.6 repeats the moved lines in its
+  goodbye and fails those checks; eng.8 does not.
+
+**Checks carried over from §10.3, now on eng.8:**
+- Closing fix: for each eng.8 fresh build, record whether its trace has the STEP line "said before the customer
+  answers" and list the affected endings (replaces the eng.6 "?"-in-`say_before_end` check).
+- PUB-06 "rest stays overdue" (both arms): per PUB-06 call, the judge verdict ("minimum payment offered once, with
+  the note that the rest stays overdue") and a transcript search of the agent turns around the floor offer for
+  `(stays|remains|is still|still) overdue`; report n/N per arm and style (talkative, asks_back, corrects).
+- Absence check: live in T3, grep the agent turns of the Brief B calls (PUB-11..13) for "overdue" and flag any hit;
+  offline, proposed to the Methodology chat (builder LLM only, no Freya): 2 fresh `--dry` extractions of
+  `kit/briefs/brief-b.md` alone at eng.8 (same extraction prompt as eng.6); the rendered stage_rules must hold no
+  overdue sentence.
+- Not covered by any item (shared with G1/eng.4): the restructuring transfer ending skips rule 47's goodbye (PUB-09,
+  6/6 calls). Report thanks/goodbye before `close_call` n/N per arm in every transfer transcript; not a pass/fail
+  criterion of the cases.
+
+**Decision rule (from §10.3, eng.6 -> eng.8; the user may change it):** eng.8 replaces eng.4 only if, in every tier
+that ran (at least T1 + T3; T2 strongly preferred), strict(eng.8) >= strict(eng.4), no case fails for an agent cause
+on eng.8 that passed on eng.4 (classified from the transcript), the PUB-06 overdue sentence is said in at least as
+many calls, E1 shows no agent-caused regression, and D8 shows one sympathy sentence, the support offer once, no
+question in the goodbye and the right ledger. E2 is diagnostic of the fix only. Before any freeze eng.8 would also
+need a fresh-clone `--dry` rehearsal and a main-merge trial. **No automatic adoption, no automatic start.**
+
+**Ordering (labelled recommendation, the user decides):** the E4 queue remainder only if the user resumes it (and
+through `run_one.sh`), then T1, T3 + E1 and D8, then T2, then E2 if approved.
+
+### 11.4 Recalculated plan and reserve (cumulative usage kept)
+
+| Item | Calls | Cumulative |
+|---|---|---|
+| Used to date (ledger `runs/dev/r4/calls.tsv`; includes the 10 phantom calls of E4-A attempt 1, see §11.1) | 343 | 343 |
+| E4 queue remainder (paused; nominal under `run_one.sh`): E4-AB-all 39, E4-AB-xb 9, E4-VE 12 | 60 | 403 |
+| Primary: T1 66 + T3 96 + E1 30 + D8 9 | 201 | 604 |
+| T2 raw material | 60 | 664 |
+| E2 closing-fix isolation (eng.6 control; explicit approval only): E2a 30 + E2b 9 | 39 | 703 |
+| Retry reserve: ~10% of planned validation (360) | 36 | 739 |
+| Hidden-brief reserve: 2 regression checks after a generic fix (styled-a 10 + styled-ab-all 13 each) + 2 smokes per hidden agent | 50 | **789** |
+
+- **Planned validation 360 calls (unchanged by the corrections; D8 moved out of E2); reserve 86 (36 + 50); internal
+  cap 789.** Applied to `qrun4.sh` and `run_one.sh` under the user's 13:45 authorization of a bounded raise computed
+  from planned validation, bounded retries and a hidden-brief reserve; the user may lower it or trim items (D11).
+  It authorizes nothing by itself.
+- eng.8's bar (Primary, 201): from 343 -> 544 if the E4 queue is skipped; 604 if it runs first. Without T2 and E2:
+  343 + 60 + 201 + 26 + 50 = 680.
+- Workflows: T1 + T3 4, T2 2, D8 1, E2 1 = 8 new; 35 of 200 used (+ up to 2 strays).
+- Credits 391.96 USD; at ~0.12-0.25 USD/call (today 0.12-0.15 in suites) the 360 planned calls cost ~45-90 USD.
+  Credits do not bind.
+- Time (assumptions: 10-13-case reps 3.5-6 min, 1-3-case simulations 3-4.5 min on today's slow platform, builds
+  2-7 min): Primary = 39 simulations (T1 12, T3 12, E1 12 with each agent's path cases joined into one file, D8 3
+  runnable today; 45 with all D8 variants) + 5 builds, about 2.5-3.5 h; T1 alone (12 simulations + 2 builds) about 45-60 min.
+  From 14:35 UTC, 17:00 leaves 2 h 25 min: **even the Primary bar may not finish before the hidden briefs, and not
+  at all if the E4 queue runs first**; ordering and trimming are the user's call.

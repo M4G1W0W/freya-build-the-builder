@@ -3,10 +3,33 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 15:57 Istanbul (12:57 UTC Sun). Last commit: see `git log`. Hidden briefs open **17:00 UTC**
-(20:00 Istanbul, about 4 h from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
+**Snapshot:** 2026-10-11 17:35 Istanbul (14:35 UTC Sun). Last commit: see `git log`. Hidden briefs open **17:00 UTC**
+(20:00 Istanbul, about 2 h 25 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
+
+## UPDATE 14:35 UTC: housekeeping (user ~14:05): E4-A-styledA COMPLETED and dequeued; challenger arm eng.6 -> eng.8 (eng.4 stays the comparison candidate); cap 789
+
+- **Authorizes housekeeping only: no builds, deployments, simulations, promotion or freeze. Queue PAUSED (`sim/STOP`
+  set).**
+- E4-A-styledA marked COMPLETED (`sim/queue-completed.tsv`) and removed from `sim/queue.txt` (pre-removal copy
+  `sim/queue-before-e4a-removal-1409.txt`). Queue now: E4-AB-all, E4-AB-xb, E4-VE (60 calls). All three reps,
+  artifacts and the raw strict 4/10 are kept (`runs/dev/r4/E4-A-styledA*`; committed copy of the analysis:
+  `docs/reviews/2026-10-11-e4a-styledA-analysis.md`). Note: the ledger books E4-A-styledA 40 for 30 real calls (attempt 1's
+  POST-504 booking of 10 was never corrected); kept, cumulative usage is not reset.
+- **Dossier §11** (`docs/reviews/2026-10-11-final-selection-evidence.md`, verified by a 3-lens read-only check):
+  challenger arm now **eng.8 (4267bb0)**; eng.4 stays the comparison candidate. eng.8's bar (Primary, 201 calls):
+  T1 66 + T3 96 + E1 path cases 30 + **D8** = the engine-required eng.8 `--spec fix1_audit_spec_ab4.json` defect path
+  (9; 3 runnable today); T2 raw-A 60 strongly preferred; **E2 (eng.6 control only, explicit approval): 39**; T4
+  dropped. D10/D11, §10.1, §10.3 (all superseded) point to §11. Prerequisite (prediction, not run): the Brief-A-ledger
+  PUB-05 cases would fail the ledger on a correct A+B ab4 agent (Brief B rule 8 hardship note); only
+  `styled-ab-a.json` PUB-05 fits today. **Run anything only through `run_one.sh` + `suite_once.py`**: `qrun4.sh`
+  still uses `--rerun-if-slow 1`, platform retries and a nominal-only cap check. Harness copies (scratch may vanish): `runs/dev/r4/harness/`
+  (`run_one.sh`, `suite_once.py`, `dump_calls.py`, `wait_bank_then_run.sh`; `suite_once.reps12.py` = the version reps
+  1-2 ran with, before the corrected gate).
+- **Cap 705 -> 789** in `qrun4.sh` and `run_one.sh`, applied under the user's 13:45 bounded-raise authorization:
+  cum 343 (kept) + 360 planned + 36 retry + 50 hidden-brief reserve (Decision log 14:15 UTC; dossier §11.4). The user
+  may lower it. Credits 391.96 USD. Ledger unchanged (cum 343).
 
 ## UPDATE 13:52 UTC: E4-A-styledA complete (3 reps): raw strict 3/3 = 4/10 (reps 4, 10, 10); cap raised to 705
 
@@ -91,7 +114,8 @@ completed. Ledger `runs/dev/r4/calls.tsv` cum **312** (runner CAP 500); credits 
 **Binding user rules (all still in force):**
 1. No automatic freeze, no automatic selection of an unmeasured candidate, no switching candidates, no deploying
    eng.6/.7 (or .8), no adopting a new tag without the user's approval. Bring evidence + fallback options first.
-2. eng.4 stays the comparison candidate. The existing E4 queue is preserved (sim/queue.txt: E4-A-styledA,
+2. eng.4 stays the comparison candidate. *(14:35: E4-A-styledA COMPLETED and removed from the queue; challenger arm
+   eng.8; see the 14:35 update.)* The existing E4 queue is preserved (sim/queue.txt: E4-A-styledA,
    E4-AB-all, E4-AB-xb, E4-VE) and runs only when the user resumes it.
 3. Resume conditions (12:09) once the user allows: one bounded smoke with a complete judged result; no stuck
    simulation still making calls; extra usage reconciled. A judged agent failure is diagnostic (inspect it first).
@@ -128,7 +152,8 @@ re-judged later (outcomes provisional).
 (sim/qrun4.sh, queue.txt, queue-parked-1135.txt, slots.tsv, qrun.out, STOP; worktrees wt-final, wt-eng4). Bounded
 smoke wrapper (scratch, may vanish): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/54d12450-d446-4d3a-862a-6541a5ece9bd/scratchpad/smoke_once.py`
 (= run_cases_retry wiring without the rep repeat, POST maxRetries 0). Smoke cases: `runs/dev/r4/smoke-pub01.json`.
-Start the queue (only on the user's go): `rm <old>/sim/STOP; bash <old>/sim/qrun4.sh >> <old>/sim/qrun.out 2>&1`
+*(14:35: superseded: run queue items one at a time via this session's `run_one.sh` + `suite_once.py`, see the 14:35
+update; `qrun4.sh` reruns slow reps and uses platform retries.)* Start the queue (only on the user's go): `rm <old>/sim/STOP; bash <old>/sim/qrun4.sh >> <old>/sim/qrun.out 2>&1`
 in the background + a monitor on qrun.out.
 
 **Next (all need the user):** answer D1-D11 in the dossier; most useful now: D4 (prepare untagged merged commits
