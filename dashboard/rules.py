@@ -186,9 +186,26 @@ def _case_files() -> list[str]:
             for r in D._calls_rows(calls.parent).values()
             if str(r.get("casefile", "")).endswith(".json")
         }
-    known = {OFFICIAL_CASES, PAGE_CASES, *fixtures}
+    kit = sorted(  # a new case file the organizers ship in the kit shows up by itself
+        str(q.relative_to(D.ROOT))
+        for q in (D.ROOT / "kit").rglob("*.json")
+        if q.name != Path(OFFICIAL_CASES).name and _looks_like_cases(q)
+    )
+    known = {OFFICIAL_CASES, PAGE_CASES, *fixtures, *kit}
     extra = sorted(r for r in referenced if r not in known and (D.ROOT / r).exists())
-    return [OFFICIAL_CASES, PAGE_CASES, *fixtures, *extra]
+    return [OFFICIAL_CASES, *kit, PAGE_CASES, *fixtures, *extra]
+
+
+def _looks_like_cases(path: Path) -> bool:
+    data = D.load_json(path)
+    data = data.get("cases") if isinstance(data, dict) else data
+    return (
+        isinstance(data, list)
+        and bool(data)
+        and all(
+            isinstance(c, dict) and "id" in c and ("expected" in c or "checks" in c) for c in data
+        )
+    )
 
 
 def _case_view(c: dict) -> dict:
@@ -263,7 +280,9 @@ def view() -> dict:
     else:
         out = _build(cat)
         _cache.update(key=key, view=out)
-    for it in out["deadlines"] + out["organizer_rules"] + out["internal_decisions"]:
+    for it in (
+        out["deadlines"] + out["reported"] + out["organizer_rules"] + out["internal_decisions"]
+    ):
         if it.get("utc"):  # the time left moves on between rebuilds
             it["time"] = _istanbul(it["utc"])
     return {**out, "generated_at": D.iso(time.time())}
@@ -277,6 +296,11 @@ def _build(cat: dict) -> dict:
     for rel, meta in sources.items():
         if meta["label"] == "unregistered" and rel.startswith(FIXTURE_CASES):
             meta["label"], meta["kind"] = "locally derived", "test fixture (no provenance note)"
+        elif meta["label"] == "unregistered" and rel.startswith("kit/"):
+            meta["label"], meta["kind"] = (
+                "official",
+                "case file in the kit (kit/ is kept unmodified)",
+            )
         elif meta["label"] == "unregistered" and rel.startswith("runs/"):
             meta["label"] = "locally derived"
             meta["kind"] = "case file named by a run's launch record (runs/ is gitignored)"
@@ -317,6 +341,7 @@ def _build(cat: dict) -> dict:
         "about": cat.get("about"),
         "labels": cat.get("labels"),
         "deadlines": deadlines,
+        "reported": [{**r, "time": _istanbul(r["utc"])} for r in cat.get("reported", [])],
         "internal_timing": [
             i for i in items if i["category"] == "internal_freeze" and i.get("utc")
         ],

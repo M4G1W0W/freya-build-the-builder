@@ -81,3 +81,10 @@ def test_deadlines_rest_on_official_quotes():
     for d in CATALOG["deadlines"]:
         assert d["utc"].endswith("Z") and d["derivation"]
         assert all(registry[b["source_file"]] == "official" for b in d["basis"]), d["what"]
+
+
+def test_reported_items_are_user_reports_with_a_time():
+    for r in CATALOG.get("reported", []):
+        assert r["utc"].endswith("Z") and r["report"] and r["reported_by"] and r["reported_at"]
+        assert "official" not in r["label"]
+        assert RC._istanbul(r["utc"])["istanbul"]

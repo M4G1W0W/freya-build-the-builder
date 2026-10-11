@@ -6804,5 +6804,17 @@
     }
    ]
   }
+ ],
+ "reported": [
+  {
+   "what": "New case",
+   "report": "Just reported, a new case will be coming in at 20.00 in istanbul time, add it to cases",
+   "reported_by": "the user, in the Dashboard Creator chat",
+   "reported_at": "2026-10-11T14:48:02Z",
+   "stated_time": "20:00 Istanbul",
+   "utc": "2026-10-11T17:00:00Z",
+   "label": "user report (not yet in project files)",
+   "notes": "No organizer text for this announcement is in the project files; who reported it and how the case will be delivered are not recorded. 20:00 Istanbul is 17:00 UTC (UTC+3), the same time the official page gives for the hidden briefs to open; whether they are the same thing is not stated."
+  }
  ]
 }
