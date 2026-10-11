@@ -485,6 +485,7 @@ def _product(k, raw, today, C, vs):
     lines.append("- deadline: " + _ds(deadline))
     lines.append("- floor (" + (floor_field or "none") + "): " + _amount(floor))
     plan = []
+    too_much_plan = ""
     if band is not None:
         allowed = int(band.get("attempts") or 0)
         lines.append(
@@ -531,8 +532,15 @@ def _product(k, raw, today, C, vs):
                 line += " (after the deadline)"
             lines.append(
                 line
-                + ", once; this offer is NOT a persuasion attempt: every attempt below stays"
+                + ", once; this offer is NOT a persuasion attempt: every listed attempt stays"
                 + " available (no other date: not today unless that is this date)"
+            )
+            too_much_plan = (
+                ' (after "too much": first the floor '
+                + _amount(floor)
+                + " on "
+                + (when.isoformat() if when is not None else "?")
+                + ", not one of these offers)"
             )
         elif (
             first is not None
@@ -594,10 +602,10 @@ def _product(k, raw, today, C, vs):
     if band is None or not C.get("attempts"):
         summary = ""
     elif not plan:
-        summary = slot + ": no persuasion attempt"
+        summary = slot + ": no persuasion attempt" + too_much_plan
     else:
         count = str(len(plan)) + (" offer only" if len(plan) == 1 else " offers")
-        summary = slot + ": " + count + ": " + ", ".join(plan)
+        summary = slot + ": " + count + ": " + ", ".join(plan) + too_much_plan
     return "\n".join(lines), sentence, deadline, summary
 
 

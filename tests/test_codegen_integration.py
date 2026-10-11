@@ -205,6 +205,10 @@ def test_too_much_separate_offer_has_its_own_date_and_is_not_an_attempt():
     assert "IS attempt 1" not in facts
     attempt_1 = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
     assert "2026-10-16 (Friday 16 October 2026)" in attempt_1
+    plan = next(x for x in facts.splitlines() if x.startswith("OFFER PLAN"))
+    assert plan.endswith(
+        '(after "too much": first the floor 637.50 on 2026-10-15, not one of these offers).'
+    )
 
 
 def test_too_much_separate_without_a_date_uses_attempt_1_date():
