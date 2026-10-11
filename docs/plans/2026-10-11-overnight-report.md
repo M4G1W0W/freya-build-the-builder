@@ -6,7 +6,8 @@
 has been stuck in "running" since 01:21:29 UTC although all 13 of its calls ended by 01:21:07. It blocks every
 simulation in the workspace. Per your rule I did not PUT/pause/stop it, and simulations stopped for the night at 01:53
 after 30 min. **Until it is freed (PUT status "paused", as on 10 Oct 21:55) no measurement can run, including the
-Sunday 12:30 final validation.** Everything for the remaining blocks is built and queued-ready (see "Resume").
+Sunday 12:30 final validation.** It does not block the submission itself: the builder's self-test uses the chat API,
+not simulations. Everything for the remaining blocks is built and queued-ready (see "Resume").
 
 **Recommended candidate: W = G1** = branch `cand-g1`, commit **83f8263** (tag `cand-g1.1`) = F3 a069dd2 + the restored
 too-much FACTS line. Not merged to main (merging waits for you). Deployed as exp-g1-a (workflow 5f39ed9a…, agent
@@ -44,10 +45,12 @@ UTC (~0.08 per call incl. builder smoke tests). Sunday reserve (155 calls) untou
 to `runs/dev/r4/stuck-sim-watch.log`. Offline review agents may be finishing (see the log below).
 
 ### Resume (once the simulation is freed; all slots built and provenance recorded in `<scratchpad>/sim/slots.tsv`)
-Queue lines ("name slot casefile reps") for `<scratchpad>/sim/qrun.sh` (remove `<scratchpad>/sim/STOP` first), in
-priority order: M2-ABv14-xb (9), M3-G1-styledA (30), M4-rawW-styledA (30), M5-ab1W-all (39), M5-ab1W-xb (9),
+`<scratchpad>/sim/queue.txt` is pre-loaded; to resume: `rm <scratchpad>/sim/STOP; bash <scratchpad>/sim/qrun.sh >>
+<scratchpad>/sim/qrun.out 2>&1` (bash; it re-checks the 340 cap before each item). Priority order: M2-ABv14-all-r3 (13),
+M2-ABv14-xb (9), M3-G1-styledA (30), M4-rawW-styledA (30), M5-ab1W-all (39), M5-ab1W-xb (9),
 O4-rawWP-styledA (30), O4-ab1WP-all (39), O4-ab1WP-xb (9), then O1: o1-a.json on exp-g1-a x3 (27), o1-b.json on
-exp-ab1-w x3 (9). Total 231 calls (with 62 used: 293 < 340).
+exp-ab1-w x3 (9). Total 244 calls (with 62 used: 306 < 340). `<scratchpad>` =
+`/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad`.
 
 
 Coordinator session: autonomous under the user's final authorization (00:50 UTC). Plan:
