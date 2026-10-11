@@ -126,6 +126,9 @@ SPEC_SCHEMA = obj(
         ),
         "bands": arr(BAND),
         "attempts": arr(ATTEMPT),
+        "too_much": obj(
+            {"offer": {"type": "string", "enum": ["attempt_1", "separate"]}, "date_expr": STR}
+        ),
         "promise_window": obj(
             {
                 "min_expr": STR,
@@ -496,6 +499,8 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         (f"band {b['name']} deadline", b["deadline_expr"]) for b in spec["bands"]
     ]
     exprs += [(f"attempt {a['n']} date", a["date_expr"]) for a in spec["attempts"]]
+    if too_much_separate(spec) and too_much(spec)["date_expr"].strip():
+        exprs += [("too much offer date", too_much(spec)["date_expr"])]
     exprs += [("promise window min", spec["promise_window"]["min_expr"])]
     exprs += [("promise window max", spec["promise_window"]["max_expr"])]
     exprs += [(f"callback day {i}", e) for i, e in enumerate(cb["day_exprs"])]
@@ -512,6 +517,20 @@ MIN_SLOTS = 3
 
 def product_slots(spec: dict) -> int:
     return max(MIN_SLOTS, int(spec["meta"]["max_products"]))
+
+
+# Specs saved before the too_much field read like a brief that is silent about it: the floor
+# offered after "too much" is attempt 1, on attempt 1's date.
+TOO_MUCH_DEFAULT = {"offer": "attempt_1", "date_expr": ""}
+
+
+def too_much(spec: dict) -> dict:
+    return spec.get("too_much") or TOO_MUCH_DEFAULT
+
+
+def too_much_separate(spec: dict) -> bool:
+    """The brief says the floor offered after "too much" is not a persuasion attempt (P2)."""
+    return too_much(spec)["offer"] == "separate"
 
 
 def identity_all_at_once(spec: dict, tool: Tool) -> bool:

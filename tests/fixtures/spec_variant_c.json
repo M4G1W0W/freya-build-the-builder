@@ -123,6 +123,10 @@
    "note": "Attempt 2, standard band only: propose the floor amount on the deadline."
   }
  ],
+ "too_much": {
+  "offer": "attempt_1",
+  "date_expr": ""
+ },
  "promise_window": {
   "min_expr": "today",
   "max_expr": "deadline",

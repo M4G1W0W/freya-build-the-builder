@@ -818,6 +818,22 @@ def test_check_spec_per_answer_missing_field_names_the_all_at_once_shape():
     assert len(problems) == 1 and "takes every answer in one call" in problems[0]
 
 
+def test_negotiate_attempts_clause_follows_the_brief_too_much_rule():
+    # Engine-fixes item 2 (rehearsal P2): a brief whose "too much" floor offer is not an attempt.
+    old = "is attempt 1 with the floor amount, on attempt 1's date"
+    sep = "is not one of these attempts: make it as FACTS says, on its own date"
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert old in task and sep not in task
+    spec = copy.deepcopy(SPEC_A)
+    spec["too_much"] = {"offer": "separate", "date_expr": "next_business_day(today)"}
+    wf = render(spec, TOOLS, BRIEF)
+    assert sep in wf["nodes"]["negotiate"]["task_message"] and old not in json.dumps(wf)
+    assert validate(wf) == []
+    assert check_spec(spec, TOOLS) == []
+    spec["too_much"]["date_expr"] = "tomorrow()"
+    assert any(x.startswith("too much offer date: ") for x in check_spec(spec, TOOLS))
+
+
 def test_identity_task_without_decline_explanation():
     # U7: no `say ""`, and the brief decides what declining does.
     task = _ident(render(_no_explain(), TOOLS, BRIEF))

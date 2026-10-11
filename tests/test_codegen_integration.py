@@ -171,3 +171,53 @@ def test_finalize_counts_the_notes_added_in_code():
     }
     exec(codegen.finalize_source(spec), {"vars": vs})
     assert (vs["close_outcome"], vs.get("close_reason")) == ("no_promise", "refused")
+
+
+CARD_12 = {
+    "product_id": "p1",
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": "2125.1",
+    "days_late": "12",
+    "minimum_payment": "637.5",
+}
+
+
+def _too_much(offer, date_expr):
+    spec = copy.deepcopy(SPEC_A)
+    spec["too_much"] = {"offer": offer, "date_expr": date_expr}
+    return spec
+
+
+def _too_much_line(facts):
+    return next(x for x in facts.splitlines() if "SAYS THE FULL AMOUNT IS TOO MUCH" in x)
+
+
+def test_too_much_separate_offer_has_its_own_date_and_is_not_an_attempt():
+    # Engine-fixes item 2 (rehearsal P2): "too much -> the floor on the next business day; this
+    # offer is not a persuasion attempt". It got attempt 1's date and used up attempt 1.
+    facts = _account(_too_much("separate", "next_business_day(today)"), "2026-10-14T11:00", CARD_12)
+    too = _too_much_line(facts)
+    assert too.startswith(
+        "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH: offer exactly the floor 637.50 on "
+        "2026-10-15 (Thursday 15 October 2026), once; this offer is NOT a persuasion attempt"
+    )
+    assert "IS attempt 1" not in facts
+    attempt_1 = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
+    assert "2026-10-16 (Friday 16 October 2026)" in attempt_1
+
+
+def test_too_much_separate_without_a_date_uses_attempt_1_date():
+    too = _too_much_line(_account(_too_much("separate", ""), "2026-10-14T11:00", CARD_12))
+    assert "exactly the floor 637.50 on 2026-10-16 (Friday 16 October 2026), once" in too
+    assert "NOT a persuasion attempt" in too
+
+
+def test_too_much_attempt_1_and_a_spec_without_the_field_render_as_before():
+    old = copy.deepcopy(SPEC_A)
+    del old["too_much"]
+    same = _too_much("attempt_1", "next_business_day(today)")
+    for spec in (old, same):
+        assert codegen.account_source(spec) == codegen.account_source(SPEC_A)
+        assert codegen.setup_source(spec) == codegen.setup_source(SPEC_A)
+    assert "this IS attempt 1" in _too_much_line(_account(old, "2026-10-14T11:00", CARD_12))

@@ -10,7 +10,13 @@ import re
 
 from . import codegen, hooks, nodes
 from .codegen import OK_FIELD
-from .spec import PLACEHOLDER, call_var, customer_field, identity_all_at_once
+from .spec import (
+    PLACEHOLDER,
+    call_var,
+    customer_field,
+    identity_all_at_once,
+    too_much_separate,
+)
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
@@ -430,9 +436,16 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
         "listed attempt is refused, make no other offer of your own for it (not even the floor). After "
         "the opening question, never ask again whether the customer can pay today (for any product, "
         'never "can you pay <this product> today?"): every offer of your '
-        "own uses exactly the date listed for that attempt (a floor offer after the customer said the "
-        "full amount is too much is attempt 1 with the floor amount, on attempt 1's date). An amount "
-        "or a date the customer proposes is not a refusal: handle it with the brief and FACTS.\n"
+        "own uses exactly the date listed for that attempt ("
+        + (
+            "the floor offer after the customer says the full amount is too much is not one of "
+            "these attempts: make it as FACTS says, on its own date"
+            if too_much_separate(spec)
+            else "a floor offer after the customer said the full amount is too much is attempt 1 "
+            "with the floor amount, on attempt 1's date"
+        )
+        + "). An amount or a date the customer proposes is not a refusal: handle it with the brief "
+        "and FACTS.\n"
         if spec["attempts"]
         else ""
     )
