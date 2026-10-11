@@ -273,6 +273,12 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
     when each run reaches `maxAttempts`. The live spec's PUT also accepts `status: completed` and `maxRetries`;
     their effect on queued retries is [ND] (untested) [C: GET /simulations/{id}/iterations/{it} 12:14 UTC,
     `runs/dev/r4/6d0c9464-iteration-1214.json`].
+  - **`maxRetries: 0` on `POST /simulations` gives `maxAttempts` 1** (one attempt, no platform retry) [C: smoke
+    188b9156, 11 Oct 12:37 UTC; live spec range 0-10]. The kit's `run_simulation` does not send it (default 3).
+  - **The judge verdict is also on the call record** (`GET /call/{id}` -> `successCriteriaResult {success, reason}`)
+    and can be there while the run still reads `analyzing` or ends `error`/`inconclusive` 'analysis never arrived'
+    [C: 94c9e350 call 6af560aa; 6d0c9464 calls ed7f5328, babc4608]. Run verdict == call-record verdict on 50/50
+    calls where both exist (43 from M3/M2 r3, 7 from 6d0c9464) [C, 11 Oct 12:20-12:29 UTC].
   - `GET /simulations/{id}/iterations` gives passed, failed, inconclusive, error and analyzing counts, `passRate` and `agentVersionId`.
   - `GET /simulations/version-checks` and `GET /simulations/version-persona-runs` take `workspaceId` and `entityVersionId`.
   - `POST /simulations/{id}/rerun` starts a new iteration [C].

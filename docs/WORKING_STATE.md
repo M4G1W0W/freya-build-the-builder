@@ -89,6 +89,12 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   Service Check's first BOTH_QUIET tick, a 2nd bounded smoke via scratch `smoke_once.py` (fallback wired, no rep
   repeat, POST maxRetries 0 = one attempt, live spec 0-10); resume the E4 queue only if it gives a judged verdict
   (run or call record) with a created call and normal latency.
+- **12:37-12:40 UTC 2nd smoke 188b9156** (maxRetries 0 -> maxAttempts 1, confirmed): call 6f4c5503 created in 10 s,
+  RUN-LEVEL verdict (judge works again) = FAIL, customer hung up at 105 s. Diagnosis (transcript + events in
+  `runs/dev/r4/SMOKE2-e4a.{log,json,call.json}`): setup code node OK (0.17 s); routing and verify_identity correct
+  (DOB verified 0.5 s); the MODEL took 54 s (45.1 -> 99.5 s) to emit the tool call and the simulated customer 29 s to
+  answer: latency, not agent logic (kit: 'the phone agent was slow'). Latency flaps: 14-37 s (12:01), 0-1.5 s
+  (12:10), 14-54 s (12:37). **Queue stays PAUSED** (a rep now would measure hang-ups). Ledger +1: cum **312**.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
