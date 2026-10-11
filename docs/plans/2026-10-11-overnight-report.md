@@ -47,5 +47,8 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
    Needs a real-decline regression case first.
 3. Rule 21 re-ask of the exact day after a question back (G2 r2 PUB-07; also F3). Proposal: global "answer a question
    back without repeating your question in that message".
+Size (all 906 stored calls, `runs/dev/r4/analysis-identity-history.md`): I1 = 11 failed calls, all PUB-03, corrects-style
+PUB-03 fails ~30% (7/23) on every recent build; I2 = 2. In the latest styled runs ~5 of 15 failing case-results would
+flip with I1+I2 fixed; the other 10 are PUB-06 floor offers (6, the G1 target), PUB-07 re-ask (2), hang-ups (2).
 Test/simulator artefacts (do not tune): PUB-12 corrects merges two phone answers; silent customer hang-ups
 (29041b61, 3575e933); leaked simulator reasoning (704c184a).
