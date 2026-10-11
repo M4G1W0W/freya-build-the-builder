@@ -21,6 +21,9 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 01:19 | M4/M5 builds ok=True at 83f8263 clean: exp-raw-w a41f58d9 (27 steps, 8 tools), exp-ab1-w 768e75c2 (32 steps, 12 tools); smoke tests PASS. Queued after M3 |
 | 01:21 | Precedence adversarial review: **SHIP-TO-O4** (no FAIL; `runs/dev/r4/precedence-review.md`). Its C1 (ending_wins row must not be the default negotiate row) and C2 (must follow every transferred entry) guards added on cand-wp-g1: **58a7473** (tag cand-wp-g1.1), 794 passed; 19 saved specs: identical (empty) check_spec issues before/after; renders byte-identical |
 | 01:24 | O4 fresh builds of cand-wp-g1.1 started (exp-raw-wp, exp-ab1-wp) |
+| 01:31 | O4 builds ok=True at 58a7473 clean: exp-raw-wp dafa86d5 (27 steps, 8 tools), exp-ab1-wp c02f4a9f (32 steps, 12 tools); both specs have 0 ending_wins (negative extraction 10/10 overall). Queued after M5 |
+| 01:21 | **PLATFORM: M2 rep-2 simulation a36c1d01 stuck in "running"** (all 13 calls ended by 01:21:07, iteration completed, status not updated since 01:21:29). M2 rep 3 waits ("another simulation is running"). Per the user's rule: report only, no PUT/pause/stop; if still blocked at 01:52 UTC (30 min) simulations stop for the night |
+| 01:15-01:21 | M2 A+B control (dev-ab-llm v14) styled-ab-all: rep 1 12/13 (PUB-03 identity), rep 2 10/13 (PUB-05 no tool calls, PUB-12 judge, PUB-13 asks_back declined). Analysis running |
 
 ## Infrastructure
 - Simulation queue runner (only launcher): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.sh`, queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt`
