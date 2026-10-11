@@ -1,4 +1,4 @@
-# Engine-fixes chat: context-save handoff (Sun 11 Oct 2026, 15:45 UTC; previous saves 13:45, 12:05 UTC)
+# Engine-fixes chat: context-save handoff (Sun 11 Oct 2026, 18:26 UTC; previous saves 15:45, 13:45, 12:05 UTC)
 
 **If you are a restored session of the ENGINE-FIXES chat, read in this order:** `CLAUDE.md` ->
 `docs/plans/2026-10-11-engine-fixes-brief.md` (your original brief) -> this file ->
@@ -6,6 +6,56 @@
 `docs/plans/2026-10-11-path-cases-sim-handoff.md` (latest hand-off to the Simulation Developer). Run
 `date -u` and `git status` first. This file is the engine-fixes chat's handoff; `docs/WORKING_STATE.md`
 belongs to the simulation chat and this chat must not edit it.
+
+## STATE AT 18:26 UTC (read this first; the final case is open, submission closes 20:00 UTC)
+
+This chat is called **Methodology Developer** in ListAgents (the engine-fixes chat). Peers: **Simulation
+Developer** (owns builds, deploys, simulations, the mock, `docs/WORKING_STATE.md`, merges into main),
+**Submission readiness reviewer** (packaging and risk calls), Dashboard Creator. User decisions reach this chat
+relayed by the Simulation chat (D-numbers); answer each with tag + sha, diff size, tests, the 36/36 check.
+
+**Instructions in force (user):**
+- **CASE-BLIND (D6 17:20, D7 17:30):** never open the final case folder's documents
+  (`/Users/atlasdenizakbulut/Desktop/Freya Final case`). Listing file names and sizes is fine, and so is running
+  the builder's own reader over it for stats only (chars read / skipped / cut, no contents). Disclosed: before D6
+  this chat read `BRIEF.md` and the flow PDF's text (17:19-17:22); one wording slip from it (a document inventory
+  in general.py's setup prompt) was removed in cand-final.6. Build and test only on synthetic contracts
+  (Simulation's library reproducer `<sim scratchpad>/synth-inquiry/`, or parcel/clinic examples).
+- After 17:00 UTC only generic bug fixes; nothing from the case in code, prompts, tests or fixtures.
+- **Stand by:** no builder changes unless the Simulation chat reports a defect (generic, synthetic) or the user
+  decides; proposals go on untagged branches. Never move tags; the user holds all pushes.
+- Every change: collections renders byte-identical (36/36 saved specs via `<scratchpad>/render_cmp.py` against
+  `c4_-.json` = freeze-final-2), full suite + ruff, a live synthetic `--dry` (no Freya) when the path changes.
+
+**Tags (all preserved):**
+
+| tag | sha | what | status |
+|---|---|---|---|
+| freeze-final | b9756fe | eng.9 (old format) | superseded |
+| cand-final.2 | 3abfd22 | final run form: folder + mock URL, docx/xlsx/pdf reader, contract->tools, language | in freeze-final-2 |
+| cand-final.3 | 4cd9e92 | + folder input: BANK BRIEF = consolidated rules | in freeze-final-2 |
+| cand-final.4 = freeze-final-2 | e2635e9 | + DATES rule in the call language (prompt only) | merged into main |
+| cand-final.5 | 01492e0 | + general flow (D6): non-collections contract -> document-driven agent | superseded by .6 |
+| cand-final.6 | ed112fd | + review fixes: nested bodies (flat a__b + pre_process_code), credential ops dropped, safe id baking, list answers, cap after contract parsing | merged into main |
+| cand-final.7 | eef48d2 | + D9 cut-off line in the call language, D10 30 s general tool timeout | merged into LOCAL main 2efc338 = the selected build (round 2 running) |
+| cand-final.8 | 279a15a | + D11 URL join: strip a repeated mock path; full-URL path -> its path | tagged 18:20, NOT merged; Simulation verifies, builds ONCE into slot final-r3; .7 agent is the fallback |
+
+**Prepared, NOT adopted (separate decisions):** `cand-final-dates` d1720c3 (Turkish-aware month words in a worded
+`now` + build test; +137 B per facts node), `cand-size` 8e9d8be (UTF-8 CONFIG, WARN for code nodes > 40,000 B),
+`cand-final-3-work` 0f943d4 (on .2: xlsx columns/dates, docx content controls, text sniffing, PDF chain, contract
+path normalisation and role re-ask, customer_field over roles, language first), `cand-timeout` e746b16 (25 s,
+superseded by D10). Worktrees for all of them are in this session's scratchpad (`wt-*`).
+
+**Facts worth keeping:** the builder's general path makes 4 model calls (contract role read, own-names re-read,
+language, setup) and builds 2 steps (assist -> hang_up). The nested-body pre-hook is NOT platform-verified (only
+unit-tested); Simulation's round 1 showed requests arriving nested without it. The 40,000-byte code-node limit is
+our own guard (no platform limit documented); a Turkish 3-product collections spec reaches ~40.7 KB. Model latency
+was high (one call hit the 240 s timeout and fell back). The final folder: 19 files, 17 read, 2 mock-example files
+skipped (.js/.toml, WARN), test-customers.json cut to 60,000 chars, about 221k chars per model call.
+
+**Next after restore:** `date -u`; `git log --oneline -3 main`; `git tag --list 'cand-final*' 'freeze*'`;
+ListAgents; wait for the Simulation chat (cand-final.8 verification / final-r3 / submission). Answer readiness
+questions with evidence; no builder change without a reported generic defect or a user decision.
 
 ## STATE AT 15:45 UTC (read this first; hidden briefs open 17:00 UTC, submission closes 20:00 UTC)
 
