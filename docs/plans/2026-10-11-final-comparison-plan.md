@@ -77,4 +77,7 @@ spec(s) as the measured arm (`--spec`, no extraction), so a difference is the fi
 `e1-ab.json` x3 and PUB-09 (`styled-a.json --only PUB-09`) x3 = 18 calls. Pre-registered rule: adopt the fix on top
 of the selected candidate only if (1) the render diff touches transfer endings only; (2) HA-A passes 3/3 and no path
 case or PUB-09 call fails for an agent cause that passed on the base arm; (3) every transfer transcript has a thanks
-+ goodbye before `close_call` (checker NO_GOODBYE = 0). Otherwise the selected candidate ships without it.
++ goodbye before `close_call` (checker NO_GOODBYE = 0). **Amended 15:08 UTC by the user, before any goodbye-fix data:** (3)
+reads "every transfer call ends with a thanks + goodbye as the agent's last message"; an end-node farewell spoken at
+hang-up counts although it logs after `close_call` (Methodology's design: the kit's end-node farewell pattern, already
+used on the notes path); the judge verdicts in (2) decide whether that order matters. Otherwise the selected candidate ships without it.
