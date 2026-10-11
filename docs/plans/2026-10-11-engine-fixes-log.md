@@ -9,7 +9,8 @@ Context-save handoff for a restored engine-fixes session: `docs/plans/2026-10-11
 ## READ FIRST: status for the Simulation Developer (12:05 UTC; user-confirmed)
 
 Candidate tags, all preserved and unmerged; adoption needs the user's separate approval:
-`cand-eng.4` = cfa4d9d, `cand-eng.5` = 27f5647, `cand-eng.6` = a170935, `cand-eng.7` = a985076.
+`cand-eng.4` = cfa4d9d, `cand-eng.5` = 27f5647, `cand-eng.6` = a170935, `cand-eng.7` = a985076,
+`cand-eng.8` = 4267bb0.
 
 1. **Fix 1 (cand-eng.6/.7) substantially changes fresh-build negotiation instructions.** Its prompt
    sentence moved most of `unmodeled` into rendered `stage_rules` (rendered negotiate stage_rules grew
@@ -29,7 +30,8 @@ Candidate tags, all preserved and unmerged; adoption needs the user's separate a
    mid-call support offer question (and in ab4 "Can I help you first?"), so the agent re-asks it in
    its goodbye message (fails PUB-05 "support team offered once"). Extraction-random: before reading
    any .6/.7 hardship, support or human-request result, check that build's spec rows for a "?" in
-   `say_before_end`. Not fixed; strict-xfail test on branch `audit-fix1-endings` (dcd9749).
+   `say_before_end`. Fixed in **`cand-eng.8` = 4267bb0** (cand-eng.6 + render-time fix; hand-off at
+   the end); unmeasured on Freya.
 
 ## Hand-off: `cand-eng.2` = 17eddb0 (items 1 + 2), tagged 10:45 UTC
 
@@ -468,3 +470,54 @@ continue" timing (same stage_rule also forbids notes on transfer); ab1's widened
 low); variant-c callback-hours line (the same text and the CALLBACK slot list state the window). No
 Brief A/B wording carried into variant-c (online banking, email sentence, "Is that correct?",
 plan_team, hardship team and its scam sentence all kept).
+
+## Hand-off: `cand-eng.8` = 4267bb0 (cand-eng.6 + closing-line fix; branch `cand-eng-closing`), tagged 12:45 UTC
+
+Fixes audit Finding 1 above. History: a170935 (cand-eng.6) -> dcd9749 (audit test) -> 4267bb0. Tags
+.4-.7 unchanged. Not deployed; no queue change; the PUB-07 vague-period concern (Finding 2) is untouched.
+
+**Change (deterministic, render-time; extraction prompt unchanged, so Fix 1's paid sentence stays in
+its row).** `spec.early_lines`: a `say_before_end` sentence is said before the customer answers, not
+in the goodbye, when it is a question, or when a transfer ending and a non-transfer ending share it
+(said before the customer picks one) unless it is common to every ending of one step (a closing line).
+Detected structurally, so it covers offers as statements and sympathy lines, not only "?".
+`render._split_early_lines` (at `render()` entry) removes them from the ENDINGS "First say" lists and
+adds to that step's rules: `SAID BEFORE THE CUSTOMER ANSWERS: say these once, when the situation comes
+up, and never again in the goodbye:` with one line per group, naming the endings. The build trace
+prints a STEP line per affected ending. A spec without such lines is returned as the same object.
+
+**Local validation (no Freya).**
+- Tests: lint clean, **869 passed** (cand-eng.6 861 + 8 in `tests/test_fix1_audit.py`: the ab4
+  fixture; no question, offer or sympathy left in any goodbye list; moved lines once per step,
+  `Can I help you first?` in opening/identity/negotiate, none in third_party; paid, deceased,
+  failed-check and goodbye lines kept; a statement-form offer and a sympathy-only pair are moved; a
+  line common to every negotiate ending and a line shared by all transfer endings are NOT moved;
+  committed fixtures unchanged; idempotent).
+- Rule on 66 saved specs: hits exactly the 9 defective fresh6 specs, 0 false positives.
+- Renders, 71 saved specs, cand-eng.6 vs .8: **62 byte-identical**; the 9 that differ are exactly the
+  defective specs, all pass `validate()`, and the only changes are the ENDINGS lines and the new
+  block. 2 old dev specs fail identically on both.
+- 5 fresh `--dry` builds at 4267bb0 (clean tree; A, A+B two files, A+B single file, raw-A,
+  variant-c): all rc=0, 104-126 s, 2 model calls. The fix fired in **3/5 (A, A+B single file,
+  raw-A)**: Brief A is affected too (a1/a2 were clean in the earlier sample). After the fix no goodbye
+  list holds a question, offer or hardship sympathy; remaining word-list hits are true closings
+  (deceased, variant-c senior transfer). Paid sentence in its row in 5/5 (3 multi-product).
+  Specs/traces: `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/cebcf16d-0321-4181-b559-125cc9c8acdd/scratchpad/fresh8/`.
+- Adversarial review (3 lenses + verifiers): 0 material findings; 2 refuted as low. Optional
+  hardening, not done: skip the transfer/non-transfer test for a sentence carried by at least half
+  of all rows (a build-wide closing line missing from one all-phase row; seen 0 times in 89 specs).
+- Cherry-pick onto cand-eng.7 applies cleanly (merge-tree check); no tag made for it.
+
+**Required Freya tests (Simulation Developer; strict 3/3; any difference from cand-eng.6 investigated).**
+1. Submission path: fresh cand-eng.8 A and A+B builds, full A set x3 and B set x3. The fix is a
+   no-op on a clean extraction, so first read the build trace: a STEP line "said before the customer
+   answers" means the fix was active in that build.
+2. Defect path, deterministic: a cand-eng.8 build with `--spec tests/fixtures/fix1_audit_spec_ab4.json`
+   (DEV path; same render as a fresh build that extracted this spec), PUB-05 x3 plus the styled PUB-05
+   cases (`styled-a.json` in_words, `styled-ab-a.json` pieces) x3. Check: one sympathy sentence, support
+   team offered once, no question in the goodbye, ledger no_promise/hardship. Optional control:
+   cand-eng.6 with the same spec (expected to repeat).
+3. Paid sentence kept: PUB-08 x3 and PUB-12 / `styled-extra-b.json` x3.
+4. Not covered by any existing case (proposals, unmeasured until built): hardship accepted ->
+   transferred/support (offer not asked again); human request + insist -> transferred/human ("Can I
+   help you first?" once).
