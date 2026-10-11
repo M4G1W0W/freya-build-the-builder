@@ -23,7 +23,35 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `run_cases.py` posts `{"case": <case id>}`: our post-17:00 case ids must equal `customer_id`s in `data/customers.json`.
 - Still the practice-kit tool semantics: after 17:00, adapt `src/bank.js` + `data/customers.json` to the zip's
   service contract and redeploy (`cd mock && CI=1 npx --yes wrangler@4.149.0 deploy`; secrets persist).
-- `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28).
+- `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
+  3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
+
+## UPDATE 16:38 UTC: cand-final.2 REHEARSAL against our mock PASSED (simulation chat)
+
+- **Build** (live, non-dry, Python 3.12.13 standalone, worktree `<this scratchpad>/wt-cf2` at 3abfd22):
+  `build.py <scratch>/rehearse-folder $MOCK_URL --slot rehearse-cf2`; folder = BRIEF.md (kit brief A) + README.md +
+  docs/service-contract.docx (text copy of kit openapi; the model-read contract path). Trace
+  `<this scratchpad>/rehearse-cf2.trace.log`: 7 tools, every URL `https://teampistalogic.atlasreyiz.workers.dev/v1/<tool>`;
+  4 model calls (contract, consolidate, extract, language=English); spec check PASS; validation PASS; platform dry-run
+  PASS; chat smoke PASS; END ok=True, 130 s. workflow 704f9b40 / agent 52cef789 (slot `rehearse-cf2`).
+- **Simulation (user D2 16:36: one call)**: REH-CF2-PUB01-mock, PUB-01 talkative x1, bank = our mock
+  (`FREYA_BANK_HOST`=mock origin, team key = MOCK_TEAM_KEY), suite_once.py (maxRetries 0, no reruns): **PASS**
+  (verify > verify > get_account > promise > close_call; judge pass + kit scorer on our mock's ledger), 42 s, turns
+  ~2 s. Ledger **cum 525**. Files `runs/dev/r4/REH-CF2-PUB01-mock.*`.
+- **Chat endpoint quirk (not a regression)**: `/chat/message` model tools take `customer_id` from the workflow's
+  `test_variables` (the brief's example value, e.g. kit A `c_4f2a...`), not from the chat's `customerVariables`;
+  api_request nodes (close_call) get the right value. Same on the frozen-era exp-eng4-a (Brief A) agent; simulations
+  resolve correctly (session ids in call records). So chat cannot test identity against a mock; use a simulation.
+- **What Freya sends to the mock** (headers recorded by the mock since 7142671): `user-agent: Python/3.12
+  aiohttp/3.14.3`, `content-type: application/json`, Sentry `baggage` + `sentry-trace`; **no call id header**. The
+  `sentry-trace` value was identical for all 5 tool calls of the simulated call and different from the chat call:
+  apparently per call (1 call of evidence, undocumented).
+- **Final-mock risk to decide after reading the contract:** the hidden test customers reach our mock with fixed
+  customer ids, 3 reps each (possibly concurrent): per-customer state (verified flags, wrong-answer lock, one promise
+  per product -> 409) can leak between reps/calls. `idleResetSeconds` 600 only covers sequential calls >10 min apart.
+  Options: key state on customer_id + sentry trace id (undocumented), reset on a new trace id, or keep the state
+  lenient (contract permitting).
+- Mock commits: 7142671 (PUB-01..13 practice customers, header capture), 846a1f4 (`mock/tools/xlsx_rows.py`).
 
 ## SIMULATION CHAT HANDOFF (16:20 UTC; READ FIRST after a context clear; then the 16:08 block below)
 
