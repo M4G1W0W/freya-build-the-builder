@@ -61,3 +61,12 @@ to the platform; the goodbye fix (eng.4g/eng.9g) and the offers fix (eng.4o2/eng
 No automatic adoption: the user decides (D6). Freeze mechanics: `merge-main-eng9` = c1cbeb7 (Methodology; 922 passed,
 fresh-clone `--dry` clean) needs main re-merged (docs/scripts only) before `freeze-final`; `final-eng4` = 924b970 is
 the eng.4 equivalent.
+
+## After the decision (D6, user 15:51 UTC: eng.9; eng.9g if it passes by 16:40)
+
+- eng.9g goodbye evaluation, round 1: HA-A PASS and HU-A PASS (farewell spoken), PUB-09 PASS; **HU-PRE FAIL**: the judge
+  failed it because `end_call` (the new end node's spoken farewell) ran after `close_call` and repeated the model's own
+  "Thank you. Goodbye." HU-PRE passed on eng.9 r1 and r2, so the fix caused a regression: rule (2) fails, eng.9g is not
+  adopted. Remaining eng.9g items not run. eng.4g (3 items, 0/3 stalled, 1/1, 1/2) and the offers fix (o2) untested.
+- **`freeze-final` = b9756fe** = cand-eng.9 + main (builder code identical to cand-eng.9), 931 passed, fresh-clone `--dry`
+  OK (Python 3.12), secrets clean.

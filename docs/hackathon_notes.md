@@ -431,6 +431,13 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   Remaining Freya time goes only to the eng.9g transfer-goodbye evaluation (18 calls, pre-registered rule); the eng.4g
   evaluation (3 items run: 0/3 stalled, 1/1, 1/2) and the offers-fix test (o2) are dropped, untested. Freeze commits
   prepared without Freya: `final-eng9` (cand-eng.9 + main) and `final-eng9g` (cand-eng.9g + main).
+- 2026-10-11 18:58 (15:58 UTC) — **`freeze-final` = b9756fe (cand-eng.9 b103e21 + main docs/scripts; builder code
+  identical to cand-eng.9).** The eng.9g transfer-goodbye fix FAILED its pre-registered rule in round 1: HU-PRE (passed on
+  eng.9 base r1/r2) was judged fail because the end node's `end_call` with a spoken farewell ran after `close_call`
+  ("close_call must be the last tool call") and produced a redundant goodbye (the model had said it already); HA-A and
+  HU-A passed, PUB-09 passed. Remaining eng.9g items were not run (the rule outcome cannot change). Freeze checks:
+  merge of main clean, ruff clean, 931 passed, fresh-clone `--dry` of b9756fe with Python 3.12 (stdlib only) END ok=True
+  in 104 s, trace secrets CLEAN. (System `python3` here is 3.9.6: the builder's 3.10+ guard stops it, as designed.)
 
 ## Score log
 

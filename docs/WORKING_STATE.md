@@ -8,6 +8,16 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
 
+## UPDATE 15:59 UTC: FROZEN. `freeze-final` = b9756fe (cand-eng.9 + main). Nothing running.
+
+- eng.9g failed its rule (HU-PRE regression: end_call after close_call + double goodbye); not adopted. Driver stopped
+  (PLANSTOP), queue paused (`sim/STOP`), no simulation running. Ledger cum 524 / 789; credits ~374.5 USD.
+- Freeze checks: ruff clean, 931 passed, fresh-clone `--dry` OK with Python 3.12 (system python3 is 3.9.6: use a 3.10+
+  interpreter for the hidden builds, e.g. `~/.local/share/uv/python/cpython-3.12*/bin/python3` or `uv run python`).
+- Next (user): hidden builds from 17:00 UTC per `docs/RUNBOOK.md`, from a checkout of `freeze-final`. Open user
+  decisions: fast-forward/merge `main` to `freeze-final` (main's builder code is still F3) and D8/D9 (organiser key,
+  remote/push).
+
 ## UPDATE 15:53 UTC: D6 = eng.9 (user 15:51); eng.9g goodbye evaluation running; freeze commits being prepared
 
 - Results + rule application: `docs/reviews/2026-10-11-final-comparison-results.md` (rounds 1-2 matched; round 3 lost to a
