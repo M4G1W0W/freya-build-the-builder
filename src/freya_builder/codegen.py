@@ -102,6 +102,8 @@ def _calendar(spec: dict) -> dict:
         **({"this_weekday": "next_occurrence"} if this_next else {}),
         "date_order": cal["numeric_date_order"],
         "now_var": call_var(spec, "now") or "now",
+        # a brief in another language (language.py): its month names, for a worded `now`
+        **({"month_words": spec["months"]} if spec.get("months") else {}),
     }
 
 

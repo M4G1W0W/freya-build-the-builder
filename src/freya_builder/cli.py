@@ -1,10 +1,11 @@
-"""Builder entry point: brief file(s) + tool API file -> a published Freya workflow + trace.
+"""Builder entry point: the bank's documents + its tool API -> a published Freya workflow + trace.
 
-    python3 builder/build.py <brief.md> [<more briefs>...] <tool_api.json> [--slot NAME]
-                             [--export PATH] [--no-selftest] [--dry]
+    python3 builder/build.py <case_folder> <mock_url> [--slot NAME] [--export PATH] [--dry]
+    python3 builder/build.py <brief.md> [<more briefs>...] <tool_api.json> [...]
 
-The last positional argument is the tool API (OpenAPI JSON); everything before it is brief text
-(several files are concatenated in order, e.g. Brief A then Brief B). Secrets come from env vars.
+The last positional argument is the tool API: a mock URL (the tools are read from the folder's
+service contract and call that URL) or an OpenAPI JSON file. Everything before it is brief text:
+files, or folders read in full (casefolder.py), concatenated in order. Secrets come from env vars.
 """
 
 import argparse
@@ -16,7 +17,7 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 
-from . import llm, platform
+from . import casefolder, contract, llm, platform
 from .toolapi import Tool, load_tool_api
 from .trace import Trace
 from .validate import unsent_required, validate
@@ -44,22 +45,26 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return a
 
 
-def read_briefs(paths: list[str]) -> str:
-    parts = []
+def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[str, str]]:
+    """(name, text) per document: a file as given, a folder as every readable file in it."""
+    docs = []
     for p in paths:
-        parts.append(f"===== FILE: {Path(p).name} =====\n{_read_text(Path(p))}")
-    return "\n\n".join(parts)
+        path = Path(p)
+        if path.is_dir():
+            docs.extend(casefolder.read_folder(path, warn))
+        elif path.suffix.lower() in casefolder.READERS:
+            docs.append((path.name, casefolder.read_file(path)))
+        else:
+            docs.append((path.name, casefolder.decode_text(path.read_bytes())))
+    return docs
 
 
-def _read_text(path: Path) -> str:
-    """UTF-8, else cp1252 (pasted e-mails), else UTF-8 with replacement: never crash (audit F79)."""
-    data = path.read_bytes()
-    for encoding in ("utf-8-sig", "cp1252"):
-        try:
-            return data.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return data.decode("utf-8", errors="replace")
+def join_documents(docs: list[tuple[str, str]]) -> str:
+    return "\n\n".join(f"===== FILE: {name} =====\n{text}" for name, text in docs)
+
+
+def read_briefs(paths: list[str]) -> str:
+    return join_documents(read_documents(paths, lambda _: None))
 
 
 def count_tools(wf: dict) -> int:
@@ -136,11 +141,15 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         )
     ok = False
     try:
-        brief_text = read_briefs(a.briefs)
-        tools = load_tool_api(a.tool_api)
-        trace.step(
-            f"read {len(a.briefs)} brief file(s), {len(brief_text)} chars; {len(tools)} tools"
-        )
+        docs = read_documents(a.briefs, trace.warn)
+        if not docs:
+            raise ValueError(f"no readable document in {a.briefs}")
+        brief_text = join_documents(docs)
+        if contract.is_url(a.tool_api):
+            tools = contract.contract_tools(trace, docs, a.tool_api)
+        else:
+            tools = load_tool_api(a.tool_api)
+        trace.step(f"read {len(docs)} document(s), {len(brief_text)} chars; {len(tools)} tools")
 
         if a.spec:
             spec = json.loads(Path(a.spec).read_text())
