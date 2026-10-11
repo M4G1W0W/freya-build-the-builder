@@ -335,6 +335,53 @@ def _ending_wins_problems(
     return p
 
 
+# "say" + a quoted sentence of at least 4 words; a closing quote followed by a letter is an apostrophe
+SAID = re.compile(
+    r"\b(?:say|says|said|tell|tells|state|states)\b[^\"\u201c\u201d\u2018\u2019]{0,40}?"
+    r"[\"\u201c\u2018']([^\"\u201c\u201d]{8,300}?[.?!])[\"\u201d\u2019'](?![A-Za-z])",
+    re.I,
+)
+
+
+def _plain(text: str) -> str:
+    return " ".join(text.replace("{", "").replace("}", "").lower().split())
+
+
+def _names(line: str, reason: str) -> bool:
+    words = {reason, reason.replace("_", " "), reason.replace("_", "-")}
+    low = line.lower()
+    return any(re.search(r"(?<![a-z_])" + re.escape(w) + r"(?![a-z_])", low) for w in words)
+
+
+def _unsaid_note_sentences(spec: dict, note_reasons: tuple[str, ...]) -> list[str]:
+    """unmodeled is never shown to the agent. In a multi-product brief the sentence for a reason
+    noted per product (e.g. already paid) landed there instead of in its row's say_before_end in
+    6 of 16 extractions (engine-fixes Fix 1). Flags a said, quoted sentence on an unmodeled line
+    that names a note reason when no row says it."""
+    if not spec["notes"]["used"]:
+        return []
+
+    def rows_for(nr: str) -> list[dict]:
+        return [
+            r
+            for r in spec["rows"]
+            if r["reason"] == nr or r["id"] == nr or (not r["reason"] and r["outcome"] == nr)
+        ]
+
+    said = _plain(" ".join(x for r in spec["rows"] for x in r["say_before_end"]))
+    p: list[str] = []
+    for line in spec["unmodeled"]:
+        rows = sorted({r["id"] for nr in note_reasons if _names(line, nr) for r in rows_for(nr)})
+        for sentence in SAID.findall(line) if rows else []:
+            if len(sentence.split()) >= 4 and _plain(sentence) not in said:
+                p.append(
+                    f"unmodeled holds a sentence the agent must say, {sentence!r}, but the agent "
+                    f"never sees unmodeled: put it in say_before_end of the row of that per-product "
+                    f"reason (one of {rows})"
+                )
+    return p
+
+
 def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     """Problems that would make the agent send values the bank does not accept, or crash code."""
     by = {t.name: t for t in tools}
@@ -379,6 +426,7 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     note_reasons: tuple[str, ...] = ()
     if spec["notes"]["used"] and "add_note" in by:
         note_reasons = _enum(by, "add_note", spec["notes"]["reason_field"])
+    p += _unsaid_note_sentences(spec, note_reasons)
     for i, c in enumerate(spec["close_precedence"]):
         if c["then"] == "row" and c["row"] not in rows:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
