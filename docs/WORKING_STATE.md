@@ -44,8 +44,13 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
   tag; tags are never moved) and merges into main.
 - Methodology note (a), NOT fixed: upper-case or diacritic-less Turkish month words in `now` (EKİM, kasim) fall back to the
   server clock. Check the final data's `now` format at 17:00 (ISO/numeric is safe).
-- **User D9 (16:57): private GitHub repo shared with the organisers.** The user creates it and gives the URL; this chat
-  adds the remote and pushes main on the user's go (never force).
+- **User D9 (16:57): private GitHub repo shared with the organisers.** User go 16:59: created by this chat with gh
+  (account M4G1W0W): **https://github.com/M4G1W0W/freya-build-the-builder** (PRIVATE), remote `origin` (ssh), `main`
+  pushed 17:00 (44f4d4a). Before the push: every blob of all history (833) scanned for the values of FREYA_API_KEY,
+  FREYA_BANK_TEAM_KEY, OPENAI_API_KEY, FREYA_WORKSPACE_ID, MOCK_ADMIN_TOKEN, MOCK_TEAM_KEY and key patterns: no value
+  hit; pattern hits are placeholders only (`Bearer YOUR_API_KEY`, `fak_your_key`, `sk-test-SECRET-...`). Scanner:
+  `<this scratchpad>/scan_history.py`. **Open: invite the organisers' GitHub handle (from the kit e-mail) as a
+  collaborator.** Never force-push.
 
 ## UPDATE 16:48 UTC: cand-final.2 REVIEW + Turkish --dry + pdftotext (simulation chat)
 
