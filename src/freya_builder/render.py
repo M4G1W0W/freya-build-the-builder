@@ -696,7 +696,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     )
     wf_nodes["negotiate"] = nodes.conversation(
         "negotiate",
-        _negotiate_task(spec, k, notes),
+        language.localize_dates(_negotiate_task(spec, k, notes), spec.get("language")),
         wrap + _exit_transitions(spec, "negotiate"),
         tools=neg_tools,
         on_enter={"type": "tts", "text": "{{disclosure_text}}"},

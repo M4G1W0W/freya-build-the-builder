@@ -56,6 +56,28 @@ def is_english(language: str | None) -> bool:
     return (language or ENGLISH).strip().lower() in ("english", "en")
 
 
+DATES_AS_WRITTEN = (
+    "take both from the DATE TABLE or FACTS and say them as written there.",
+    'start your reply with that date as written in FACTS (for example "<weekday> <day> <month> '
+    '<year> is ...")',
+)
+
+
+def localize_dates(prompt: str, language: str | None) -> str:
+    """For a call in another language, the DATES rule keeps the date but not its English words:
+    FACTS and the DATE TABLE spell dates in English. English prompts are returned unchanged."""
+    if is_english(language):
+        return prompt
+    same = "(the same weekday, day, month and year)"
+    return prompt.replace(
+        DATES_AS_WRITTEN[0],
+        f"take both from the DATE TABLE or FACTS and say them in {language} {same}.",
+    ).replace(
+        DATES_AS_WRITTEN[1],
+        f"start your reply with that date from FACTS, said in {language} {same}",
+    )
+
+
 def speak_line(language: str | None) -> str:
     """The prompt's first instruction; unchanged ("Speak English.") for English briefs."""
     if is_english(language):
