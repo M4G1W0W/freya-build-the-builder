@@ -405,7 +405,7 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   checks after a generic fix, styled-a 10 + styled-ab-all 13 each, + 2 smokes per hidden agent). Every item still
   needs its own user go. Credits do not bind (393 USD; ~0.15-0.25 USD/call -> 55-90 USD). Applied to `qrun4.sh` and
   this session's `run_one.sh`.
-- 2026-10-11 17:15 (14:15 UTC; corrected 14:35 after a 3-lens read-only check) — **Challenger arm of the proposed
+- 2026-10-11 17:15 (14:15 UTC; corrected 14:20 after a 3-lens read-only check) — **Challenger arm of the proposed
   comparison eng.6 -> eng.8 (4267bb0); eng.4 stays the comparison candidate. E4-A-styledA completed and dequeued.
   Cap 705 -> 789 (housekeeping, user ~14:05; nothing built, deployed or run).** eng.8's bar (dossier §11.3 Primary,
   201 calls): T1 66 + T3 96 + E1 transfer-path cases 30 + D8 9 (the engine-required eng.8 `--spec

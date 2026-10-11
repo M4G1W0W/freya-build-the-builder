@@ -1,6 +1,6 @@
 # Final-selection evidence: builder candidates (11 Oct, as of 12:50 UTC; §11 update 14:15 UTC)
 
-Evidence in this dossier runs up to 12:42 UTC: the checkers' corrections plus `docs/WORKING_STATE.md` entries through the 2nd smoke at 12:40. *(14:35 UTC: §11 adds E4-A-styledA's result (completed, raw strict 4/10), the eng.8 challenger arm and the recalculated plan; ledger cum 343, cap 789.)* Nothing is selected or frozen here. The user makes the final selection.
+Evidence in this dossier runs up to 12:42 UTC: the checkers' corrections plus `docs/WORKING_STATE.md` entries through the 2nd smoke at 12:40. *(14:20 UTC: §11 adds E4-A-styledA's result (completed, raw strict 4/10), the eng.8 challenger arm and the recalculated plan; ledger cum 343, cap 789.)* Nothing is selected or frozen here. The user makes the final selection.
 
 Source shorthand used in brackets:
 - `r4/` = `runs/dev/r4/`, `r3/` = `runs/dev/r3/`
@@ -201,7 +201,7 @@ Common to all:
 
 - **Ledger: cum 312** of the runner cap 500 → 188 left [r4/calls.tsv last row 12:40:17]. The cap is internal; the organiser rule is only "do not probe or load-test".
 - **Credits:** 391.06 USD at 12:29 [WS]. At 0.21-0.26 USD per call, the 90-call E4 queue costs about 19-23 USD. Credits are not binding.
-- *(14:35 UTC: E4-A-styledA COMPLETED and removed from the queue; cum 343, cap 789; see §11.1, §11.4.)*
+- *(14:20 UTC: E4-A-styledA COMPLETED and removed from the queue; cum 343, cap 789; see §11.1, §11.4.)*
 - **E4 queue** [sim/queue.txt]: E4-A-styledA 30, E4-AB-all 39, E4-AB-xb 9, E4-VE 12 = 90 nominal → cum 402. Worst case is 4 simulations per rep (slow re-run x unjudged repeat), which could exceed 500. The runner checks the cap only at item start.
 - **Normal-speed durations** [r4/*.json `seconds`]:
   - styled-a x3: 6-22 min
@@ -233,7 +233,7 @@ SMOKE2 (12:40) was judged but failed on latency, and the user has kept the queue
 
 ### S1: platform recovers by about 13:30 UTC (16:30 Istanbul)
 
-*(14:35 UTC: E4-A-styledA has run and is COMPLETED (raw strict 4/10, §11.1); S1/S2 steps that start with it are done.)*
+*(14:20 UTC: E4-A-styledA has run and is COMPLETED (raw strict 4/10, §11.1); S1/S2 steps that start with it are done.)*
 
 | Item | Detail |
 |---|---|
@@ -294,8 +294,8 @@ No live measurement is possible. Choose on the existing evidence, preferably bef
 | D7 | Treat a bare chat-smoke 500 with exit 3 as "deployed, do not re-run" (RUNBOOK change) | 17:00 / 20:00 | RUNBOOK unchanged: re-run on 500 |
 | D8 | OpenAI key arrangement for the organisers' re-run (organiser email) | 20:00 / 23:00 | Open; nothing goes into the repo |
 | D9 | Remote, visibility and push | 20:00 / 23:00 | No remote, no push |
-| D10 | **(Updated 14:35 UTC, §11.3)** Challenger arm now eng.8 (4267bb0): approve, trim or order the Primary items (T1, T3, E1, D8 = eng.8's bar; 5 workflows) and T2; separately approve or drop E2 (eng.6 control on the same ab4 spec, 1 more workflow) | Before any deployment; at today's speed the Primary bar is about 2.5-3 h | **Not deployed, not adopted.** eng.4 stays the comparison candidate; eng.6 runs only as the E2 control if approved |
-| D11 | **(Updated 14:35 UTC, §11.4)** Internal cap: applied 500 → 705 (13:50) → **789** (14:15) under the user's 13:45 bounded-raise authorization (cum 343 + 360 planned + 86 reserve). The user may lower it or trim items | Before resume | Cap 789 applied in `qrun4.sh` and `run_one.sh` (note: `qrun4.sh` pre-checks nominal calls only); nothing runs without the user |
+| D10 | **(Updated 14:20 UTC, §11.3)** Challenger arm now eng.8 (4267bb0): approve, trim or order the Primary items (T1, T3, E1, D8 = eng.8's bar; 5 workflows) and T2; separately approve or drop E2 (eng.6 control on the same ab4 spec, 1 more workflow) | Before any deployment; at today's speed the Primary bar is about 2.5-3 h | **Not deployed, not adopted.** eng.4 stays the comparison candidate; eng.6 runs only as the E2 control if approved |
+| D11 | **(Updated 14:20 UTC, §11.4)** Internal cap: applied 500 → 705 (13:50) → **789** (14:15) under the user's 13:45 bounded-raise authorization (cum 343 + 360 planned + 86 reserve). The user may lower it or trim items | Before resume | Cap 789 applied in `qrun4.sh` and `run_one.sh` (note: `qrun4.sh` pre-checks nominal calls only); nothing runs without the user |
 
 ## 9. Open gaps and unverified items
 
@@ -439,7 +439,7 @@ style. **Absence check:**
 At normal speed the E4 queue plus T1 is about 1-2 h. With the 12:40 latency (14-54 s turns) none of it produces
 valid reps. Trimming T3 to styled-ab-all only (78 calls) saves 18 calls. Dropping T4 is the default.
 
-## 11. Update (14:15 UTC, verified 14:35): challenger arm eng.6 -> eng.8; E4-A-styledA completed (housekeeping, user ~14:05)
+## 11. Update (14:15 UTC, verified 14:20): challenger arm eng.6 -> eng.8; E4-A-styledA completed (housekeeping, user ~14:05)
 
 User instruction (housekeeping only): mark E4-A-styledA completed and remove it from the queue; change the
 **challenger arm** of the proposed comparison from eng.6 to **eng.8 (4267bb0)** using Methodology's latest hand-off
@@ -578,5 +578,5 @@ through `run_one.sh`), then T1, T3 + E1 and D8, then T2, then E2 if approved.
 - Time (assumptions: 10-13-case reps 3.5-6 min, 1-3-case simulations 3-4.5 min on today's slow platform, builds
   2-7 min): Primary = 39 simulations (T1 12, T3 12, E1 12 with each agent's path cases joined into one file, D8 3
   runnable today; 45 with all D8 variants) + 5 builds, about 2.5-3.5 h; T1 alone (12 simulations + 2 builds) about 45-60 min.
-  From 14:35 UTC, 17:00 leaves 2 h 25 min: **even the Primary bar may not finish before the hidden briefs, and not
+  From 14:20 UTC, 17:00 leaves 2 h 40 min: **even the Primary bar may not finish before the hidden briefs, and not
   at all if the E4 queue runs first**; ordering and trimming are the user's call.
