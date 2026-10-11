@@ -20,7 +20,7 @@ from .trace import Trace
 
 MIN_RULES_CHARS = 200
 
-SETUP_SYSTEM = """You prepare a company's documents for a phone agent that answers or makes one kind of phone call, so that it can follow them. The documents may be one clean specification or raw material (e-mails, several versions of an analysis, memos, announcements, a flow drawing, FAQ, meeting notes) written at different times that do not always agree. Return:
+SETUP_SYSTEM = """You prepare a company's documents for a phone agent that answers or makes one kind of phone call, so that it can follow them. The documents may be one clean specification or raw material of any kind (mails, memos, extracts, lists, notes) written at different times that do not always agree. Return:
 - bank_name: the company's name as the documents write it.
 - agent_self_description: who the agent is on the call, in a few English words (for example "the company's phone assistant").
 - call_vars: every variable the call gives the agent (the documents name them, often in a list of variables or as {{name}}): its exact name, what it holds, role (customer_id = the id of the caller or customer, now = the date and time of the call, other), and an example value from the documents ("" if none).
@@ -68,15 +68,97 @@ def missing_roles(tools: list[Tool]) -> list[str]:
     return [r for r in REQUIRED if r not in names]
 
 
+CREDENTIAL_FIELDS = {
+    "client_secret",
+    "client_id",
+    "grant_type",
+    "password",
+    "refresh_token",
+    "api_key",
+}
+SEP = "__"  # a nested request field 'a.b' is the flat body leaf 'a__b' (kit: flat body leaves only)
+
+
+def _last(name: str) -> str:
+    return re.split(r"\.|__", name)[-1]
+
+
+def service_tools(tools: list[Tool]) -> tuple[list[Tool], list[Tool]]:
+    """(kept, dropped): an operation that takes credentials (a token endpoint) is plumbing between
+    systems, not something the agent does on the call."""
+    dropped = [
+        t for t in tools if any(_last(f.name).lower() in CREDENTIAL_FIELDS for f in t.request)
+    ]
+    return [t for t in tools if t not in dropped], dropped
+
+
+def _segment(t: Tool) -> str:
+    seg = urlsplit(t.url).path.rstrip("/").split("/")[-1]
+    name = re.sub(r"\W", "_", seg)
+    if "{" in seg or not re.search("[A-Za-z]", seg) or not re.fullmatch(r"[A-Za-z_]\w{0,63}", name):
+        return ""
+    return name
+
+
 def named_by_path(tools: list[Tool]) -> list[Tool]:
     """In the general flow the role names mean nothing: call each tool by its path's last segment
-    (the contract's own operation name) when that is a unique identifier."""
-    wanted = [re.sub(r"\W", "_", urlsplit(t.url).path.rstrip("/").split("/")[-1]) for t in tools]
+    (the contract's own operation name) when that name is unique among all final names."""
+    names: list[str] = []
+    for i, t in enumerate(tools):
+        cand = _segment(t)
+        others = [_segment(o) or o.name for j, o in enumerate(tools) if j != i]
+        names.append(cand if cand and cand not in others and cand not in names else t.name)
+    if len(set(names)) < len(names):
+        return tools
+    return [dataclasses.replace(t, name=n) for t, n in zip(tools, names, strict=True)]
+
+
+def _expand(fields: tuple, prefix: str = "") -> list:
+    """Object fields with children (an OpenAPI body) become dotted leaves, like the model's."""
     out = []
-    for t, name in zip(tools, wanted, strict=True):
-        ok = re.fullmatch(r"[A-Za-z_]\w{0,63}", name or "") and wanted.count(name) == 1
-        out.append(dataclasses.replace(t, name=name) if ok else t)
+    for f in fields:
+        name = prefix + f.name
+        if f.children and f.type == "object":
+            out.extend(_expand(f.children, name + "."))
+        else:
+            out.append(dataclasses.replace(f, name=name, children=()))
     return out
+
+
+def flat_tool(t: Tool) -> tuple[Tool, bool]:
+    """A tool whose request nests fields in objects: dot-free flat leaves (a__b), the bare parent
+    objects dropped; NEST_PRE rebuilds the nested body before the request is sent."""
+    fields = _expand(t.request)
+    dotted = [f.name for f in fields if "." in f.name]
+    if not dotted:
+        return t, False
+    parents = {n.rsplit(".", k)[0] for n in dotted for k in range(1, n.count(".") + 1)}
+    leaves = tuple(
+        dataclasses.replace(
+            f, name=f.name.replace(".", SEP), description=f"{f.description} ({f.name})".strip()
+        )
+        for f in fields
+        if f.name not in parents
+    )
+    return dataclasses.replace(t, request=leaves), True
+
+
+NEST_PRE = """try:
+    _b = config.get('body') if isinstance(config, dict) else None
+    if isinstance(_b, dict):
+        for _k in list(_b.keys()):
+            if '__' in _k:
+                _v = _b.pop(_k)
+                _parts = _k.split('__')
+                _n = _b
+                for _p in _parts[:-1]:
+                    if not isinstance(_n.get(_p), dict):
+                        _n[_p] = dict()
+                    _n = _n[_p]
+                _n[_parts[-1]] = _v
+except Exception:
+    pass
+"""
 
 
 def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
@@ -92,7 +174,22 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     for a in out["amendments"]:
         trace.step(f"amendment: {a[:200]}")
     call_vars = [v for v in out["call_vars"] if re.fullmatch(r"[A-Za-z_]\w*", v["name"])]
+    for v in out["call_vars"]:
+        if v not in call_vars:
+            trace.warn(f"call variable {v['name']!r} is not a valid name: left out")
+    for t in service_tools(tools)[1]:
+        trace.warn(f"tool {t.name} takes credentials ({t.url}): not given to the agent")
+    names = {v["name"] for v in call_vars}
+    opening = out["opening_line"].strip()
+    for ph in re.findall(r"\{\{\s*([^{}]*?)\s*\}\}", opening):
+        if ph not in names:
+            trace.warn(f"opening line names {{{{{ph}}}}}, which the call does not give: removed")
+            opening = re.sub(r"\{\{\s*" + re.escape(ph) + r"\s*\}\}", "", opening)
+    opening = re.sub(r"\s+([,.!?])", r"\1", re.sub(r"\s{2,}", " ", opening)).strip()
+    if not opening:
+        trace.warn("no opening line: the agent waits for the caller's first words")
     trace.step("call variables: " + ", ".join(f"{v['name']} ({v['role']})" for v in call_vars))
+    _bake_check(call_vars, service_tools(tools)[0], trace)
     for t in tools:
         if t.method != "POST":
             trace.warn(f"tool {t.name}: {t.method} with a JSON body is not covered by the kit docs")
@@ -103,7 +200,7 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
         trace.warn(f"consolidated rules are {len(rules)} chars: the prompt keeps the full text")
         rules = brief_text
     return {
-        "general": {"opening_line": out["opening_line"].strip()},
+        "general": {"opening_line": opening},
         "meta": {
             "bank_name": out["bank_name"],
             "agent_self_description": out["agent_self_description"],
@@ -134,29 +231,64 @@ POST_TEXT = {
 }
 
 
+# A 200 whose body is a JSON list is an answer (an empty list too): the envelope expects a dict.
+_LIST = """
+_raw = result.get('data')
+if isinstance(_raw, list):
+    result['data'] = dict(items=_raw, count=len(_raw))
+"""
+
+
 def post_hook() -> str:
-    return hooks._post("", _POST, {k: hooks.lit(v) for k, v in POST_TEXT.items()})
+    return hooks._post(_LIST, _POST, {k: hooks.lit(v) for k, v in POST_TEXT.items()})
+
+
+def _words(name: str) -> set[str]:
+    parts = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", name)
+    return {w.lower() for w in parts if len(w) >= 3}
 
 
 def baked_fields(spec: dict, tools: list[Tool]) -> dict[str, str]:
-    """Request field -> call variable: same name (any case); else, for the caller's id, the one
-    field every tool requires (a renamed id, as spec.customer_field does for collections)."""
-    by_lower = {v["name"].lower(): v["name"] for v in spec["meta"]["call_vars"]}
-    out = {
-        f.name: by_lower[f.name.lower()]
-        for t in tools
-        for f in t.request
-        if f.name.lower() in by_lower
-    }
-    cid = _var(spec, "customer_id")
+    return _bake(spec["meta"]["call_vars"], tools)
+
+
+def _bake(call_vars: list[dict], tools: list[Tool]) -> dict[str, str]:
+    """Request field -> call variable. Same name (last segment of a nested field); any case only
+    for the caller's id. Else the caller's id goes into the one field every tool that requires
+    something requires, when that field's name shares a word with the variable's name."""
+    out = {}
+    for v in call_vars:
+        for t in tools:
+            for f in t.request:
+                last = _last(f.name)
+                if last == v["name"] or (
+                    v["role"] == "customer_id" and last.lower() == v["name"].lower()
+                ):
+                    out[f.name] = v["name"]
+    cid = next((v["name"] for v in call_vars if v["role"] == "customer_id"), "")
     if cid and cid not in out.values():
         common: set[str] | None = None
         for t in tools:
             names = {f.name for f in t.request if f.required}
-            common = names if common is None else common & names
+            if names:
+                common = names if common is None else common & names
         if common and len(common) == 1:
-            out[next(iter(common))] = cid
+            field = next(iter(common))
+            if _words(_last(field)) & _words(cid):
+                out[field] = cid
     return out
+
+
+def _bake_check(call_vars: list[dict], tools: list[Tool], trace: Trace) -> None:
+    tools = [flat_tool(t)[0] for t in tools]
+    baked = _bake(call_vars, tools)
+    cid = next((v["name"] for v in call_vars if v["role"] == "customer_id"), "")
+    if cid and cid not in baked.values():
+        trace.warn(f"call variable {cid} matches no request field: the model fills the id fields")
+    for t in tools:
+        open_ = [f.name for f in t.request if f.required and f.name not in baked]
+        if open_:
+            trace.step(f"tool {t.name}: the model fills the required {', '.join(open_)}")
 
 
 def _var(spec: dict, role: str) -> str:
@@ -183,7 +315,7 @@ HOW TO WORK
 - If the customer asks for something the RULES and the tools do not cover, say that you do not have that information or cannot do that; do not make anything up.
 - Every date decision (today, tomorrow, this week, due or overdue, how many days) uses {when}, never the system clock or your memory. Say dates, amounts and numbers the way a {said} speaker says them.
 - If a customer message breaks off mid-sentence, reply "Please go on." and wait for the rest.
-- To end the call: say the goodbye ("{goodbye}") and call transition_to_hang_up in the same turn. When a rule hands the call to a person, call that tool first, tell the customer, then end the call the same way.
+- To end the call: say the closing line the RULES give (if they give none, say "{goodbye}") and call transition_to_hang_up in the same turn. When a rule hands the call to a person, call that tool first, tell the customer, then end the call the same way.
 
 THE CALL GIVES YOU (never ask the customer for these)
 {given}
@@ -194,25 +326,29 @@ RULES
 
 
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
-    tools = named_by_path(tools)
+    flat = [flat_tool(t) for t in named_by_path(service_tools(tools)[0])]
+    tools = [t for t, _ in flat]
     bake = baked_fields(spec, tools)
     post = post_hook()
-    tool_defs = [
-        model_tool(
+    tool_defs = []
+    for t, nested in flat:
+        d = model_tool(
             t,
             t.summary or t.name,
             {f.name: "{{" + bake[f.name] + "}}" for f in t.request if f.name in bake},
             post_process_code=post,
         )
-        for t in tools
-    ]
+        if nested:
+            d["pre_process_code"] = NEST_PRE
+        tool_defs.append(d)
+    opening = spec["general"]["opening_line"]
     assist = nodes.conversation(
         "assist",
         "Help the customer as the RULES say, from the first message to the goodbye.",
         [nodes.tool_transition("hang_up", "End the call after the goodbye has been said.")],
         tools=tool_defs,
-        on_enter={"type": "tts", "text": spec["general"]["opening_line"]},
-        first_entry_only=True,
+        on_enter={"type": "tts", "text": opening} if opening else None,
+        first_entry_only=bool(opening),
     )
     test_vars = {v["name"]: v["example"] for v in spec["meta"]["call_vars"] if v["example"]}
     return {

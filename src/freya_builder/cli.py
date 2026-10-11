@@ -45,18 +45,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return a
 
 
-MAX_DOC_CHARS = 60_000  # a data dump (thousands of records) would swamp every model call
-
-
-def capped(name: str, text: str, warn: Callable[[str], None]) -> str:
-    """A document's text for the model calls: an oversized one keeps its first MAX_DOC_CHARS."""
-    if len(text) <= MAX_DOC_CHARS:
-        return text
-    warn(f"{name}: {len(text)} chars; the model reads the first {MAX_DOC_CHARS}")
-    cut = len(text) - MAX_DOC_CHARS
-    return text[:MAX_DOC_CHARS] + f"\n[... cut by the builder: {cut} more chars]"
-
-
 def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[str, str]]:
     """(name, text) per document: a file as given, a folder as every readable file in it."""
     docs = []
@@ -68,13 +56,13 @@ def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[
             docs.append((path.name, casefolder.read_file(path)))
         else:
             docs.append((path.name, casefolder.decode_text(path.read_bytes())))
-    return [(name, capped(name, text, warn)) for name, text in docs]
+    return docs
 
 
 MIN_RULES_CHARS = 1000  # shorter consolidated rules for a whole case folder cannot be complete
 
 
-def folder_prompt_brief(trace: Trace, spec: dict) -> None:
+def folder_prompt_brief(trace: Trace, spec: dict, brief_text: str) -> None:
     """A case folder also holds test customers, example calls and the service contract: the
     agent's BANK BRIEF is consolidate's rule list, not every document (review 16:40 UTC).
     Extraction still read the full text. Short or empty rules keep the full text, with a WARN."""
@@ -83,6 +71,7 @@ def folder_prompt_brief(trace: Trace, spec: dict) -> None:
         trace.warn(
             f"consolidated rules are {len(rules)} chars: the prompt keeps the full folder text"
         )
+        spec["_prompt_brief"] = brief_text
         return
     spec["_prompt_brief"] = rules
     trace.step(f"BANK BRIEF in the prompt = the consolidated rules, {len(rules)} chars")
@@ -173,7 +162,7 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
         docs = read_documents(a.briefs, trace.warn)
         if not docs:
             raise ValueError(f"no readable document in {a.briefs}")
-        brief_text = join_documents(docs)
+        brief_text = join_documents([(n, casefolder.capped(n, t, trace.warn)) for n, t in docs])
         if contract.is_url(a.tool_api):
             tools = contract.contract_tools(trace, docs, a.tool_api)
         else:
@@ -187,7 +176,7 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
             spec = extract(trace, brief_text, tools)
         spec.setdefault("_prompt_brief", brief_text)
         if any(Path(b).is_dir() for b in a.briefs):
-            folder_prompt_brief(trace, spec)
+            folder_prompt_brief(trace, spec, brief_text)
         if a.save_spec:
             Path(a.save_spec).write_text(json.dumps(spec, indent=1))
         workflow = render(spec, tools)

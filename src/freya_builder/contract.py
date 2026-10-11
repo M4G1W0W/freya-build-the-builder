@@ -8,7 +8,7 @@ every tool's URL is the mock URL plus the contract's path.
 
 import json
 
-from . import llm
+from . import casefolder, llm
 from .toolapi import Field, Tool, parse_tool_api
 from .trace import Trace
 
@@ -192,7 +192,9 @@ def contract_tools(trace: Trace, files: list[tuple[str, str]], mock_url: str) ->
         tools = on_mock(doc, mock_url)
         trace.step(f"tool API from {rel} (OpenAPI), every URL on the mock: {len(tools)} tools")
     else:
-        text = "\n\n".join(f"===== FILE: {rel} =====\n{body}" for rel, body in files)
+        text = "\n\n".join(
+            f"===== FILE: {rel} =====\n{casefolder.capped(rel, body)}" for rel, body in files
+        )
         out = llm.chat_json(
             trace, "read the tool API out of the service contract", SYSTEM, text, SCHEMA, "tools"
         )
@@ -202,17 +204,21 @@ def contract_tools(trace: Trace, files: list[tuple[str, str]], mock_url: str) ->
             trace.step(
                 f"no operation for {', '.join(missing)}: reading the contract with its own names"
             )
-            out = llm.chat_json(
-                trace,
-                "re-read the contract with its own operation names",
-                SYSTEM_OWN_NAMES,
-                text,
-                SCHEMA,
-                "tools",
-            )
-            own = tools_from_operations(out.get("operations") or [], mock_url)
-            if len(own) >= len(tools):
-                tools = own
+            try:
+                out = llm.chat_json(
+                    trace,
+                    "re-read the contract with its own operation names",
+                    SYSTEM_OWN_NAMES,
+                    text,
+                    SCHEMA,
+                    "tools",
+                )
+            except llm.LLMError as e:  # an optional second reading: keep the first one
+                trace.warn(f"own-names reading failed ({str(e)[:120]}); keeping the role reading")
+            else:
+                own = tools_from_operations(out.get("operations") or [], mock_url)
+                if len(own) >= len(tools):
+                    tools = own
         trace.step(f"tool API read from the documents, every URL on the mock: {len(tools)} tools")
     if not tools:
         raise ValueError("no service operations found in the case folder")

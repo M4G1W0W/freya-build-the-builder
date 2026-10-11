@@ -16,8 +16,8 @@ from freya_builder.validate import validate
 
 MOCK = "https://mock.example.dev"
 BRIEF = """# City Library: loans enquiry line (synthetic)
-Members phone the library to ask which books they have on loan. The phone menu has identified the
-member and passes the member number. Variables: `memberNumber` (7 digits), `now` (call date-time,
+Members phone the library to ask which books they have on loan. The call passes the member
+number. Variables: `memberNumber` (7 digits), `now` (call date-time,
 for example 2026-10-12T10:30:00+01:00).
 1. Greet: "Welcome to the City Library loans line." Do not ask who they are.
 2. Call list_loans with the member number. Read each loan's title and due date, overdue first.
@@ -40,7 +40,7 @@ def _field(name, required=True, enum=()):
     }
 
 
-OPERATIONS = [  # what the role-naming contract call produced for this contract (17:17 UTC trace)
+OPERATIONS = [  # a plausible role-named reading of this contract
     {
         "name": "get_account",
         "path": "/api/list_loans",
@@ -238,7 +238,7 @@ def _op(name, path):
 
 
 def test_a_contract_without_the_roles_is_read_again_with_its_own_names(monkeypatch):
-    # 17:27 UTC live dry run: the role reading returned 2 of 3 operations, one misnamed.
+    # A live dry run: the role reading returned 2 of 3 operations, one misnamed.
     from freya_builder import contract
 
     answers = [
@@ -275,14 +275,35 @@ def test_a_contract_with_every_role_is_read_once(monkeypatch):
     assert len(calls) == 1 and [t.name for t in tools] == list(general.REQUIRED)
 
 
-def test_an_oversized_document_is_cut_for_the_model(tmp_path):
+def test_an_oversized_document_is_cut_for_the_model_but_an_openapi_file_still_parses(
+    tmp_path, monkeypatch, capsys
+):
+    import json
+
     case = tmp_path / "c"
     case.mkdir()
     (case / "BRIEF.md").write_text("brief")
     (case / "records.json").write_text("[" + ",".join(['{"id": 1}'] * 20_000) + "]")
-    warnings: list[str] = []
-    docs = dict(cli.read_documents([str(case)], warnings.append))
-    assert docs["BRIEF.md"] == "brief"
-    assert len(docs["records.json"]) < cli.MAX_DOC_CHARS + 100
-    assert docs["records.json"].endswith("more chars]")
-    assert any("records.json" in w and "the model reads the first" in w for w in warnings)
+    doc = json.loads(Path(API).read_text())
+    doc["info"] = {"title": "big", "description": "x" * 70_000}
+    (case / "openapi.json").write_text(json.dumps(doc))
+    seen = {}
+
+    def fake(trace, purpose, *a, **k):
+        raise AssertionError(f"no model call expected: {purpose}")
+
+    monkeypatch.setattr(llm, "chat_json", fake)
+
+    def extract(trace, text, tools):
+        seen["text"], seen["tools"] = text, [t.name for t in tools]
+        return {"_prompt_brief": text}
+
+    def render(spec, tools):
+        from test_cli import fake_render
+
+        return fake_render(spec, tools)
+
+    assert cli.run([str(case), MOCK, "--dry"], extract, render) == 0
+    assert "verify_identity" in seen["tools"]  # the uncut OpenAPI file was parsed
+    assert "cut by the builder" in seen["text"] and len(seen["text"]) < 3 * 60_000
+    assert "records.json: " in capsys.readouterr().err
