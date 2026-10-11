@@ -252,3 +252,26 @@ judged reps even with the sentence in the row. Suggested: cand-eng.6 vs cand-eng
 styled-extra-b x3 (PUB-12 paid check) and the B set x3; the A set x3 because the extraction prompt
 changed for every brief (A's saved-spec render is identical, but each fresh build re-extracts). Any
 difference from cand-eng.4 is to be investigated, not called noise.
+
+## Hand-off: `cand-eng.7` = a985076 (Fix 1 on cand-eng.5; branch `cand-eng-fix1-on5`), tagged 11:48 UTC
+
+Clean cherry-pick of a170935 onto cand-eng.5 (27f5647); cand-eng.4/.5/.6 unchanged. `pipeline.py` and
+`spec.py` are byte-identical to cand-eng.6, so the extraction path is the same: the 16 fresh
+extractions measured for cand-eng.6 (12/12 multi-product with the sentence in its row) apply here
+unchanged and were not re-run. Tests: lint clean, **863 passed** (cand-eng.5 861 + the 2 Fix 1 tests).
+Render scope: all 7 saved-spec renders byte-identical to cand-eng.5. check_spec on the 50 saved specs:
+identical output to cand-eng.6.
+
+The four arms, each needing strict 3/3 on fresh builds before promotion:
+
+| Tag | = | Adds |
+|---|---|---|
+| cand-eng.4 | cfa4d9d | items 1, 2, 4, 5 (part) + all review fixes + variant-e fixtures |
+| cand-eng.5 | 27f5647 | cand-eng.4 + PUB-12 multi-product paragraph (item 3) |
+| cand-eng.6 | a170935 | cand-eng.4 + Fix 1 (per-product sentence) |
+| cand-eng.7 | a985076 | cand-eng.5 + Fix 1 |
+
+Suggested Freya measurement (Simulation Developer): fresh A+B builds; styled-extra-b x3 (PUB-12:
+target of both item 3 and Fix 1) and the B set x3; the A set x3 (every fresh build re-extracts with the
+new prompt). Comparing .4/.5/.6/.7 separates the two effects: .5 vs .4 = item 3, .6 vs .4 = Fix 1,
+.7 = both. Investigate any difference from cand-eng.4; do not call it noise.
