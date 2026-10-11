@@ -94,3 +94,9 @@ test("the token path answers the documented token response under every base", ()
     assert.deepEqual([r.status, r.body.token_type, r.service], [200, "Bearer", "token"]);
   }
 });
+
+test("configured aliases fill an empty field (the call variable's name for the customer number)", () => {
+  const cfg = { ...CFG, aliases: { customerNo: ["customerNumber"] } };
+  assert.equal(serve(PACK, cfg, "POST", "/x.list", { data: { customerNumber: "10000001" } }).status, 200);
+  assert.equal(serve(PACK, CFG, "POST", "/x.list", { data: { customerNumber: "10000001" } }).status, 400);
+});

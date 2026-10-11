@@ -90,6 +90,9 @@ export function serve(pack, cfg, method, pathname, body, guid = "0".repeat(32)) 
   if (method.toUpperCase() !== "POST") return out(errorBody(cfg, "INVALID_ARGUMENTS_ERROR", "only POST is supported", guid));
   const s = cfg.services[service];
   const f = fieldsOf(body);
+  for (const [name, alts] of Object.entries(cfg.aliases || {})) {
+    for (const alt of alts) if (str(f[name]) === "" && str(f[alt]) !== "") f[name] = f[alt];
+  }
   for (const name of s.required || []) {
     if (str(f[name]) === "") return out(errorBody(cfg, "INVALID_ARGUMENTS_ERROR", `${cfg.fieldLabels?.[name] || name} cannot be empty`, guid));
   }
