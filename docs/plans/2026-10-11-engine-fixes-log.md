@@ -521,3 +521,33 @@ prints a STEP line per affected ending. A spec without such lines is returned as
 4. Not covered by any existing case (proposals, unmeasured until built): hardship accepted ->
    transferred/support (offer not asked again); human request + insist -> transferred/human ("Can I
    help you first?" once).
+
+## Regression cases for the two uncovered eng.8 paths (13:10 UTC; branch `cases-eng8-paths` = 1dc8c6d)
+
+Not on main and not in the simulation queue (user: keep isolated). Never run on Freya. Files on the branch:
+`tests/fixtures/cases/hardship-accept.json` (HA-A on the PUB-05 account, Brief A; HA-B on PUB-13, Brief B),
+`tests/fixtures/cases/human-insist.json` (HU-A on PUB-01 after verification; HU-PRE on PUB-06 before the
+security questions; HU-B on PUB-12, Brief B), `tests/fixtures/cases/path-cases.md` (per case: brief
+references for every expected value and check, how the two derivations differed, residual ambiguities),
+`tests/test_path_cases.py` (seed accounts equal the public cases, one id per file, enums, expected ledgers).
+Lint clean, 807 passed on the branch.
+
+Derived from `kit/briefs/brief-a.md` / `brief-b.md` text only: two blind derivers per case + one adversarial
+reconciler (all 5 "high" confidence). Expected ledgers: HA-* `transferred`/`support`, transfers [support];
+HU-* `transferred`/`human`, transfers [general]; all with no promises, notes or callbacks (Brief A 32, 42,
+45 last sentence, closing table; Brief B 10: no notes on any transfer). Speech checks fail one repeated
+sympathy sentence, a repeated support offer, or a repeated help-first question, including in the goodbye.
+
+Reachability (local, eng.6/eng.8 fresh renders): the human-transfer ending exists in opening and identity
+in 21/21 builds and the support ending in negotiate in 21/21, so every case can end correctly.
+
+Main residual risks (details in path-cases.md): judge reading of soft goodbye words ("take care") as a
+repeat; HU-PRE rule 15 (declined) vs rule 42/45 (human), the brief text supports the transfer; HU-A
+rule 30 vs 42 order left lenient; HA-B covers hardship raised at the all-products question only; the order
+of goodbye and transfer is not fixed by the brief and not checked.
+
+Suggested use (user decides): run both files x3 on the agent being validated (eng.4 now gives a baseline for
+rules 32/42 that does not depend on eng.8), and on an eng.8 build from
+`--spec tests/fixtures/fix1_audit_spec_ab4.json` (branch `cand-eng-closing`), where the fix is active for both
+the hardship lines and "Can I help you first?". A fresh eng.8 build exercises the fix only if its trace has a
+"said before the customer answers" line (12/21 fresh builds so far).
