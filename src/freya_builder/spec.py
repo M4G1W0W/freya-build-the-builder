@@ -622,7 +622,9 @@ def early_lines(spec: dict) -> dict[str, list[str]]:
     question and the sympathy line in both the accept and the decline ending, "Can I help you
     first?" in the human-transfer ending; 9 of 16 fresh extractions, 0 of 13 before Fix 1). Early:
     a question, or a sentence shared by a transfer ending and a non-transfer ending (said before the
-    customer picks one of them), unless it is common to every ending of one step (a closing line).
+    customer picks one of them), unless it is a closing line: common to every ending of one step,
+    or in more than half of all endings (one row that drops or rewords the goodbye, such as a
+    human-transfer row listed in every step, must not turn the goodbye into an early line).
     """
     rows = spec["rows"]
     sayers: dict[str, list[dict]] = {}
@@ -635,7 +637,7 @@ def early_lines(spec: dict) -> dict[str, list[str]]:
             shared = sayers[_words(s)]
             ids = {x["id"] for x in shared}
             mixed = len({bool(x["queue"]) for x in shared}) == 2
-            common = any(
+            common = len(ids) * 2 > len(rows) or any(
                 {q["id"] for q in rows if p in q["phases"]} <= ids
                 for x in shared
                 for p in x["phases"]
