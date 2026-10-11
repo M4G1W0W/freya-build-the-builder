@@ -54,7 +54,47 @@ cand-final.1 it is noise or a fresh-extraction difference, not these fixes. Item
 observable on the perturbed briefs (p3b/p2), which have no case files: no simulation needed for them.
 No trace line the RUNBOOK greps for changed.
 
-## Next (in progress)
-- `cand-eng.3`: item-1 review fixes (a 3-lens adversarial review of cand-eng.1, 13 agents: 2 MED + 5
-  LOW confirmed; all in the all-at-once corner, none touches A/B) and item 4 ("this <weekday>" as a
-  spec field `calendar.this_weekday`, default today's meaning).
+## Hand-off: `cand-eng.3` = 57e6e66 (items 1, 2, 4, 5 + review fixes; supersedes cand-eng.2), tagged ~10:55 UTC
+
+Commits after cand-eng.2: fd705de (item 4), d54a850 (item-1 review fixes), 57e6e66 (item 5).
+Tests: lint clean, **857 passed**. Every fix has a regression test that fails on the old code.
+
+- **Item 4 (MED), "this <weekday>".** New spec field `calendar.this_weekday {current_week |
+  next_occurrence}` (`spec.py`, prompt in `pipeline.py`); the DATE TABLE (`sandbox/facts.py`
+  `date_table`) prints "this <weekday> (the first such weekday after today): ..." only for
+  `next_occurrence`; `codegen._calendar` adds the CONFIG key only then. p1 said on Fri 23 Oct: "this
+  Wednesday" = 2026-10-28 (was 2026-10-21, a past date).
+- **Item-1 review fixes** (3-lens adversarial review of cand-eng.1, 13 agents; 2 MED + 5 LOW
+  reproduced, all in the all-at-once corner): only ONE response list whose name says wrong
+  (wrong/incorrect/fail/invalid/mismatch) and that holds only question keys names wrong answers (a
+  `matched_fields` list was read as wrong); otherwise the agent asks again for what the brief says
+  (else every answer). Keys match request fields ignoring case (check_spec then asks for the exact
+  name); a question field whose enum lists the keys stays per-answer; a required enum field is a
+  setting, not a missing question; a per-answer spec whose keys are request fields (the invented P3
+  mapping with other key spellings), or empty question/answer fields with non-field keys, now get one
+  clear checker message (they passed silently or contradicted themselves).
+- **Item 5 (LOW), three of six parts:** percentage floor in whole cents, half up (30% of 99.95 = 29.99,
+  was 29.98; facts.py has no new import); verify_post reads no hint field when the brief lists no hint
+  values (p1 hint_field "error" quoted error text as a hint); `cli.run` flushes stdout before the END
+  line. Not done: identity entry "Please go on." (call 29041b61), pre-question sentence placement,
+  first retry after the 30-min guard (need transcripts or platform work).
+
+**check_spec on every saved spec** (39 specs under runs/dev + P1-P3b + variant fixtures, each with its
+API): the same problems as cand-final.1 for every spec; only the wording of two existing messages gained
+the all-at-once hint. No saved spec gets a new repair round.
+
+**Render scope vs cand-final.1** (same 3 required specs + p1-p3b): A, A+B, raw-A: prompts, tools and
+hooks byte-identical; only the 3 code nodes (shared facts module) differ, with identical output over
+8000 states per spec (re-run at 57e6e66: A, A+B, raw-A all EQUAL). p1: verify_identity post_process_code (hint fix)
++ code nodes. p2: code nodes only (saved spec has no too_much). p3/p3b: identity step + code nodes.
+
+**Fresh `--dry` extractions at d54a850** (builder LLM only): A, p1, p3b, variant-c all pass spec check
+in round 1. A: too_much attempt_1, this_weekday current_week (unchanged behaviour). p1: this_weekday
+next_occurrence (correct). p3b: all-at-once (correct). variant-c: per-answer question/value (correct).
+
+**Measurement request (sim chat): measure cand-eng.3, not cand-eng.2.** Same as above: for A and A+B
+the deployed prompts are identical to cand-final.1 and FACTS output is identical, so 1 fresh build of A
+(and A+B if a slot is free) plus the validation set at 1 rep is a regression check only. Items 1, 2, 4
+and the floor fix are only observable on perturbed briefs (no case files): no simulation is needed for
+them. No trace line the RUNBOOK greps for changed (the END line is unchanged; it now follows a flushed
+stdout).
