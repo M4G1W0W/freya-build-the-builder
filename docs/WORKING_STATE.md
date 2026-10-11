@@ -6,7 +6,54 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 **Snapshot:** 2026-10-11 17:20 Istanbul (14:20 UTC Sun). Last commit: see `git log`. Hidden briefs open **17:00 UTC**
 (20:00 Istanbul, about 2 h 40 min from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
-ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
+ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, **`freeze-final` b9756fe** (= main 8e251fe's builder code).
+
+## SIMULATION CHAT HANDOFF (16:20 UTC; READ FIRST after a context clear; then the 16:08 block below)
+
+**State: nothing running.** Plan driver stopped (`PLANSTOP` in this session's scratchpad), queue paused (`sim/STOP`), no
+simulation, no `wrangler dev`. Ledger `runs/dev/r4/calls.tsv` cum **524** / cap 789; credits ~374.5 USD.
+
+**Decided (user):** D6 = eng.9 (15:51). `freeze-final` = b9756fe (cand-eng.9 + main), merged into `main` = 8e251fe
+(16:06; builder code identical). eng.9g goodbye fix failed its rule (HU-PRE regression), not adopted; offers fix (o2)
+and eng.4g untested. Results: `docs/reviews/2026-10-11-final-comparison-results.md`; plan + amendments:
+`docs/plans/2026-10-11-final-comparison-plan.md`.
+
+**Final format changed (16:00, see the 16:08 block):** one Turkish case folder, `python3 builder/build.py {case_folder}
+{mock_url}`, our own Cloudflare mock, `submission.json`. **User split (16:13):**
+1. **Methodology** (engine chat): generic builder changes BEFORE 17:00 on top of b9756fe as a NEW tag (asked by ~16:50):
+   folder input (.md/.txt, .docx/.xlsx stdlib, .pdf best-effort, warn never crash), tools from the folder's service
+   contract with base URL = mock_url, agent language from the brief (no hard-coded English lines/dates), old CLI kept.
+   Not yet reported back. Tags are never moved: a new freeze needs the user's call (new tag name or moving
+   `freeze-final`), then re-merge into `main`.
+2. **This chat**: mock bank template `mock/` (0a8d2ad, 6fc3e51; NOT builder code): `src/bank.js` (pure logic, adapt
+   `HANDLERS` after 17:00), `src/worker.js` (Worker + Durable Object per customer; admin `GET /v1/ledger/<id>`,
+   `POST /v1/reset/<id>` with `x-admin-token`; **practice** `POST /v1/practice/sessions` + `GET /v1/practice/ledger/<id>`
+   with `x-team-key`, kit-scorer ledger format so `kit/tools/run_cases.py` runs against it with
+   `FREYA_BANK_HOST=<mock origin>` + `FREYA_BANK_TEAM_KEY=<TEAM_KEY>`), `data/customers.json` (EXAMPLE public practice
+   customers), `test/bank.test.mjs` (`npm test`, 6 pass), `README.md` (post-17:00 steps). Tested on `wrangler dev
+   --local` (local secrets in gitignored `mock/.dev.vars`).
+3. **User**: Cloudflare. `npx --yes wrangler@4.149.0 login` DONE (16:19). **Deploy blocked: the account has no
+   workers.dev subdomain** ("mock" taken). User registers one at
+   https://dash.cloudflare.com/708643963b93e91d297ce3b21aafd8d7/workers/onboarding.
+
+**Next for this chat (in order):**
+1. After the subdomain exists: generate two random secrets into `.env` (`MOCK_ADMIN_TOKEN`, `MOCK_TEAM_KEY`; never
+   print them), `cd mock && CI=1 npx --yes wrangler@4.149.0 deploy`, then `wrangler secret put ADMIN_TOKEN` / `TEAM_KEY`
+   (value via stdin from .env), smoke-test `GET /` and one practice session; write `MOCK_URL=https://freya-mock-bank.<sub>.workers.dev/v1` to `.env`.
+2. When Methodology's tag lands: verify it (tests, diff limited to the input layer/language), rehearse the new command on
+   a practice folder (kit brief-a.md + a contract) against the deployed mock with a 3.10+ Python
+   (`~/.local/share/uv/python/cpython-3.12*/bin/python3`; system python3 is 3.9.6), and bring the freeze decision to the user.
+3. From 17:00 (zip via the Submit tab / e-mail, user downloads): adapt `mock/src/bank.js` + `data/customers.json` from
+   the service contract and test customers, `npm test`, redeploy; build ONE run with the new command, keep its trace;
+   test with run_cases against our mock (cases from the 6 example conversations); `submission.json` before 20:00 UTC.
+   Open user decisions: D8 (organisers' model key), **D9 remote/push (repo URL needed)**, and whether the filled
+   `mock/` (final-case content, not builder) is committed in the submitted repo (Dashboard Creator flagged it).
+
+**Peers:** Methodology Developer (engine; generic builder tag pending; its checker `scripts/transcript_check.py`),
+Dashboard Creator (gap analysis `docs/reviews/2026-10-11-final-format-gap.md`, cd40069), Service Check (idle).
+**Scratchpad (may vanish):** `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/6099f72d-6345-4df7-a171-465da9b25d18/scratchpad/`
+(plan_run.sh, run_one.sh, suite_once.py, probe_strict.sh, worktrees wt-eng4/9/4g/9g/4o2/9o2, wt-final-eng4/9/9g);
+copies of the harness in `runs/dev/r4/harness/`. Final-comparison call records: `runs/dev/r4/final.calls/`.
 
 ## UPDATE 16:08 UTC: THE FINAL FORMAT CHANGED (official page). READ THIS BEFORE ANY 17:00 STEP.
 
