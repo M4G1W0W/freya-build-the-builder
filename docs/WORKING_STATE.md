@@ -8,6 +8,23 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3; no longer main's builder code), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, **`freeze-final` b9756fe** (= main 8e251fe's builder code).
 
+## UPDATE 16:28 UTC: MOCK DEPLOYED (simulation chat)
+
+- The user registered the workers.dev subdomain `atlasreyiz` and opened the worker `teampistalogic` (it served the
+  onboarding "Hello World!"). `mock/wrangler.toml` name -> `teampistalogic`; deployed (version 92b9273c) at
+  **https://teampistalogic.atlasreyiz.workers.dev**; secrets `ADMIN_TOKEN` / `TEAM_KEY` set from `.env`
+  (`MOCK_ADMIN_TOKEN`, `MOCK_TEAM_KEY`, random, never printed). **`MOCK_URL=https://teampistalogic.atlasreyiz.workers.dev/v1`
+  in `.env`.**
+- Live smoke (live run, deployed version): health 200; admin/practice endpoints 403 without the token/key; unknown
+  customer 404; get_account before verify 403 "identity not verified"; wrong DOB counted (wrong_answers_left 2);
+  DOB + phone -> all_verified; get_account, create_promise ok; 2nd promise on p1 409; close_call ok. The kit scorer
+  (`kit/tools/score.py` http + score_ledger, `FREYA_BANK_HOST`=mock origin, `FREYA_BANK_TEAM_KEY`=MOCK_TEAM_KEY) passes
+  the good session and fails the bad one for the right reasons. Scripts: this session's scratchpad `smoke_mock*.sh`.
+- `run_cases.py` posts `{"case": <case id>}`: our post-17:00 case ids must equal `customer_id`s in `data/customers.json`.
+- Still the practice-kit tool semantics: after 17:00, adapt `src/bank.js` + `data/customers.json` to the zip's
+  service contract and redeploy (`cd mock && CI=1 npx --yes wrangler@4.149.0 deploy`; secrets persist).
+- `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28).
+
 ## SIMULATION CHAT HANDOFF (16:20 UTC; READ FIRST after a context clear; then the 16:08 block below)
 
 **State: nothing running.** Plan driver stopped (`PLANSTOP` in this session's scratchpad), queue paused (`sim/STOP`), no

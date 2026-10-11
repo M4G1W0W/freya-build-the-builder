@@ -24,5 +24,5 @@ from the final zip's **service contract** and **test customers**, deployed, and 
 2. Convert the test customers (Excel/Markdown) into `data/customers.json` (`customer_id`, `identity`, `products`, with
    the contract's field names). Adjust `config` (wrong-answer limit) to the contract.
 3. `npm test` (update the tests to the contract), then `npx wrangler login` (user), `npx wrangler secret put ADMIN_TOKEN` and `TEAM_KEY`,
-   `npx wrangler deploy`. The printed `https://freya-mock-bank.<subdomain>.workers.dev` + base path is `mock_url`.
+   `npx wrangler deploy`. The printed `https://teampistalogic.atlasreyiz.workers.dev` + base path is `mock_url` (deployed 16:25 UTC 11 Oct; `MOCK_URL` in `.env`). `run_cases.py` opens sessions with `{"case": <case id>}`, so a case id must equal a `customer_id` here.
 4. Smoke-test with `curl` (health, one verify, one get_account), then run the builder with `{case_folder} {mock_url}`.

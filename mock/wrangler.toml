@@ -1,6 +1,6 @@
 # Our mock bank for the final (template). Deploy: `npx wrangler deploy` from mock/ after `npx wrangler login`.
 # Set the admin token once: `npx wrangler secret put ADMIN_TOKEN` (used only for /v1/ledger and /v1/reset).
-name = "freya-mock-bank"
+name = "teampistalogic"
 main = "src/worker.js"
 compatibility_date = "2026-10-01"
 
