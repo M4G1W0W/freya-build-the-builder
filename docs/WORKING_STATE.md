@@ -3,9 +3,68 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 14:25 Istanbul (11:25 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
-17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
-`cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
+**Snapshot:** 2026-10-11 15:57 Istanbul (12:57 UTC Sun). Last commit: see `git log`. Hidden briefs open **17:00 UTC**
+(20:00 Istanbul, about 4 h from now); submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
+`cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
+ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
+
+## SIMULATION CHAT HANDOFF (11 Oct 12:57 UTC; READ THIS FIRST after a context clear; supersedes the sections below)
+
+**Roles.** This chat (Simulation Developer) owns ALL deployments and simulations. Methodology Developer (engine chat)
+fixes the builder on its own branches/tags (log `docs/plans/2026-10-11-engine-fixes-log.md`, READ FIRST at its top;
+its handoff `docs/plans/2026-10-11-engine-fixes-handoff.md`). **Service Check** (peer session, read-only GETs) watches
+platform health and our simulations; coordinate via SendMessage instead of polling in parallel.
+
+**State now: NOTHING running. Queue PAUSED by the user (12:45: no simulations, no latency probes until the user says
+so).** `sim/STOP` is set. The last simulations (6d0c9464 M5r2 restart, 94c9e350 smoke 1, 188b9156 smoke 2) are all
+completed. Ledger `runs/dev/r4/calls.tsv` cum **312** (runner CAP 500); credits **391.06 USD** (12:29).
+
+**Binding user rules (all still in force):**
+1. No automatic freeze, no automatic selection of an unmeasured candidate, no switching candidates, no deploying
+   eng.6/.7 (or .8), no adopting a new tag without the user's approval. Bring evidence + fallback options first.
+2. eng.4 stays the comparison candidate. The existing E4 queue is preserved (sim/queue.txt: E4-A-styledA,
+   E4-AB-all, E4-AB-xb, E4-VE) and runs only when the user resumes it.
+3. Resume conditions (12:09) once the user allows: one bounded smoke with a complete judged result; no stuck
+   simulation still making calls; extra usage reconciled. A judged agent failure is diagnostic (inspect it first).
+   Missing results or continuing platform errors keep the queue paused.
+4. The 15:30 UTC freeze is an internal target; the user makes the final selection.
+
+**Deliverable waiting for the user: `docs/reviews/2026-10-11-final-selection-evidence.md`** (commit 597c2e8): every
+candidate's measured/unmeasured status, what transfers, risks, readiness, fallbacks by platform scenario (S1/S2/S3),
+the eng.6/.7/.8 matched-comparison proposal (§10: T1 A 66 calls, T2 raw-A 60, T3 A+B 96, T4 optional; only T1 fits
+under the cap after the E4 queue), and **decisions D1-D11 (§8) that are the user's**; default for all: nothing runs,
+nothing is selected or tagged. Key facts: G1 is the only fully measured build (A saved 10/10, fresh raw-A 8/10,
+fresh A+B 7/13, extra-B 1/3); `cand-retry.4` = G1 + platform retries with renders byte-identical to the measured G1
+agent; final.1/eng.4/eng.5/eng.6-8 have NO valid measured rep; Fix 1 (eng.6/.7) has a CONFIRMED PUB-05 closing-row
+defect in 6/16 fresh builds; main's builder code is F3 (any candidate must be merged with main's docs first;
+merge-tree clean; a trial main->eng.4 merge passed 872 tests).
+
+**Deployed eng.4 slots (export MATCH, do not rebuild):** exp-eng4-a wf 66db0b41 / agent f166447e (spec-a-llm),
+exp-eng4-ab wf 0a819c5b / agent 0988e6f1 (spec-ab-llm-c45758f), exp-eng4-ve wf 56124310 / agent 7818e5e2 (fresh
+variant-e). Worktree `<old scratchpad>/wt-eng4` (detached cfa4d9d). 35 of 200 workflow slots (+ up to 2 strays).
+
+**eng.4 live evidence so far:** smoke 1 (94c9e350, PUB-01): call 6af560aa judged pass on the call record, ledger
+right, 14-37 s turns, DOB asked 3x; platform retry call af507b83 judged pass with normal latency; the run itself ended
+error ('No call created' on attempt 4). Smoke 2 (188b9156, maxRetries 0): run-level judged FAIL, customer hung up after
+a 54 s model turn; logic correct (latency).
+
+**Tooling changes today (main):** `scripts/run_cases_retry.py` verdict fallback (4631971, aa7726a, 7bfcf41): a run with
+no judge verdict ('analyzing', or error/inconclusive 'analysis never arrived') takes `successCriteriaResult` from its
+call record (one unretried read), prints `VERDICT FROM CALL RECORD`, rows carry `verdict_source` and `attempts`;
+801 tests. Platform facts in `docs/freya_api_notes.md` §simulations: pause does not stop platform retries (maxAttempts
+4); `maxRetries: 0` = one attempt; verdicts live on the call record (50/50 agree with runs); completed simulations get
+re-judged later (outcomes provisional).
+
+**Paths.** `<old scratchpad>` = `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad`
+(sim/qrun4.sh, queue.txt, queue-parked-1135.txt, slots.tsv, qrun.out, STOP; worktrees wt-final, wt-eng4). Bounded
+smoke wrapper (scratch, may vanish): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/54d12450-d446-4d3a-862a-6541a5ece9bd/scratchpad/smoke_once.py`
+(= run_cases_retry wiring without the rep repeat, POST maxRetries 0). Smoke cases: `runs/dev/r4/smoke-pub01.json`.
+Start the queue (only on the user's go): `rm <old>/sim/STOP; bash <old>/sim/qrun4.sh >> <old>/sim/qrun.out 2>&1`
+in the background + a monitor on qrun.out.
+
+**Next (all need the user):** answer D1-D11 in the dossier; most useful now: D4 (prepare untagged merged commits
+main->eng.4 and/or main->retry.4, about 10 min each, no deployment), D6 (final selection + freeze-final, before
+17:00 UTC).
 
 ## UPDATE 11:44 UTC: QUEUE PAUSED (platform 500/504), nothing running, no orphan simulation
 
@@ -96,7 +155,7 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   answer: latency, not agent logic (kit: 'the phone agent was slow'). Latency flaps: 14-37 s (12:01), 0-1.5 s
   (12:10), 14-54 s (12:37). **Queue stays PAUSED** (a rep now would measure hang-ups). Ledger +1: cum **312**.
 - **12:45 UTC USER: keep the queue paused for now.** No latency probes or other simulations until the user says so.
-- **13:05 UTC: FINAL-SELECTION EVIDENCE DOSSIER ready for the user: `docs/reviews/2026-10-11-final-selection-evidence.md`**
+- **12:55 UTC: FINAL-SELECTION EVIDENCE DOSSIER ready for the user: `docs/reviews/2026-10-11-final-selection-evidence.md`**
   (9-agent read-only workflow, every claim checked against sources; §10 eng.6/.7/.8 addendum, adversarially checked
   and corrected: Fix 1 PUB-05 closing-row defect, cand-eng.8 4267bb0 unmeasured, matched-comparison tiers T1-T4, cap
   arithmetic after the E4 queue). Decisions D1-D11 in §8 belong to the user; defaults: nothing runs, nothing is
@@ -133,7 +192,7 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   Old component A/Bs parked in `sim/queue-parked-1135.txt` (not to run). Runner qrun4.sh started 11:36 UTC
   (STOP removed); results `runs/dev/r4/E4-*.{log,json,meta.json}`.
 
-## SIMULATION CHAT HANDOFF (11 Oct 11:25 UTC; read this first after a context clear)
+## SIMULATION CHAT HANDOFF (11 Oct 11:25 UTC; HISTORICAL, superseded by the 12:57 handoff above)
 
 **Roles.** This chat owns ALL deployments and simulations. The Methodology Developer (engine) chat fixes the
 builder on its own branches and hands over tags; its log is `docs/plans/2026-10-11-engine-fixes-log.md`
