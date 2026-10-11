@@ -9,6 +9,10 @@ from the final zip's **service contract** and **test customers**, deployed, and 
   state when a customer calls again after `idleResetSeconds` (each simulated call starts clean).
 - `src/worker.js` — routes `POST /v1/<tool>` (JSON body with `customer_id`) to that customer's Durable Object; admin-only
   `GET /v1/ledger/<id>` and `POST /v1/reset/<id>` (header `x-admin-token`); `GET /` health.
+- `POST /v1/practice/sessions` and `GET /v1/practice/ledger/<id>` (header `x-team-key` = `TEAM_KEY` secret): a fresh
+  per-call copy of a test customer and the kit scorer's ledger format, so `kit/tools/run_cases.py` runs against this
+  mock with `FREYA_BANK_HOST=<mock origin>` and `FREYA_BANK_TEAM_KEY=<TEAM_KEY>` (our own cases from the 6 example
+  conversations). Tested locally with `npx wrangler dev --local` (secrets in the gitignored `.dev.vars`).
 - `data/customers.json` — EXAMPLE customers from the public practice set; replace with the final's test customers.
 - `test/bank.test.mjs` — `npm test` (Node 18+; no dependencies).
 
@@ -19,6 +23,6 @@ from the final zip's **service contract** and **test customers**, deployed, and 
    uses another base path) so requests and responses match it exactly.
 2. Convert the test customers (Excel/Markdown) into `data/customers.json` (`customer_id`, `identity`, `products`, with
    the contract's field names). Adjust `config` (wrong-answer limit) to the contract.
-3. `npm test` (update the tests to the contract), then `npx wrangler login` (user), `npx wrangler secret put ADMIN_TOKEN`,
+3. `npm test` (update the tests to the contract), then `npx wrangler login` (user), `npx wrangler secret put ADMIN_TOKEN` and `TEAM_KEY`,
    `npx wrangler deploy`. The printed `https://freya-mock-bank.<subdomain>.workers.dev` + base path is `mock_url`.
 4. Smoke-test with `curl` (health, one verify, one get_account), then run the builder with `{case_folder} {mock_url}`.

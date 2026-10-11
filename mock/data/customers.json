@@ -21,7 +21,13 @@
      "days_late": 6,
      "minimum_payment": 126.0
     }
-   ]
+   ],
+   "variables": {
+    "first_name": "Daniel",
+    "last_name": "Reyes",
+    "title": "Mr",
+    "now": "2026-10-14T11:00"
+   }
   },
   {
    "customer_id": "c_example_11",
@@ -53,7 +59,13 @@
      "days_late": 3,
      "instalment_amount": 25.0
     }
-   ]
+   ],
+   "variables": {
+    "first_name": "Sofia",
+    "last_name": "Almeida",
+    "title": "Ms",
+    "now": "2026-10-14T11:00"
+   }
   }
  ]
 }
