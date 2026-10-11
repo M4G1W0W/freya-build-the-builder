@@ -10,7 +10,14 @@ import re
 
 from . import codegen, hooks, nodes
 from .codegen import OK_FIELD
-from .spec import PLACEHOLDER, call_var, customer_field
+from .spec import (
+    PLACEHOLDER,
+    call_var,
+    customer_field,
+    early_lines,
+    identity_all_at_once,
+    too_much_separate,
+)
 from .toolapi import Tool, engine_call, model_tool
 
 STAGES = ("opening", "third_party", "identity", "negotiate")
@@ -65,6 +72,36 @@ def _note_rows(spec: dict, note_reasons: tuple[str, ...]) -> dict[str, str]:
 
 def exit_tool_name(row_id: str) -> str:
     return f"transition_to_ev_{row_id}"
+
+
+def _split_early_lines(spec: dict) -> dict:
+    """Moves early_lines out of the endings' "First say" lists into each step's rules, said once.
+
+    A spec without them is returned unchanged, so its render is byte-identical.
+    """
+    early = early_lines(spec)
+    if not early:
+        return spec
+    rules = dict(spec["stage_rules"])
+    for stage in STAGES:
+        groups: dict[tuple[str, ...], list[str]] = {}
+        for r in _rows_for(spec, stage):
+            if r["id"] in early:
+                groups.setdefault(tuple(early[r["id"]]), []).append(exit_tool_name(r["id"]))
+        if groups:
+            rules[stage] += (
+                "\nSAID BEFORE THE CUSTOMER ANSWERS: say these once, when the situation comes up, "
+                "and never again in the goodbye:\n"
+                + "\n".join(
+                    f"- {' '.join(_quote(s) for s in says)} (before {' or '.join(exits)})"
+                    for says, exits in groups.items()
+                )
+            )
+    rows = [
+        dict(r, say_before_end=[s for s in r["say_before_end"] if s not in early.get(r["id"], [])])
+        for r in spec["rows"]
+    ]
+    return dict(spec, rows=rows, stage_rules=rules)
 
 
 def _endings_text(spec: dict, stage: str) -> str:
@@ -196,7 +233,7 @@ HOW TO WORK
 - Call at most one tool per message.
 - If a tool result is an error saying the result could not be read or parsed, call the same tool once more with the same values.
 - Never compute dates or amounts yourself. Use the FACTS and the DATE TABLE given in your current task.
-- If you are asked something the brief and the facts do not answer, say that you do not have that information.
+- If the customer asks a question or asks for information that the brief and the facts do not answer, say that you do not have that information. Never say it to a remark that asks for nothing.
 - These bank actions run automatically and are not yours to call: {", ".join(engine_tools)}.
 - To end the call, use only the ENDINGS listed in your current task.
 
@@ -244,17 +281,160 @@ def _field_desc(by: dict, tool: str, field: str) -> str:
     return f.description.strip() if f and f.description else ""
 
 
-def _identity_task(spec: dict) -> str:
+def _complete_when(fmt: str) -> tuple[str, str, str]:
+    """(kind, C, W) for a security answer format, parsed the way the hooks.py normaliser reads it:
+    C ends "complete when it has ...", W fills the short ask "Just W, please.". Any format the
+    normaliser does not treat as a date, a year or N digits is text."""
+    f = str(fmt).strip().lower()
+    if f == "date":
+        return "date", "a day, a month and a full year", "the day, the month and the year"
+    if f == "year":
+        return "year", "a full year", "the year, all four digits"
+    if f.startswith("digits"):
+        try:
+            n = int(f.split(":")[1])
+        except (IndexError, ValueError):
+            n = 0
+        if n > 0:
+            return "digits", f"{n} digits (or all of it, if it has letters)", f"the {n} digits"
+    return "text", "all of it", "the whole answer"
+
+
+def _per_answer(spec: dict, t: Tool) -> bool:
+    """verify_identity takes one answer per call (question and answer fields), the branch
+    verify_pre takes at runtime; otherwise it takes every answer at once, one field per key
+    (also when the spec names two answer fields as question and answer field: P3)."""
+    if identity_all_at_once(spec, t):
+        return False
+    return t.field(spec["identity"]["answer_field"]) is not None
+
+
+def _identity_task(spec: dict, t: Tool) -> str:
     i = spec["identity"]
-    questions = "\n".join(
-        f"{n}. {q['ask']} (send {i['question_field']}={q['key']}; answer format: {q['format']})"
-        for n, q in enumerate(i["questions"], 1)
+    qf, af = i["question_field"], i["answer_field"]
+    per_answer = _per_answer(spec, t)
+    kinds: set[str] = set()
+    questions = []
+    for n, q in enumerate(i["questions"], 1):
+        kind, complete_when, short = _complete_when(q["format"])
+        kinds.add(kind)
+        where = f"send {qf}={q['key']}" if per_answer else f"field {q['key']}"
+        questions.append(
+            f"{n}. {q['ask']} ({where}; answer format: {q['format']}; complete when it has "
+            f'{complete_when}; short ask: "Just {short}, please.")'
+        )
+    if per_answer:
+        call = (
+            "Whenever the customer's message holds a complete answer to the question you asked (even "
+            "if the same message also asks something, complains or breaks off), CALL verify_identity "
+            "with that answer FIRST, then reply. CALL verify_identity once per complete answer, with "
+            f"{qf} set to the question key and {af} set to the answer in the format above."
+        )
+        since = "since the last verify_identity result"
+        at_once = ": CALL verify_identity with it at once, before you reply to the rest"
+    else:
+        call = (
+            "Ask the questions one at a time and keep each complete answer. Once every question has "
+            "a complete answer, CALL verify_identity once with all of them, each in its own field in "
+            "the format above, FIRST, then reply. If a result asks for an answer again, ask for it, "
+            "then CALL verify_identity again with every answer, the new one in place of the old (an "
+            "answer the customer gives again after a result, even the same value, is a new answer)."
+        )
+        since = "since you asked that question"
+        at_once = ""
+    blocks = [
+        call,
+        f"COMPLETE: join the parts the customer gave {since}; if they correct a part, use the "
+        "corrected part; after a result that asks for one part again (for example the month as a "
+        "word), rebuild the answer from the part they now give and their earlier words, read the way "
+        "that result says (if it says two parts were swapped, the number you sent for the part they "
+        "now give belongs in the other part). An answer is "
+        'complete when it passes its "complete when" test above, whatever follows it in the '
+        "message (a full stop, a complaint, a question, or words that break off)"
+        f'{at_once}. Only if "sorry", "I mean", "no", "wait" or "actually" follow it before any '
+        "full stop, use the value they go on to give; while that value is cut off, it is a part."
+        + (
+            " For a date, a year or digits, these tests decide what is complete, not the word "
+            "list in HOW TO WORK."
+            if kinds & {"date", "year", "digits"}
+            else ""
+        ),
+    ]
+    if kinds & {"date", "year"}:
+        blocks.append(
+            "A full year has four digits: in figures, said one digit at a time, or in words that "
+            'include the century ("nineteen seventy-six", "two thousand and four"). Join the parts '
+            'first: a year that still has only its last two digits ("seventy-six.", "\'76", with '
+            "no century said before them) is never a full year: do not send such an answer; ask at "
+            'once "Just the year, all four digits, please." (that ask is not counted under CUT-OFF '
+            "and does not restart it; a year in figures that breaks off before its fourth digit, "
+            'such as "19" or "199" at the end of a message, is a part under CUT-OFF; if the BANK '
+            "BRIEF says more about it, follow that). A year in words is complete when a full "
+            "stop or other words follow it, or when it ends on a number word from one to nineteen "
+            'after its century ("nineteen seventy-six", "twenty fifteen"); at the very end of a '
+            'message, a year in words that ends on its century, on a tens word ("ninety") or on '
+            '"thousand" or "and" may still go on.'
+        )
+    if "text" in kinds:
+        blocks.append(
+            "An answer in letters or words (a code, a name) is complete when the customer has said "
+            "all of it: the message may end right after it, unless it ends on half a word or on "
+            '"and", "the" or "of". A first part of a code, or words saying more follows, is a part.'
+        )
+    blocks.append(
+        "CUT-OFF: count only the customer's messages that break off or hold only part of an "
+        "answer, since you last asked this security question or got a verify_identity result; "
+        'your "Please go on." and the cut-off line do not restart the count. A whole message that '
+        "is a question back, a refusal or a complaint is not counted: the rules below decide it. "
+        'After the 1st counted message reply "Please go on."; after the 2nd, the cut-off line '
+        "from HOW TO WORK; after the 3rd, say only that question's short ask (not the question "
+        "itself), which restarts the count. In this step this count replaces the HOW TO WORK "
+        'rules for "Please go on." and against repeating a question; never ask the whole question '
+        "again for a part."
     )
+    if per_answer:
+        blocks.append(
+            "If the customer says they already answered, look at their messages since the last "
+            "verify_identity result: if they hold a complete answer you did not send, CALL "
+            "verify_identity with it now. Never send again an answer from messages you already "
+            "sent it from, unless a verify_identity result tells you to send it again; an answer the "
+            "customer gives again after its result, even the same value, is a new answer: send it."
+        )
+    declining = (
+        "DECLINING: what counts as declining the security questions, and how often it ends the "
+        "call, is only what the BANK BRIEF and the ENDING for declining say; a question that "
+        'refuses ("why should I?") is declining.'
+    )
+    if i["decline_explain"].strip():
+        x = _quote(i["decline_explain"])
+        declining += (
+            f" When the customer declines and no ENDING applies yet, explain once: {x} (an earlier "
+            "answer to why you need it is not this explanation). Do not repeat the security "
+            "question in that message; they answer next. A question that only asks why you need "
+            f"the answer is not declining unless the BANK BRIEF says so: say {x} without repeating "
+            "the security question, and wait for their answer. Any other question back that the "
+            "BANK BRIEF does not count as declining (for example whether you are a robot, or "
+            "whether this is a scam) is not declining: answer it in one short sentence as the "
+            "brief says for that question, without repeating the security question, and wait for "
+            "their answer."
+        )
+    else:
+        declining += (
+            " When the customer declines, do what the BANK BRIEF says for it. A question back that "
+            "the BANK BRIEF does not count as declining (for example why you need the answer, "
+            "whether you are a robot, or whether this is a scam) is not declining: answer it in "
+            "one short sentence as the brief says for that question, without repeating the "
+            "security question, and wait for their answer."
+        )
+    declining += (
+        " Such questions never end the call unless another ENDING's trigger names them. A "
+        'complaint, "I already told you" or a cut-off message is never declining.'
+    )
+    body = "\n".join(questions + blocks)
     return f"""STEP: verify the customer's identity. Ask the security questions one at a time, in this order:
-{questions}
-Whenever the customer's message contains an answer to the question you asked (even if the same message also asks something or complains), CALL verify_identity with that answer FIRST, then reply. CALL verify_identity once per complete answer, with {i["question_field"]} set to the question key and {i["answer_field"]} set to the answer in the format above. An answer may come in parts over several messages (a date, then its year; two digits, then two more): join the parts the customer gave since the last verify_identity result and CALL verify_identity as soon as together they make a complete answer; if they correct a part, use the corrected part. While a part is missing, reply "Please go on." (but if your previous reply was already "Please go on.", use the cut-off line from HOW TO WORK); never ask the whole question again for it.
+{body}
 Obey what_to_do_next in every verify_identity result.
-If the customer asks a question back (why you need it, what the call is about) or does not want to answer, explain once: {_quote(i["decline_explain"])} Do not repeat the security question in that message; they answer next.
+{declining}
 Never mention the debt, the product, an amount or why you are calling in this step.
 {spec["stage_rules"]["identity"]}
 {_endings_text(spec, "identity")}"""
@@ -278,18 +458,25 @@ def _negotiate_task(spec: dict, k: int, notes: bool) -> str:
     attempts_line = (
         "ATTEMPTS: persuasion attempts are counted per product, and FACTS lists each product's "
         "attempts in order. Unless a brief rule says to make no persuasion attempt, each time the "
-        "customer refuses or does not answer for a product (not answering is a complete reply with no "
-        'yes, no, date or amount, such as "I don\'t know"; a cut-off message that holds no yes, no, date '
-        "or amount is no reply, and a first "
-        'reply to an offer that is only small talk gets "Please go on." and uses no attempt), make '
+        "customer refuses or does not answer for a product (not answering is a complete reply to "
+        'your question or offer with no yes, no, date or amount, such as "I don\'t know", "maybe" '
+        'or "we\'ll see"; a cut-off message that holds no yes, no, date or amount is no reply, and '
+        "neither is small talk (see WAITING): such a no-reply message uses no attempt), make "
         "that product's NEXT listed attempt, "
         "with exactly its amount and date: never skip one, never add one. After a product's last "
         "listed attempt is refused, make no other offer of your own for it (not even the floor). After "
         "the opening question, never ask again whether the customer can pay today (for any product, "
         'never "can you pay <this product> today?"): every offer of your '
-        "own uses exactly the date listed for that attempt (a floor offer after the customer said the "
-        "full amount is too much is attempt 1 with the floor amount, on attempt 1's date). An amount "
-        "or a date the customer proposes is not a refusal: handle it with the brief and FACTS.\n"
+        "own uses exactly the date listed for that attempt ("
+        + (
+            "the floor offer after the customer says the full amount is too much is not one of "
+            "these attempts: make it as FACTS says, on its own date"
+            if too_much_separate(spec)
+            else "a floor offer after the customer said the full amount is too much is attempt 1 "
+            "with the floor amount, on attempt 1's date"
+        )
+        + "). An amount or a date the customer proposes is not a refusal: handle it with the brief "
+        "and FACTS.\n"
         if spec["attempts"]
         else ""
     )
@@ -302,6 +489,7 @@ DATE TABLE:
 
 Follow the brief from the first ask to the confirmation and recording.
 PARTS: A date or an amount may come in parts over several messages ("the", then "fifth"; "four hundred", then "and twenty"): join the parts the customer gave since your last question and use the joined value; while a part is clearly missing, reply "Please go on." (but if your previous reply was already "Please go on.", use the cut-off line from HOW TO WORK).
+WAITING: after your question or offer, until the customer answers it, a message with no reply to it is not an answer, a refusal or a non-answer: small talk or a remark about something else (it says nothing about paying, money, the debt, your offer or this call, and describes no situation a brief rule names; a date or an amount in it that the customer does not give for paying, such as the day of a party or a trip, is part of the remark, not a date they named), or a cut-off message without a reply. However many such messages come in a row, reply only "I see. Please go on." (to a cut-off one, use the cut-off rule in HOW TO WORK): never repeat the offer, its amount or its date, never ask again whether they can pay, and add no sympathy. If the customer asks what you offered, say what you offered as a statement (the same amount, date and required sentences) without asking again. If the customer asks any other question (not about a date or an amount for paying), answer it as the brief says and stop there: do not repeat your question or offer (a new offer that a brief rule calls for is not a repeat). A yes, a no, a date or an amount given for paying, "too much", a reply to your question or offer with none of these (such as "I don't know", "maybe" or "we'll see"), a question about a date or an amount for paying, a request or a situation is handled with the brief and FACTS as usual. If the BANK BRIEF itself says how to treat small talk or a change of subject, follow the brief for those messages instead of this paragraph.
 DATES: when the customer names a date, first turn it into a calendar date with the DATE TABLE (for example "this Friday" or "next Monday"), then find that date in each product's "IF THE CUSTOMER NAMES A DATE" lines in FACTS and do exactly what they say (they already apply the brief's date rules). Compare dates, never weekday names: a deadline that falls on the same weekday is a different date. This year's calendar differs from other years: never pair a weekday with a date from memory; take both from the DATE TABLE or FACTS and say them as written there. If the customer first named a period (like "next week" or "the week after next") and then gives only a weekday or a day number, that day lies INSIDE that period, not in a later week. When you answer a date the customer named, start your reply with that date as written in FACTS (for example "<weekday> <day> <month> <year> is ..."), then say what its line in FACTS says. Never offer the latest date unless those lines say so.
 {attempts_line}Use an ending the brief ties to a situation (a transfer, the support team or another option, see ENDINGS) only after the customer has described that situation. Then do what its rule says: when the rule says to transfer or close, do it at once without asking whether they want it; ask first only when the rule itself says to offer it or to ask. If a brief rule says another situation the customer also described comes first, follow that rule first.
 RECORDING: after the read-back and a clear yes, call the create_promise tool of each agreed product ({slots}); its product id is filled in automatically, you give the amount and the date as YYYY-MM-DD. One tool per message. In the read-back say what you WILL record; never say "I have recorded" before the create_promise result says so.
@@ -315,17 +503,29 @@ RECORDING: after the read-back and a clear yes, call the create_promise tool of 
 
 def _verify_tool(spec: dict, t: Tool) -> dict:
     i = spec["identity"]
-    tool = model_tool(
-        t,
-        "Check one security answer. CALL it every time the customer gives a complete answer to a security question.",
-        _bake_customer(spec, t),
-        {
+    if _per_answer(spec, t):
+        desc = "Check one security answer. CALL it every time the customer gives a complete answer to a security question."
+        fields = {
             i["question_field"]: "Which security question was answered.",
             i["answer_field"]: "The customer's answer, in the format the current step asks for.",
-        },
-        post_process_code=hooks.verify_post(spec, i["failed_row"]),
+        }
+    else:
+        desc = "Check the security answers. CALL it once the customer has given a complete answer to every security question, each in its own field."
+        fields = {
+            q[
+                "key"
+            ]: f"The customer's answer to security question {n}, in the format the step asks for."
+            for n, q in enumerate(i["questions"], 1)
+        }
+    return model_tool(
+        t,
+        desc,
+        _bake_customer(spec, t),
+        fields,
+        post_process_code=hooks.verify_post(
+            spec, i["failed_row"], all_at_once=not _per_answer(spec, t)
+        ),
     )
-    return tool
 
 
 def _callback_tool(spec: dict, t: Tool) -> dict:
@@ -363,7 +563,7 @@ def opening_line(spec: dict) -> str:
 
 
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
-    spec = dict(spec, _customer_field=customer_field(spec, tools))
+    spec = dict(_split_early_lines(spec), _customer_field=customer_field(spec, tools))
     by = _tools_by_name(tools)
     k = codegen._slots(spec)
     notes = bool(spec["notes"]["used"]) and "add_note" in by
@@ -435,7 +635,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     gate = spec["identity"]["gate_field"]
     wf_nodes["identity"] = nodes.conversation(
         "identity",
-        _identity_task(spec),
+        _identity_task(spec, by["verify_identity"]),
         [
             nodes.when_true(
                 "load_account",

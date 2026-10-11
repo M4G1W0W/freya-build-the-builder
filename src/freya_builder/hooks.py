@@ -504,21 +504,58 @@ elif _good:
     else:
         _msg = $GENERIC_NEXT
 else:
-    _msg = 'Wrong answer; do not say it was correct.'
-    if _rem is not None:
-        _msg = _msg + ' Wrong answers left: ' + str(_rem) + '.'
-    _msg = _msg + ' You may ask that same question again.'
+$WRONG
     if _hint:
         _msg = 'The bank returned hint ' + _hint + '; follow the brief for it. ' + _msg
 _d['what_to_do_next'] = _msg
 """
 )
 
+_WRONG_ONE = """    _msg = 'Wrong answer; do not say it was correct.'
+    if _rem is not None:
+        _msg = _msg + ' Wrong answers left: ' + str(_rem) + '.'
+    _msg = _msg + ' You may ask that same question again.'"""
 
-def verify_post(spec: dict, failed_row_id: str | None = None) -> str:
+# One call checked every answer: the gate failed, so at least one is wrong. Only a response list
+# whose name says wrong (e.g. wrong_fields) and that holds only question keys names which ones,
+# and only when exactly one list does (a matched_fields list must never read as wrong: review).
+_WRONG_ALL = """    _wrong = []
+    _lists = 0
+    for _wk in list(_d.keys()):
+        _wv = _d.get(_wk)
+        _wn = str(_wk).lower()
+        _says = False
+        for _part in ('wrong', 'incorrect', 'fail', 'invalid', 'mismatch'):
+            if _part in _wn:
+                _says = True
+        if _says and isinstance(_wv, list) and _wv:
+            _named = []
+            for _w in _wv:
+                for _q in _QUESTIONS:
+                    if str(_w).strip().lower() == _q[0].lower() and _q[1] not in _named:
+                        _named.append(_q[1])
+            if len(_named) == len(_wv):
+                _wrong = _named
+                _lists = _lists + 1
+    if _lists != 1:
+        _wrong = []
+    _msg = $WRONG_HEAD
+    if _wrong:
+        _msg = _msg + $WRONG_NAMED + ' | '.join(_wrong) + '.'
+    if _rem is not None:
+        _msg = _msg + ' Failed checks left: ' + str(_rem) + '.'
+    if _wrong:
+        _msg = _msg + $ASK_NAMED
+    else:
+        _msg = _msg + $ASK_ALL
+    _msg = _msg + $WRONG_TAIL"""
+
+
+def verify_post(spec: dict, failed_row_id: str | None = None, all_at_once: bool = False) -> str:
     """Post-hook of `verify_identity`: one instruction from the response roles (§4 identity).
 
     The failed-check exit defaults to `spec.identity.failed_row` (§9 signature `verify_post(spec)`).
+    `all_at_once`: one call checks every answer, so only the gate says an answer was right.
     """
     ident = spec["identity"]
     questions = ident["questions"]
@@ -543,9 +580,10 @@ def verify_post(spec: dict, failed_row_id: str | None = None) -> str:
         "ASKED_VAR": lit(ASKED_VAR),
         "PASSED_VAR": lit(PASSED_VAR),
         "GATE": lit(ident["gate_field"]),
-        "ANSWER_OK": lit(ident["answer_ok_field"]),
+        "ANSWER_OK": lit("" if all_at_once else ident["answer_ok_field"]),
         "REMAINING": lit(ident["remaining_field"]),
-        "HINT": lit(ident["hint_field"]),
+        # with no hint values in the brief, a hint field is only error text (rehearsal P1: "error")
+        "HINT": lit(ident["hint_field"] if ident["hints"] else ""),
         "SERVICE_HEAD": lit("The answer was not checked because of a service error"),
         "SERVICE_TAIL": lit(
             ". This is not a wrong answer. Call verify_identity once more with the same answer."
@@ -561,6 +599,20 @@ def verify_post(spec: dict, failed_row_id: str | None = None) -> str:
             "; ask the customer to say it again (this does not count as wrong)."
         ),
         "GENERIC_NEXT": lit(generic),
+        "WRONG_HEAD": lit(
+            "The check did not pass: at least one answer is wrong. Do not say any answer was "
+            "correct."
+        ),
+        "WRONG_NAMED": lit(" The bank marked as wrong: "),
+        "ASK_NAMED": lit(" You may ask again for those answers only,"),
+        "ASK_ALL": lit(
+            " Ask again for the answers the BANK BRIEF says to ask for after a failed check (if it "
+            "does not say, every answer),"
+        ),
+        "WRONG_TAIL": lit(
+            " then CALL verify_identity again with every answer, each new answer in place of the "
+            "old one."
+        ),
     }
     consts = (
         "_QUESTIONS = "
@@ -579,7 +631,8 @@ def verify_post(spec: dict, failed_row_id: str | None = None) -> str:
         )
         + "\n"
     )
-    return _post(consts, _VERIFY_POST, values)
+    body = _VERIFY_POST.replace("$WRONG", _WRONG_ALL if all_at_once else _WRONG_ONE, 1)
+    return _post(consts, body, values)
 
 
 _VERIFY_PRE = """

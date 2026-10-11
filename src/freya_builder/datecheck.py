@@ -15,6 +15,10 @@ from . import codegen
 GRID_DAYS = 42  # six weeks: every weekday, several weekends, month ends
 SAMPLE_PAST_DUE, SAMPLE_FLOOR = "500", "150"
 ATTEMPT_LINE = re.compile(r"^- attempt (\d+), on (.+?): ", re.M)
+TOO_MUCH_LINE = re.compile(
+    r"^- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH[^:]*: offer exactly the floor \S+ on (.+?), once",
+    re.M,
+)
 
 
 def _anchor(spec: dict) -> dt.date:
@@ -126,8 +130,14 @@ def check_dates(spec: dict) -> list[str]:
                             f"date check: the valid promise window of "
                             f"{where} cannot be computed: {line[2:120]}",
                         )
-                for n, date_text in ATTEMPT_LINE.findall(block):
-                    tag = f"attempt {n} of {where}"
+                dated = ATTEMPT_LINE.findall(block)
+                dated += [("too much", d) for d in TOO_MUCH_LINE.findall(block)]
+                for n, date_text in dated:
+                    tag = (
+                        f"attempt {n} of {where}"
+                        if n != "too much"
+                        else f"the too-much offer of {where}"
+                    )
                     if "not available" in date_text:
                         problem(
                             f"att{n}:{band}:none",

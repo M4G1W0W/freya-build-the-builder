@@ -80,7 +80,14 @@ PRECEDENCE = obj(
     {
         "when": {
             "type": "string",
-            "enum": ["transferred", "promise_recorded", "all_notes_reason", "any_note", "always"],
+            "enum": [
+                "transferred",
+                "ending_wins",
+                "promise_recorded",
+                "all_notes_reason",
+                "any_note",
+                "always",
+            ],
         },
         "note_reason": STR,
         "then": {"type": "string", "enum": ["event_row", "row", "first_note_reason_not"]},
@@ -104,6 +111,7 @@ SPEC_SCHEMA = obj(
                 "business_weekdays": arr(INT),
                 "holidays": arr(STR),
                 "next_weekday": {"type": "string", "enum": ["following_week", "next_occurrence"]},
+                "this_weekday": {"type": "string", "enum": ["current_week", "next_occurrence"]},
                 "numeric_date_order": {"type": "string", "enum": ["dmy", "mdy", "ymd"]},
             }
         ),
@@ -119,6 +127,9 @@ SPEC_SCHEMA = obj(
         ),
         "bands": arr(BAND),
         "attempts": arr(ATTEMPT),
+        "too_much": obj(
+            {"offer": {"type": "string", "enum": ["attempt_1", "separate"]}, "date_expr": STR}
+        ),
         "promise_window": obj(
             {
                 "min_expr": STR,
@@ -283,6 +294,94 @@ def _engine_field_problems(spec: dict, tools: list[Tool]) -> list[str]:
     return p
 
 
+def _ending_wins_problems(
+    i: int, c: dict, rows: dict, note_reasons: tuple[str, ...], spec: dict
+) -> list[str]:
+    """Review gap 7: an ending the brief keeps even after a recorded promise. finalize closes with
+    its row when the agent took that ending or a note carries `note_reason`."""
+    where = f"close_precedence[{i}] ending_wins"
+    p: list[str] = []
+    if c["then"] != "row":
+        p.append(f"{where}: then must be 'row'")
+    row = rows.get(c["row"])
+    if row and ("negotiate" not in row["phases"] or row["queue"]):
+        p.append(f"{where}: row {c['row']!r} must be a negotiate-phase ending without a queue")
+    precedence = spec["close_precedence"]
+    if c["row"] == spec["default_rows"]["negotiate"]:
+        # notes-done and the turn caps end through the default row: every promise call closing
+        # that way would take this row instead of the promise outcome (precedence review C1)
+        p.append(
+            f"{where}: row {c['row']!r} is default_rows.negotiate; calls that end without an "
+            f"explicit ending close through it, so it must not win over a recorded promise"
+        )
+    later = [j for j, d in enumerate(precedence) if j > i and d["when"] == "transferred"]
+    if later:
+        # a transfer the agent announced must still happen (precedence review C2)
+        p.append(f"{where}: must come after the 'transferred' entry at index {later[0]}")
+    nr = c["note_reason"]
+    taken = {
+        d["note_reason"]
+        for d in precedence
+        if d["when"] == "all_notes_reason" or d["then"] == "first_note_reason_not"
+    }
+    if nr and nr not in note_reasons:
+        known = ", ".join(note_reasons) or "notes are not used"
+        p.append(f"{where}: note_reason {nr!r} is not an add_note reason ({known})")
+    elif nr and nr in taken:
+        p.append(
+            f"{where}: note_reason {nr!r} is already used by an all_notes_reason or "
+            f"first_note_reason_not entry"
+        )
+    return p
+
+
+# "say" + a quoted sentence of at least 4 words; a closing quote followed by a letter is an apostrophe
+SAID = re.compile(
+    r"\b(?:say|says|said|tell|tells|state|states)\b[^\"\u201c\u201d\u2018\u2019]{0,40}?"
+    r"[\"\u201c\u2018']([^\"\u201c\u201d]{8,300}?[.?!])[\"\u201d\u2019'](?![A-Za-z])",
+    re.I,
+)
+
+
+def _plain(text: str) -> str:
+    return " ".join(text.replace("{", "").replace("}", "").lower().split())
+
+
+def _names(line: str, reason: str) -> bool:
+    words = {reason, reason.replace("_", " "), reason.replace("_", "-")}
+    low = line.lower()
+    return any(re.search(r"(?<![a-z_])" + re.escape(w) + r"(?![a-z_])", low) for w in words)
+
+
+def _unsaid_note_sentences(spec: dict, note_reasons: tuple[str, ...]) -> list[str]:
+    """unmodeled is never shown to the agent. In a multi-product brief the sentence for a reason
+    noted per product (e.g. already paid) landed there instead of in its row's say_before_end in
+    6 of 16 extractions (engine-fixes Fix 1). Flags a said, quoted sentence on an unmodeled line
+    that names a note reason when no row says it."""
+    if not spec["notes"]["used"]:
+        return []
+
+    def rows_for(nr: str) -> list[dict]:
+        return [
+            r
+            for r in spec["rows"]
+            if r["reason"] == nr or r["id"] == nr or (not r["reason"] and r["outcome"] == nr)
+        ]
+
+    said = _plain(" ".join(x for r in spec["rows"] for x in r["say_before_end"]))
+    p: list[str] = []
+    for line in spec["unmodeled"]:
+        rows = sorted({r["id"] for nr in note_reasons if _names(line, nr) for r in rows_for(nr)})
+        for sentence in SAID.findall(line) if rows else []:
+            if len(sentence.split()) >= 4 and _plain(sentence) not in said:
+                p.append(
+                    f"unmodeled holds a sentence the agent must say, {sentence!r}, but the agent "
+                    f"never sees unmodeled: put it in say_before_end of the row of that per-product "
+                    f"reason (one of {rows})"
+                )
+    return p
+
+
 def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
     """Problems that would make the agent send values the bank does not accept, or crash code."""
     by = {t.name: t for t in tools}
@@ -324,9 +423,15 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         elif stage == "negotiate" and rows[rid]["queue"]:
             # turn caps and render's ev_notes end through it; finalize would transfer every such call
             p.append(f"default row for negotiate must not transfer: {rid!r}")
+    note_reasons: tuple[str, ...] = ()
+    if spec["notes"]["used"] and "add_note" in by:
+        note_reasons = _enum(by, "add_note", spec["notes"]["reason_field"])
+    p += _unsaid_note_sentences(spec, note_reasons)
     for i, c in enumerate(spec["close_precedence"]):
         if c["then"] == "row" and c["row"] not in rows:
             p.append(f"close_precedence[{i}] names unknown row {c['row']!r}")
+        if c["when"] == "ending_wins":
+            p += _ending_wins_problems(i, c, rows, note_reasons, spec)
         if c["then"] == "first_note_reason_not" and outcomes and c["outcome"] not in outcomes:
             p.append(f"close_precedence[{i}] outcome {c['outcome']!r} not in API enum")
         if c["then"] == "first_note_reason_not" and spec["notes"]["used"] and "add_note" in by:
@@ -350,16 +455,57 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
             p.append(f"band {b['name']}: unknown transfer_row {b['transfer_row']!r}")
 
     ident = spec["identity"]
-    keys = _enum(by, "verify_identity", ident["question_field"])
-    if not by["verify_identity"].field(ident["question_field"]):
-        p.append(f"verify_identity has no field {ident['question_field']!r}")
-    if not by["verify_identity"].field(ident["answer_field"]):
-        p.append(f"verify_identity has no field {ident['answer_field']!r}")
-    for q in ident["questions"]:
-        if keys and q["key"] not in keys:
-            p.append(f"identity question {q['key']!r} not in API enum {keys}")
-    resp_types = {f.name: f.type for f in by["verify_identity"].response}
+    vt = by["verify_identity"]
+    at_once = identity_all_at_once(spec, vt)
+    # empty question and answer fields mean the spec reads the tool as all-at-once: only the keys
+    # are then wrong, and answer_ok_field is unused either way
+    no_answer_ok = at_once or not (ident["question_field"] or ident["answer_field"])
+    qkeys = [q["key"] for q in ident["questions"]]
+    fields = [f.name for f in vt.request]
+    shape = (
+        " (if verify_identity takes every answer in one call, each identity question key is "
+        "the exact request field for that answer, and question_field, answer_field and "
+        'answer_ok_field are ""; request fields: ' + ", ".join(fields) + ")"
+    )
+    if at_once:
+        cid = customer_field(spec, tools)
+        for k in qkeys:
+            if k not in fields:
+                exact = next(f for f in fields if f.lower() == k.lower())
+                p.append(f"identity question key {k!r} must be the exact request field {exact!r}")
+        for f in vt.request:
+            # an enum field is a setting, not a free-text answer (review of cand-eng.1)
+            if f.required and f.name != cid and not f.enum and f.name.lower() not in _lower(qkeys):
+                p.append(
+                    f"verify_identity takes every answer in one call and requires {f.name!r}, "
+                    f"but no identity question has key {f.name!r}"
+                )
+    elif not ident["question_field"] and not ident["answer_field"]:
+        p.append(
+            f"identity question keys {[k for k in qkeys if k not in fields]} are not "
+            f"verify_identity request fields" + shape
+        )
+    else:
+        keys = _enum(by, "verify_identity", ident["question_field"])
+        if not vt.field(ident["question_field"]):
+            p.append(f"verify_identity has no field {ident['question_field']!r}" + shape)
+        if not vt.field(ident["answer_field"]):
+            p.append(f"verify_identity has no field {ident['answer_field']!r}" + shape)
+        for q in ident["questions"]:
+            if keys and q["key"] not in keys:
+                p.append(f"identity question {q['key']!r} not in API enum {keys}")
+        # a repair round once named two answer fields as question and answer field (P3)
+        named = [x for x in (ident["question_field"], ident["answer_field"]) if x in qkeys]
+        partly = [k for k in qkeys if k.lower() in _lower(fields)]
+        if named or partly:
+            p.append(
+                f"identity question keys {sorted(set(named + partly))} are verify_identity request "
+                f"fields, so the question/answer reading cannot be right" + shape
+            )
+    resp_types = {f.name: f.type for f in vt.response}
     for role in ("gate_field", "answer_ok_field", "remaining_field", "hint_field"):
+        if no_answer_ok and role == "answer_ok_field":
+            continue
         if ident[role] and resp_types and ident[role] not in resp_types:
             p.append(f"identity {role} {ident[role]!r} is not a verify_identity response field")
     # The identity gate and the post-hook compare these with 'true': an empty or non-boolean field
@@ -368,6 +514,8 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         ("gate_field", "is true once EVERY security question has passed"),
         ("answer_ok_field", "is true when the answer just checked was correct"),
     ):
+        if no_answer_ok and role == "answer_ok_field":
+            continue  # one call checks every answer: the gate alone decides
         if not ident[role]:
             p.append(f"identity {role} is empty: name the verify_identity boolean that {meaning}")
         elif resp_types.get(ident[role]) not in (None, "", "boolean"):
@@ -422,6 +570,14 @@ def check_spec(spec: dict, tools: list[Tool]) -> list[str]:
         (f"band {b['name']} deadline", b["deadline_expr"]) for b in spec["bands"]
     ]
     exprs += [(f"attempt {a['n']} date", a["date_expr"]) for a in spec["attempts"]]
+    if too_much_separate(spec) and too_much(spec)["date_expr"].strip():
+        exprs += [("too much offer date", too_much(spec)["date_expr"])]
+    elif too_much_separate(spec):
+        # attempt 1's date would make the refused offer and attempt 1 the same (review)
+        p.append(
+            "too_much.offer is 'separate' but date_expr is empty: give the date the "
+            "specification sets for that floor offer"
+        )
     exprs += [("promise window min", spec["promise_window"]["min_expr"])]
     exprs += [("promise window max", spec["promise_window"]["max_expr"])]
     exprs += [(f"callback day {i}", e) for i, e in enumerate(cb["day_exprs"])]
@@ -438,6 +594,74 @@ MIN_SLOTS = 3
 
 def product_slots(spec: dict) -> int:
     return max(MIN_SLOTS, int(spec["meta"]["max_products"]))
+
+
+# Specs saved before the too_much field read like a brief that is silent about it: the floor
+# offered after "too much" is attempt 1, on attempt 1's date.
+TOO_MUCH_DEFAULT = {"offer": "attempt_1", "date_expr": ""}
+
+
+def too_much(spec: dict) -> dict:
+    return spec.get("too_much") or TOO_MUCH_DEFAULT
+
+
+def too_much_separate(spec: dict) -> bool:
+    """The brief says the floor offered after "too much" is not a persuasion attempt (P2)."""
+    return too_much(spec)["offer"] == "separate"
+
+
+def _words(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
+
+
+def early_lines(spec: dict) -> dict[str, list[str]]:
+    """Per row id, the say_before_end sentences said BEFORE the customer answers, not at the end.
+
+    An ending's sentences are said in the goodbye message together with its transition, so such a
+    sentence was said twice and a question could never be answered (Fix 1 audit: the support offer
+    question and the sympathy line in both the accept and the decline ending, "Can I help you
+    first?" in the human-transfer ending; 9 of 16 fresh extractions, 0 of 13 before Fix 1). Early:
+    a question, or a sentence shared by a transfer ending and a non-transfer ending (said before the
+    customer picks one of them), unless it is a closing line: common to every ending of one step,
+    or in more than half of all endings (one row that drops or rewords the goodbye, such as a
+    human-transfer row listed in every step, must not turn the goodbye into an early line).
+    """
+    rows = spec["rows"]
+    sayers: dict[str, list[dict]] = {}
+    for r in rows:
+        for s in r["say_before_end"]:
+            sayers.setdefault(_words(s), []).append(r)
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        for s in r["say_before_end"]:
+            shared = sayers[_words(s)]
+            ids = {x["id"] for x in shared}
+            mixed = len({bool(x["queue"]) for x in shared}) == 2
+            common = len(ids) * 2 > len(rows) or any(
+                {q["id"] for q in rows if p in q["phases"]} <= ids
+                for x in shared
+                for p in x["phases"]
+            )
+            if s.strip().endswith("?") or (mixed and not common):
+                out.setdefault(r["id"], []).append(s)
+    return out
+
+
+def _lower(names: list[str]) -> set[str]:
+    return {n.lower() for n in names}
+
+
+def identity_all_at_once(spec: dict, tool: Tool) -> bool:
+    """verify_identity takes every answer in one call: each identity question key is one of its
+    request fields, ignoring case (perturbed rehearsal P3). question_field, answer_field and
+    answer_ok_field are then unused, whatever the spec names there. A question field whose enum
+    lists every key is the per-answer shape, even if a key is also a field name."""
+    ident = spec["identity"]
+    keys = [q["key"] for q in ident["questions"]]
+    selector = tool.field(ident["question_field"]) if ident["question_field"] else None
+    if selector and selector.enum and set(keys) <= set(selector.enum):
+        return False
+    return bool(keys) and _lower(keys) <= _lower([f.name for f in tool.request])
 
 
 def call_var(spec: dict, role: str) -> str:

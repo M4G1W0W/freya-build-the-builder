@@ -251,10 +251,13 @@ def date_table(today, end, C):
     lines.append("Every other date in that range is a business day.")
     tomorrow = today + datetime.timedelta(days=1)
     lines.append("tomorrow = " + _wd(tomorrow))
-    this_days = [weekday_in_week(today, wd, 0) for wd in range(7)]
-    lines.append(
-        "this <weekday> (this Monday-to-Sunday week): " + ", ".join(_wd(x) for x in this_days)
-    )
+    if C.get("this_weekday") == "next_occurrence":
+        this_days = [next_occurrence(today, wd, False) for wd in range(7)]
+        this_rule = "this <weekday> (the first such weekday after today): "
+    else:
+        this_days = [weekday_in_week(today, wd, 0) for wd in range(7)]
+        this_rule = "this <weekday> (this Monday-to-Sunday week): "
+    lines.append(this_rule + ", ".join(_wd(x) for x in this_days))
     following = C.get("next_weekday") != "next_occurrence"
     if following:
         nxt = [weekday_in_week(today, wd, 1) for wd in range(7)]
@@ -451,7 +454,8 @@ def _product(k, raw, today, C, vs):
     floor_field = kind.get("floor_field") or ""
     floor_pct = _num(kind.get("floor_percent")) or 0
     if floor_pct > 0 and past_due is not None:  # a share of the past-due amount (audit F15)
-        floor = round(past_due * floor_pct / 100.0, 2)
+        # in whole cents, half up: float round() gave 29.98 for 30% of 99.95 (rehearsal P1)
+        floor = int(round(past_due * 100) * floor_pct / 100.0 + 0.5 + 1e-9) / 100.0
         floor_field = (
             str(int(floor_pct) if floor_pct == int(floor_pct) else floor_pct) + "% of past due"
         )
@@ -485,6 +489,7 @@ def _product(k, raw, today, C, vs):
     lines.append("- deadline: " + _ds(deadline))
     lines.append("- floor (" + (floor_field or "none") + "): " + _amount(floor))
     plan = []
+    too_much_plan = ""
     if band is not None:
         allowed = int(band.get("attempts") or 0)
         lines.append(
@@ -493,12 +498,18 @@ def _product(k, raw, today, C, vs):
             + (" (ONE offer only)" if allowed == 1 else "")
         )
         afns = C.get("fn_attempt") or []
+        first = None
+        floor_dates = []  # (n, date) of attempts whose amount after "too much" is the floor
         for ai, attempt in enumerate(C.get("attempts") or []):
             n = int(attempt.get("n") or 0)
             names = attempt.get("bands") or []
             if n > allowed or (names and band.get("name") not in names) or ai >= len(afns):
                 continue
             when = _ev(afns[ai], today, deadline, days_late)
+            if first is None:
+                first = (attempt.get("amount"), when)
+            if attempt.get("amount") in ("floor", "full_or_floor"):
+                floor_dates.append((n, when))
             plan.append(
                 str(n)
                 + ") "
@@ -512,6 +523,61 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
+        separate = C.get("too_much_separate") and floor is not None
+        if separate and not band.get("transfer_row"):
+            # the brief's own rule: this floor offer is not a persuasion attempt (rehearsal P2)
+            tfns = C.get("fn_too_much") or []
+            when = _ev(tfns[0], today, deadline, days_late) if tfns else None
+            if not tfns and first is not None:
+                when = first[1]
+            line = (
+                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
+                + " exactly the floor "
+                + _amount(floor)
+                + " on "
+                + _ds(when)
+            )
+            if when is not None and when < today:
+                line += " (already past: not a valid promise date)"
+            if when is not None and deadline is not None and when > deadline:
+                line += " (after the deadline)"
+            line += (
+                ", once; this offer is NOT a persuasion attempt: every listed attempt stays"
+                + " available (no other date: not today unless that is this date)"
+            )
+            for n, adate in floor_dates:
+                if when is not None and adate == when:
+                    # review of cand-eng.3: next_business_day can be attempt 1's date
+                    line += (
+                        "; attempt "
+                        + str(n)
+                        + " below offers the same floor on the same date: if the customer refused"
+                        + " this offer, follow the brief's rules on refused offers for attempt "
+                        + str(n)
+                    )
+            lines.append(line)
+            too_much_plan = (
+                ' (after "too much": first the floor '
+                + _amount(floor)
+                + " on "
+                + (when.isoformat() if when is not None else "?")
+                + ", not one of these offers)"
+            )
+        elif (
+            not separate
+            and first is not None
+            and first[0] == "full_or_floor"
+            and first[1] is not None
+            and floor is not None
+        ):
+            lines.append(
+                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
+                + " exactly the floor "
+                + _amount(floor)
+                + " on "
+                + _ds(first[1])
+                + "; this IS attempt 1 (no other date: not today unless that is this date)"
+            )
         if allowed > 0:
             lines.append(
                 "- after attempt "
@@ -558,10 +624,10 @@ def _product(k, raw, today, C, vs):
     if band is None or not C.get("attempts"):
         summary = ""
     elif not plan:
-        summary = slot + ": no persuasion attempt"
+        summary = slot + ": no persuasion attempt" + too_much_plan
     else:
         count = str(len(plan)) + (" offer only" if len(plan) == 1 else " offers")
-        summary = slot + ": " + count + ": " + ", ".join(plan)
+        summary = slot + ": " + count + ": " + ", ".join(plan) + too_much_plan
     return "\n".join(lines), sentence, deadline, summary
 
 
@@ -729,6 +795,11 @@ def finalize_main(vs, C):
             when = rule.get("when")
             if when == "transferred":
                 hit = bool((rows.get(event_row) or {}).get("queue"))
+            elif when == "ending_wins":
+                # an ending kept even after a recorded promise: the agent took it, or a note
+                # carries its reason (the model noted the products itself)
+                nr = rule.get("note_reason")
+                hit = event_row == rule.get("row") or (bool(nr) and any(r == nr for _, r in notes))
             elif when == "promise_recorded":
                 hit = bool(promises)
             elif when == "all_notes_reason":

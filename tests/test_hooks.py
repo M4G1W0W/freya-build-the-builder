@@ -353,6 +353,67 @@ def test_verify_question_count_other_than_two_says_all(split):
     assert what(result).startswith("All answers are verified.")
 
 
+def _all_at_once_post(answer_ok="ok"):
+    spec = copy.deepcopy(SPEC)
+    spec["identity"]["answer_ok_field"] = answer_ok
+    return hooks.verify_post(spec, FAILED_ROW, all_at_once=True)
+
+
+@pytest.mark.parametrize("answer_ok", ["ok", "verified", ""])
+def test_verify_all_at_once_wrong_answer_is_never_correct(answer_ok, split):
+    # Engine-fixes item 1 (rehearsal P3b): ok=true only means the check ran.
+    data = {"ok": True, "verified": True, "all_verified": False, "wrong_answers_left": 2}
+    msg = what(post(_all_at_once_post(answer_ok), envelope(data), split))
+    assert not msg.startswith("Correct")
+    assert msg.startswith("The check did not pass: at least one answer is wrong.")
+    assert "Failed checks left: 2." in msg and ASK_ALL in msg
+    assert msg.endswith("each new answer in place of the old one.")
+
+
+def test_verify_all_at_once_names_the_answers_the_bank_marked_wrong(split):
+    data = {"ok": True, "all_verified": False, "wrong_fields": ["phone_last4"]}
+    msg = what(post(_all_at_once_post(), envelope(data), split))
+    assert "The bank marked as wrong: " + Q2 + "." in msg
+    assert "You may ask again for those answers only," in msg and Q1 not in msg
+
+
+ASK_ALL = "Ask again for the answers the BANK BRIEF says to ask for after a failed check (if it "
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"wrong_fields": ["phone_last4", "pin"]},  # not only question keys
+        {"matched_fields": ["date_of_birth"]},  # review of cand-eng.1: a right answer named wrong
+        {"correct_fields": ["date_of_birth"], "failed": ["phone_last4"], "wrong": ["phone_last4"]},
+        {"wrong_fields": "phone_last4"},  # not a list
+        {"wrong_fields": []},
+    ],
+)
+def test_verify_all_at_once_names_answers_only_from_one_list_that_says_wrong(data, split):
+    data = {"ok": True, "all_verified": False, **data}
+    msg = what(post(_all_at_once_post(), envelope(data), split))
+    assert "marked as wrong" not in msg and ASK_ALL in msg
+
+
+def test_verify_all_at_once_gate_failed_and_unreadable_paths_are_unchanged(split):
+    src = _all_at_once_post()
+    assert what(post(src, envelope({"ok": True, "all_verified": True}), split)).startswith(
+        "Both answers are verified."
+    )
+    gone = {"ok": True, "all_verified": False, "wrong_answers_left": 0}
+    assert what(post(src, envelope(gone), split)).startswith("The check has FAILED.")
+    unreadable = what(post(src, envelope({"ok": False, "error": "bad date"}), split))
+    assert unreadable.startswith("The answer could not be read")
+
+
+def test_verify_per_answer_source_is_unchanged_by_the_all_at_once_branch():
+    assert hooks.verify_post(SPEC, FAILED_ROW) == hooks.verify_post(
+        SPEC, FAILED_ROW, all_at_once=False
+    )
+    assert "marked as wrong" not in hooks.verify_post(SPEC, FAILED_ROW)
+
+
 # --- verify_identity pre ------------------------------------------------------------------------
 
 VERIFY_PRE = PRE["verify_pre"]
@@ -937,3 +998,13 @@ def test_pre_hooks_pad_month_end_year_end_and_leap_dates(said, sent, split):
     body = {"customer_id": "c_1", "product_id": "p1", "amount": 1, "date": said}
     assert pre(PROMISE_PRE, body, split)[0]["date"] == sent
     assert pre(CALLBACK_PRE, {"date": said, "time": "11:00"}, split)[0]["date"] == sent
+
+
+def test_verify_hint_field_without_hint_values_is_not_quoted_as_a_hint(split):
+    # Engine-fixes item 5 (rehearsal P1): hint_field "error" and no hints in the brief made a wrong
+    # answer say "The bank returned hint <error text>".
+    spec = copy.deepcopy(SPEC)
+    spec["identity"].update(hint_field="error", hints=[])
+    data = {"ok": True, "verified": False, "all_verified": False, "error": "answer mismatch"}
+    msg = what(post(hooks.verify_post(spec, FAILED_ROW), envelope(data), split))
+    assert msg.startswith("Wrong answer; do not say it was correct.") and "hint" not in msg

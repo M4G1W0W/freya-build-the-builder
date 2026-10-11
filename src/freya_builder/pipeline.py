@@ -11,11 +11,12 @@ from . import platform
 from .datecheck import check_dates
 from .expr import FUNCS, NAMES
 from .llm import LLMError, budget_left, chat_json
-from .spec import MIN_SLOTS, SPEC_SCHEMA, check_spec, schema_problems
+from .spec import MIN_SLOTS, SPEC_SCHEMA, check_spec, early_lines, schema_problems
 from .toolapi import Tool
 from .trace import Trace
 
 REPAIR_ROUNDS = 2
+SMOKE_WAITS = (5, 15)  # the smoke test is optional: a short retry schedule
 REPAIR_MIN_S = (
     300  # a repair call takes about a minute; below this the best spec so far is deployed
 )
@@ -68,16 +69,17 @@ EXPRESSIONS (deadline_expr, date_expr, min_expr, max_expr, day_exprs) are tiny P
 FIELDS
 - meta.call_vars: every variable the call starts with. role: customer_id (the id passed to the bank tools), now (current date and time), addressing (used to name or address the customer), other. example: the example value given, else "".
 - meta.max_products: the largest number of late products one customer can have per the specification (1 if it says one product).
-- calendar.business_weekdays: weekday numbers, Monday=0. calendar.holidays: ISO dates, after amendments. calendar.next_weekday: "following_week" if "next <weekday>" means that weekday in the following calendar week, "next_occurrence" if it means the next such day. calendar.numeric_date_order: how a date said only in numbers is read.
+- calendar.business_weekdays: weekday numbers, Monday=0. calendar.holidays: ISO dates, after amendments. calendar.next_weekday: "following_week" if "next <weekday>" means that weekday in the following calendar week, "next_occurrence" if it means the next such day. calendar.this_weekday: "next_occurrence" only if the specification says "this <weekday>" means the first such weekday after today (or the same day as "next <weekday>" when that is the next such day); otherwise "current_week" (that weekday in the current Monday-to-Sunday week, also when the specification says nothing). calendar.numeric_date_order: how a date said only in numbers is read.
 - products: field names of the get_account response (list_field = the array of products; id_field, type_field, past_due_field, days_late_field). products.types: one entry per product type value of the tool API that the specification covers; label = how the agent names it in speech, may contain product fields in single braces like {{last4}}; floor_field = the product field holding the lowest acceptable amount; floor_percent = 0, unless the specification defines that lowest amount as a percentage of the past-due amount: then floor_percent = that percentage (e.g. 30) and floor_field = "".
 - bands: one per lateness band. deadline_expr = the latest allowed promise date. attempts = number of persuasion attempts. transfer_row = the row id if this band must be transferred, else "".
 - attempts: the persuasion ladder. bands = band names it applies to ([] = all bands). amount: "full", "floor", or "full_or_floor" (the full amount, or the floor if the customer already said the full amount is too much). date_expr = the date proposed. note = the specification's wording of this attempt.
+- too_much: the floor offered when the customer says the full amount is too much. offer = "separate" only if the specification says that this floor offer is NOT a persuasion attempt (it uses no attempt); otherwise "attempt_1" (that floor offer is attempt 1, also when the specification says nothing more). date_expr = the date the specification gives for a "separate" offer; "" when offer is "attempt_1".
 - promise_window: earliest and latest allowed promise date as expressions; business_days_only. non_business_day = what to offer when the customer names a weekend day or holiday inside the window (next_business_day, previous_business_day, or ask_again). after_max = what to do when the customer names a date after the latest allowed date (offer_max = offer the latest date; ask_again).
 - callback: enabled if a callback can be booked; day_exprs = the allowed callback days; start/end = allowed times "HH:MM"; after_now = must be later than now; date_field/time_field = schedule_callback request field names ("" if a field does not exist); booked_row = the row used after booking.
 - opening.line: the agent's exact first utterance: the required opening sentence(s) followed by the confirmation question, with call variables written as {{{{name}}}} (double braces). Never use the word "recorded" in the opening (it is reserved for confirming a recorded promise): to say that the call is recorded, say "we are recording this call". opening.confirm_criteria: what counts as the customer confirming, and what to do if unclear. opening.forbidden_before_verified: words and topics never said before identity is verified (include product names if the specification forbids naming the product).
-- identity.questions: in order. key = the value of verify_identity's question field. ask = the question to say. format: "date", "digits:N", "year", "alnum" or "text". identity.question_field / answer_field = verify_identity request field names. gate_field = the verify_identity response boolean meaning ALL checks passed. answer_ok_field = the response boolean for this one answer. remaining_field = the response integer of wrong answers left ("" if none). hint_field = the response field carrying hints ("" if none). hints = what to do for each hint value. failed_line = what the agent says when the check fails. decline_explain = what the agent says once when the customer refuses to answer. failed_row = the row used when the check fails.
-- rows: one per (outcome, reason) row of the outcome table, reason "" when the table gives none. id = "<outcome>_<reason>" or "<outcome>". phases = the call steps where this ending can happen: opening (before anyone is identified), third_party (someone else answered), identity (during the security questions), negotiate (after verification). trigger = when, in at most 30 words from the specification. say_before_end = exact sentences required before ending this way ([] if none); a quoted sentence is copied verbatim, and a rule "say that X" gives the sentence X ("say that payments can take a day to appear" -> "Payments can take a day to appear."). queue = the transfer queue value if this ending transfers the call, else "".
-- close_precedence: ordered rules that compute the final outcome from what was actually recorded. when: "transferred" (the ending row has a queue), "promise_recorded", "all_notes_reason" (every product has a note with note_reason), "any_note", "always". then: "event_row" (the row of the ending the agent chose), "row" (the given row id), "first_note_reason_not" (outcome = the given outcome, reason = the first note reason, in product order, that is not note_reason). End with {{"when": "always", "then": "event_row"}}.
+- identity.questions: in order. key = the value of verify_identity's question field. ask = the question to say. format: "date", "digits:N", "year", "alnum" or "text". identity.question_field / answer_field = verify_identity request field names. If verify_identity instead takes every answer in one call (one request field per answer), each key = the request field for that answer, and question_field, answer_field and answer_ok_field = "". gate_field = the verify_identity response boolean meaning ALL checks passed. answer_ok_field = the response boolean for this one answer. remaining_field = the response integer of wrong answers left ("" if none). hint_field = the response field carrying hints ("" if none). hints = what to do for each hint value. failed_line = what the agent says when the check fails. decline_explain = what the agent says once when the customer refuses to answer. failed_row = the row used when the check fails.
+- rows: one per (outcome, reason) row of the outcome table, reason "" when the table gives none. id = "<outcome>_<reason>" or "<outcome>". phases = the call steps where this ending can happen: opening (before anyone is identified), third_party (someone else answered), identity (during the security questions), negotiate (after verification). trigger = when, in at most 30 words from the specification. say_before_end = exact sentences required before ending this way ([] if none); a quoted sentence is copied verbatim, and a rule "say that X" gives the sentence X ("say that payments can take a day to appear" -> "Payments can take a day to appear."). When a reason is noted per product and the call goes on with the other products, say_before_end of that reason's row also holds the sentence the specification requires when the customer raises that situation for one product (the agent says it then, for that product), even if the row's trigger is the end of the call. queue = the transfer queue value if this ending transfers the call, else "".
+- close_precedence: ordered rules that compute the final outcome from what was actually recorded. when: "transferred" (the ending row has a queue), "ending_wins" (the call ended through the given row, or a product has a note with note_reason), "promise_recorded", "all_notes_reason" (every product has a note with note_reason), "any_note", "always". then: "event_row" (the row of the ending the agent chose), "row" (the given row id), "first_note_reason_not" (outcome = the given outcome, reason = the first note reason, in product order, that is not note_reason). Add an "ending_wins" entry (then "row", row = that ending's row id, note_reason = the add_note reason it gives, else "") ONLY for a non-transfer ending that the specification says keeps its own outcome even when a promise was already recorded, placed right before "promise_recorded"; never for a reason given to a single product. End with {{"when": "always", "then": "event_row"}}.
 - default_rows: the row to use per step if the call ends there without an explicit ending (the most conservative row of that step).
 - notes: used = the specification uses add_note; product_field/reason_field = add_note request field names; on_transfer = notes are allowed when the call is transferred.
 - promise_fields / transfer_field / close_fields: request field names in the tool API.
@@ -85,7 +87,7 @@ FIELDS
 - disclosure: intro = what the agent says right after verification before the amounts; product_sentence = a template for one product using {{label}}, {{past_due}}, {{days_late}}; first_ask_single / first_ask_multi = the exact first request for payment.
 - success_lines.promise = the exact sentence after a promise is recorded. failure_rules.promise = the specification's rule when recording fails.
 - stage_rules: for each step, the specification's rules that apply there (short; cite rule numbers or titles).
-- unmodeled: specification rules that no field above captures (short lines). They stay in the agent's prompt."""
+- unmodeled: specification rules that no field above captures (short lines). The agent never sees this list, only the specification text: a sentence the agent must say belongs in a field above, never only here."""
 
 
 def _field_text(f) -> str:
@@ -195,6 +197,8 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     spec = extract_spec(trace, rules_text, tools)
     for u in spec["unmodeled"]:
         trace.warn(f"NOT ENFORCED BY CODE (kept in prompt): {u[:200]}")
+    for row_id, says in early_lines(spec).items():
+        trace.step(f"ending {row_id}: said before the customer answers, not in the goodbye: {says}")
     if spec["meta"]["max_products"] < MIN_SLOTS:
         trace.warn(
             f"brief read as {spec['meta']['max_products']} product(s); rendering {MIN_SLOTS} product"
@@ -217,24 +221,27 @@ def _example(var: dict) -> str:
     return time.strftime("%Y-%m-%dT%H:%M", time.gmtime()) if var["role"] == "now" else "x"
 
 
+def _smoke_retry(e: Exception) -> bool:
+    """A bare 500 from /chat/message is final: the workflow cannot start (kit/docs/api.md)."""
+    return platform.transient(e) and platform.status_of(e) != 500
+
+
 def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     """Smoke test on the published workflow: it starts, says the opening line, leaks nothing."""
     freya = platform.kit()
     variables = {v["name"]: _example(v) for v in spec["meta"]["call_vars"]}
     body = {"workflowId": saved["workflow_id"], "message": "Hello?", "customerVariables": variables}
-    r = None
-    for attempt in (1, 2):  # the kit warns a long chat turn can return 504; retry a 5xx once
-        try:
-            r = freya.api("POST", "/api/v2/chat/message", body)
-            break
-        except RuntimeError as e:
-            transient = any(f"-> {c}" in str(e) for c in (500, 502, 503, 504))
-            if attempt == 1 and transient:
-                trace.warn(f"chat smoke test: {str(e)[:120]}; retrying once")
-                time.sleep(5)
-                continue
-            trace.test("chat smoke test: workflow starts", False, str(e)[:200])
-            return False
+    try:  # the kit warns a long chat turn can return 504. A repeat only opens another test chat.
+        r = platform.call(
+            trace,
+            "POST /api/v2/chat/message",
+            lambda: freya.api("POST", "/api/v2/chat/message", body),
+            _smoke_retry,
+            SMOKE_WAITS,
+        )
+    except (RuntimeError, *platform.NETWORK_ERRORS) as e:
+        trace.test("chat smoke test: workflow starts", False, platform.describe(trace, e))
+        return False
     reply = str(r.get("response") or "")
     forbidden = [
         w for w in spec["opening"]["forbidden_before_verified"] if w.lower() in reply.lower()
@@ -244,6 +251,6 @@ def selftest(trace: Trace, saved: dict, spec: dict, tools: list[Tool]) -> bool:
     if r.get("callId"):
         try:
             freya.api("POST", "/api/v2/chat/end", {"callId": r["callId"]})
-        except RuntimeError:
+        except (RuntimeError, *platform.NETWORK_ERRORS):
             pass
     return ok

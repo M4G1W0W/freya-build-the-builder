@@ -47,6 +47,7 @@
    "2027-01-01"
   ],
   "next_weekday": "following_week",
+  "this_weekday": "current_week",
   "numeric_date_order": "dmy"
  },
  "products": {
@@ -112,6 +113,10 @@
    "note": "Attempt 2, late band only: the floor amount on the deadline."
   }
  ],
+ "too_much": {
+  "offer": "attempt_1",
+  "date_expr": ""
+ },
  "promise_window": {
   "min_expr": "today",
   "max_expr": "deadline",

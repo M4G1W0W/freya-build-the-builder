@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from freya_builder import pipeline
+from freya_builder import llm, pipeline
 from freya_builder.toolapi import load_tool_api
 from freya_builder.trace import Trace
 
@@ -77,7 +77,13 @@ class _FakeFreya:
         }
 
 
-def test_smoke_test_retries_a_transient_5xx_once(monkeypatch):
+@pytest.fixture(autouse=True)
+def _no_build_budget(monkeypatch):
+    # test_cli starts the real 25-minute budget; the smoke tests must not depend on what is left of it.
+    monkeypatch.setattr(llm, "_deadline", None)
+
+
+def test_smoke_test_retries_a_transient_5xx(monkeypatch):
     # 10 Oct 15:55 UTC: one 504 from the chat route made the trace show a failed self-test.
     fake = _FakeFreya([504])
     monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
@@ -85,7 +91,8 @@ def test_smoke_test_retries_a_transient_5xx_once(monkeypatch):
     out = io.StringIO()
     pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS)
     log = out.getvalue()
-    assert "retrying once" in log and "chat smoke test: opening reply: PASS" in log
+    assert "POST /api/v2/chat/message -> 504: error); retrying in 5s" in log
+    assert "chat smoke test: opening reply: PASS" in log
 
 
 def test_smoke_test_does_not_retry_a_client_error(monkeypatch):
@@ -95,6 +102,26 @@ def test_smoke_test_does_not_retry_a_client_error(monkeypatch):
     assert pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS) is False
     assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
     assert fake.calls.count("/api/v2/chat/message") == 1
+
+
+def test_smoke_test_fails_after_a_short_retry_schedule(monkeypatch):
+    fake = _FakeFreya([503] * 10)
+    monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
+    monkeypatch.setattr(pipeline.time, "sleep", lambda s: None)
+    out = io.StringIO()
+    assert pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS) is False
+    assert fake.calls.count("/api/v2/chat/message") == len(pipeline.SMOKE_WAITS) + 1
+    assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
+
+
+def test_smoke_test_does_not_retry_a_bare_500(monkeypatch):
+    # kit/docs/api.md: a bare 500 from /chat/message means the workflow cannot start a call.
+    fake = _FakeFreya([500, 500])
+    monkeypatch.setattr(pipeline.platform, "kit", lambda: fake)
+    out = io.StringIO()
+    assert pipeline.selftest(Trace(out), {"workflow_id": "wf"}, SPEC_A, TOOLS) is False
+    assert fake.calls.count("/api/v2/chat/message") == 1
+    assert "chat smoke test: workflow starts: FAIL" in out.getvalue()
 
 
 def test_a_brief_read_as_single_product_is_flagged_in_the_trace(monkeypatch):

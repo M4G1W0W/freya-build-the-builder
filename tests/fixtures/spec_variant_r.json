@@ -47,6 +47,7 @@
    "2027-01-01"
   ],
   "next_weekday": "following_week",
+  "this_weekday": "current_week",
   "numeric_date_order": "dmy"
  },
  "products": {
@@ -121,6 +122,10 @@
    "note": "Attempt 3, Late band only: propose the Floor Amount again and ask the Customer to name any Business Day, up to and including the deadline, on which they can pay it. The date expression supplies the upper bound, not a fixed proposed payment date; use the Business Day the Customer names, subject to the promise-window rules."
   }
  ],
+ "too_much": {
+  "offer": "attempt_1",
+  "date_expr": ""
+ },
  "promise_window": {
   "min_expr": "today",
   "max_expr": "deadline",

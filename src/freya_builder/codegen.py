@@ -11,7 +11,7 @@ No brief knowledge: every value comes from the spec. Node and tool names are the
 from .expr import check_expr, normalise
 from .hooks import ARG_PREFIX
 from .sandbox import assemble
-from .spec import call_var, product_slots
+from .spec import call_var, product_slots, too_much, too_much_separate
 
 MODULES = ["calendar_core", "flatvars", "policy_helpers", "facts"]
 # Each node gets only the modules its main uses (smaller nodes; E8 has not measured the limit).
@@ -58,6 +58,8 @@ def _expressions(spec: dict) -> tuple[list[str], list[str]]:
     ]
     if not cb["enabled"]:
         groups[-1] = ("fn_callback", [])
+    if too_much_separate(spec) and too_much(spec)["date_expr"].strip():
+        groups.append(("fn_too_much", [("too much offer date", too_much(spec)["date_expr"])]))
     defs: list[str] = []
     lines: list[str] = []
     for key, items in groups:
@@ -91,10 +93,13 @@ def _slots(spec: dict) -> int:
 
 def _calendar(spec: dict) -> dict:
     cal = spec["calendar"]
+    this_next = cal.get("this_weekday") == "next_occurrence"
     return {
         "workdays": sorted({int(w) for w in cal["business_weekdays"]}),
         "holidays": sorted({str(h)[:10] for h in cal["holidays"]}),
         "next_weekday": cal["next_weekday"],
+        # only when the brief says so: saved specs have no this_weekday (rehearsal P1)
+        **({"this_weekday": "next_occurrence"} if this_next else {}),
         "date_order": cal["numeric_date_order"],
         "now_var": call_var(spec, "now") or "now",
     }
@@ -191,6 +196,7 @@ def account_config(spec: dict) -> dict:
             {"n": a["n"], "bands": list(a["bands"]), "amount": a["amount"]}
             for a in spec["attempts"]
         ],
+        **({"too_much_separate": True} if too_much_separate(spec) else {}),
         "business_days_only": spec["promise_window"]["business_days_only"],
         "non_business_day": spec["promise_window"]["non_business_day"],
         "after_max": spec["promise_window"]["after_max"],

@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 
 from freya_builder.nodes import always as nodes_always
-from freya_builder.render import exit_tool_name, render
-from freya_builder.spec import check_spec
+from freya_builder.render import _complete_when, exit_tool_name, render
+from freya_builder.spec import check_spec, identity_all_at_once
 from freya_builder.toolapi import load_tool_api
 from freya_builder.validate import validate
 
@@ -152,6 +152,7 @@ def test_negotiate_has_no_attempt_procedure_without_an_attempt_plan():
     s["attempts"] = []
     task = render(s, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
     assert "ATTEMPTS:" not in task
+    assert "WAITING:" in task  # offers exist without attempts
 
 
 def test_notes_come_before_the_goodbye():
@@ -382,20 +383,35 @@ def test_prompts_handle_customer_speech_styles():
     breaker = "Sorry, your message was cut off. Could you give me the whole answer in a few words?"
     assert breaker in system and "a whole answer then replaces the parts so far" in system
     assert "to a part or to a cut-off message without a reply" in system
-    ident = wf["nodes"]["identity"]["task_message"]
     nego0 = wf["nodes"]["negotiate"]["task_message"]
-    for task in (ident, nego0):
-        assert (
-            'but if your previous reply was already "Please go on.", use the cut-off line' in task
-        )
+    assert 'but if your previous reply was already "Please go on.", use the cut-off line' in nego0
     assert "only as often as that rule says in the whole call" in system
     ident = wf["nodes"]["identity"]["task_message"]
     assert "join the parts the customer gave since the last verify_identity result" in ident
-    assert "never ask the whole question again for it" in ident
+    assert "never ask the whole question again for a part" in ident
     assert "Do not repeat the security question in that message" in ident
     nego = wf["nodes"]["negotiate"]["task_message"]
     assert "a cut-off message that holds no yes, no, date or amount is no reply" in nego
     assert "uses no attempt" in nego
+    # M4 r3 PUB-06 talkative (3f5a442c) and bfe80eb8, e5d24c34, 704c184a: after the floor offer, a
+    # 2nd small-talk or fragment message got the offer again; brief A rule 26 offers it once.
+    assert "a first reply to an offer" not in nego
+    assert 'However many such messages come in a row, reply only "I see. Please go on."' in nego
+    assert "never repeat the offer, its amount or its date" in nego
+    assert "If the customer asks what you offered" in nego
+    assert "WAITING" not in ident
+    # cand-idw review: the talkative style's "wedding is on the 30th" must not reach DATES (FACTS
+    # would offer the deadline again); "maybe" is a non-answer; a question back is not a re-ask.
+    assert "is part of the remark, not a date they named" in nego
+    assert "a date or an amount given for paying" in nego
+    assert '"maybe" or "we\'ll see"' in nego
+    assert "a complete reply about paying" not in nego
+    assert (
+        "answer it as the brief says and stop there: do not repeat your question or offer" in nego
+    )
+    assert "a question about a date or an amount for paying, a request or a situation" in nego
+    assert "follow the brief for those messages instead of this paragraph" in nego
+    assert "If the BANK BRIEF itself says how to treat small talk" in nego
     assert "only after the customer has described that situation" in nego
     # Voice test 577a2cd4: "can we make it in instalments" got "would you like me to connect you
     # with restructuring?" and a "not right now"; brief A rule 41 says to transfer.
@@ -403,6 +419,14 @@ def test_prompts_handle_customer_speech_styles():
     assert "ask first only when the rule itself says to offer it or to ask" in nego
     assert "that day lies INSIDE that period, not in a later week" in nego
     assert "period's row" not in nego  # the DATE TABLE has no period rows (exp07, c45758f)
+
+
+def test_unknown_information_answers_questions_only():
+    # 3f5a442c: "My cousin's wedding is on the 30th" got "I don't have any information about your
+    # cousin's wedding" plus the offer again; the rule is for questions, not remarks.
+    system = render(SPEC_A, TOOLS, BRIEF)["system_prompt"]
+    assert "Never say it to a remark that asks for nothing" in system
+    assert "If you are asked something" not in system
 
 
 def test_engine_calls_missing_a_required_field_are_reported(tmp_path):
@@ -586,3 +610,318 @@ def test_a_named_date_is_answered_by_first_saying_it_as_written_in_facts():
         " FACTS says." in dates
     )
     assert not re.search(r"\d{4}-\d{2}-\d{2}|\b(January|October|November)\b", dates)
+
+
+# ---- identity step v2 (docs/proposals/2026-10-11-identity-fix-v2.md §3-§4) -------------------
+# M1 replay: complete answers that a full stop, a complaint or a cut-off followed were held
+# (d10044ef, 79778b2e, 6902b731), and "Why do you need that?" closed as declined (68d28036).
+
+T3 = "COMPLETE: join the parts the customer gave"
+T4 = "A full year has four digits"
+T5 = "An answer in letters or words (a code, a name) is complete"
+T6 = "CUT-OFF: count only the customer's messages"
+T7 = "If the customer says they already answered"
+T2A = "Ask the questions one at a time and keep each complete answer."
+T9 = "Check the security answers. CALL it once the customer has given a complete answer"
+OVERRIDE = "For a date, a year or digits, these tests decide what is complete"
+FX = ROOT / "tests" / "fixtures"
+
+
+def _ident(wf: dict) -> str:
+    return wf["nodes"]["identity"]["task_message"]
+
+
+def _numbered(task: str) -> list[str]:
+    return [x for x in task.splitlines() if re.match(r"\d+\. ", x)]
+
+
+def _variant(name: str) -> tuple[dict, list]:
+    spec = json.loads((FX / f"spec_variant_{name}.json").read_text())
+    return spec, load_tool_api(FX / "briefs" / f"variant-{name}.openapi.json")
+
+
+def _three_questions() -> dict:
+    s = copy.deepcopy(SPEC_A)
+    s["identity"]["questions"] = [
+        {"key": "birth_year", "ask": "What is your year of birth?", "format": "year"},
+        {"key": "postcode", "ask": "What is your postcode?", "format": "alnum"},
+        {
+            "key": "first_school",
+            "ask": "What was the name of your first school?",
+            "format": "text",
+        },
+    ]
+    return s
+
+
+def _one_question() -> dict:
+    s = copy.deepcopy(SPEC_A)
+    s["identity"]["questions"] = s["identity"]["questions"][:1]
+    return s
+
+
+def _no_explain() -> dict:
+    s = copy.deepcopy(SPEC_A)
+    s["identity"]["decline_explain"] = ""
+    return s
+
+
+def _all_at_once_tools(tmp_path) -> list:
+    """verify_identity takes customer_id and one string field per question key, no field/answer."""
+    api = json.loads((ROOT / "kit" / "tools" / "openapi.json").read_text())
+    body = api["paths"]["/verify_identity"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    keys = [q["key"] for q in SPEC_A["identity"]["questions"]]
+    body["properties"] = {"customer_id": {"type": "string"}} | {k: {"type": "string"} for k in keys}
+    body["required"] = ["customer_id", *keys]
+    path = tmp_path / "api.json"
+    path.write_text(json.dumps(api))
+    return load_tool_api(path)
+
+
+def test_complete_when_parses_formats_like_the_hooks():
+    # U1: lower/strip like hooks.py; digits:N only for N > 0; everything else is text.
+    date = ("date", "a day, a month and a full year", "the day, the month and the year")
+    year = ("year", "a full year", "the year, all four digits")
+    text = ("text", "all of it", "the whole answer")
+    expected = {
+        "date": date,
+        " Date ": date,
+        "year": year,
+        "digits:4": ("digits", "4 digits (or all of it, if it has letters)", "the 4 digits"),
+        "DIGITS:5": ("digits", "5 digits (or all of it, if it has letters)", "the 5 digits"),
+        "digits": text,
+        "digits:x": text,
+        "digits:0": text,
+        "alnum": text,
+        "text": text,
+        "time": text,
+        "": text,
+    }
+    for fmt, row in expected.items():
+        assert _complete_when(fmt) == row, fmt
+
+
+def test_identity_task_spec_a_states_complete_tests_and_short_asks():
+    # U2
+    wf = render(SPEC_A, TOOLS, BRIEF)
+    task = _ident(wf)
+    assert "complete when it has a day, a month and a full year" in task
+    assert 'short ask: "Just the 4 digits, please."' in task
+    assert T4 in task and T6 in task and T7 in task
+    assert T5 not in task
+    # a two-digit year is judged after joining the parts; a year cut off in figures is a part
+    assert "Join the parts first: a year that still has only its last two digits" in task
+    assert "not counted under CUT-OFF and does not restart it" in task
+    assert 'such as "19" or "199" at the end of a message, is a part under CUT-OFF' in task
+    nego = wf["nodes"]["negotiate"]["task_message"]
+    assert 'but if your previous reply was already "Please go on.", use the cut-off line' in nego
+
+
+def test_identity_task_variant_c_year_and_five_digits():
+    # U3
+    spec, tools = _variant("c")
+    task = _ident(render(spec, tools, ""))
+    assert "a full year" in task and "5 digits" in task
+    assert 'ask at once "Just the year, all four digits, please."' in task
+    assert T5 not in task
+
+
+def test_identity_task_three_questions_with_text_answers():
+    # U4: year / alnum / text
+    wf = render(_three_questions(), TOOLS, BRIEF)
+    task = _ident(wf)
+    assert [x[:3] for x in _numbered(task)] == ["1. ", "2. ", "3. "]
+    assert "complete when it has all of it" in task
+    assert T5 in task
+    assert 'unless it ends on half a word or on "and", "the" or "of"' in task
+    assert "A first part of a code" in task
+    assert OVERRIDE in task
+    assert validate(wf) == []
+
+
+def test_identity_task_one_date_question():
+    # U5
+    wf = render(_one_question(), TOOLS, BRIEF)
+    task = _ident(wf)
+    assert len(_numbered(task)) == 1
+    for block in (T3, T4, T6, T7):
+        assert block in task
+    assert T5 not in task
+    assert validate(wf) == []
+
+
+def test_identity_task_all_at_once_verify_identity(tmp_path):
+    # U6: no question/answer field, so the per-answer CALL sentences would send a partial body.
+    wf = render(SPEC_A, _all_at_once_tools(tmp_path), BRIEF)
+    task = _ident(wf)
+    assert T2A in task
+    assert "(field date_of_birth;" in task
+    assert "CALL verify_identity with it at once" not in task
+    assert T7 not in task
+    assert wf["nodes"]["identity"]["tools"][0]["function"]["description"].startswith(T9)
+    assert validate(wf) == []
+    per_answer = render(SPEC_A, TOOLS, BRIEF)["nodes"]["identity"]["tools"][0]["function"]
+    assert per_answer["description"].startswith("Check one security answer.")
+
+
+def _invented_mapping() -> dict:
+    """The P3 repair round's spec for an all-at-once tool: the two answer fields named as the
+    question and answer field, and the action flag `ok` as the one-answer flag (rehearsal P3b)."""
+    s = copy.deepcopy(SPEC_A)
+    keys = [q["key"] for q in s["identity"]["questions"]]
+    s["identity"].update(question_field=keys[0], answer_field=keys[1], answer_ok_field="ok")
+    return s
+
+
+def test_all_at_once_tool_with_invented_question_answer_mapping_renders_all_at_once(tmp_path):
+    # Engine-fixes item 1: keys that are verify_identity request fields decide the shape, so the
+    # agent never sends the question key as the first answer.
+    tools = _all_at_once_tools(tmp_path)
+    for spec in (_invented_mapping(), SPEC_A):
+        wf = render(spec, tools, BRIEF)
+        task = _ident(wf)
+        assert T2A in task and "(field date_of_birth;" in task
+        assert "send date_of_birth=" not in task and "set to the question key" not in task
+        fn = wf["nodes"]["identity"]["tools"][0]["function"]
+        assert fn["description"].startswith(T9)
+        props = fn["parameters"]["properties"]["body"]["properties"]
+        assert "Which security question" not in json.dumps(props)
+        assert props["date_of_birth"]["description"].startswith(
+            "The customer's answer to security question 1"
+        )
+        post = wf["nodes"]["identity"]["tools"][0]["post_process_code"]
+        assert "_good = str(_d.get('')).strip()" in post and "The bank marked as wrong" in post
+        assert validate(wf) == []
+
+
+def test_check_spec_accepts_all_at_once_verify_identity(tmp_path):
+    tools = _all_at_once_tools(tmp_path)
+    blank = copy.deepcopy(SPEC_A)
+    blank["identity"].update(question_field="", answer_field="", answer_ok_field="")
+    for spec in (blank, _invented_mapping(), SPEC_A):
+        assert [x for x in check_spec(spec, tools) if "identity" in x] == []
+
+
+def test_check_spec_all_at_once_needs_a_question_per_required_answer_field(tmp_path):
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["questions"] = spec["identity"]["questions"][:1]
+    problems = check_spec(spec, _all_at_once_tools(tmp_path))
+    assert any("requires 'phone_last4'" in x for x in problems)
+
+
+def test_check_spec_per_answer_missing_field_names_the_all_at_once_shape():
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["question_field"] = ""
+    problems = [x for x in check_spec(spec, TOOLS) if "verify_identity has no field" in x]
+    assert len(problems) == 1 and "takes every answer in one call" in problems[0]
+
+
+def _verify_body_tools(tmp_path, props: dict, required: list[str]) -> list:
+    api = json.loads((ROOT / "kit" / "tools" / "openapi.json").read_text())
+    body = api["paths"]["/verify_identity"]["post"]["requestBody"]["content"]["application/json"][
+        "schema"
+    ]
+    body["properties"] = {"customer_id": {"type": "string"}} | props
+    body["required"] = ["customer_id", *required]
+    path = tmp_path / "api.json"
+    path.write_text(json.dumps(api))
+    return load_tool_api(path)
+
+
+def test_identity_review_findings_on_the_all_at_once_shape(tmp_path):
+    # Review of cand-eng.1 (13 agents): partial or mis-cased keys, a required setting field, a
+    # per-answer selector whose enum lists the keys, and empty fields with keys that are not fields.
+    two = {"date_of_birth": {"type": "string"}, "phone_last4": {"type": "string"}}
+    tools = _verify_body_tools(tmp_path, two, list(two))
+    spec = _invented_mapping()
+    spec["identity"]["questions"][1]["key"] = "phone"
+    found = [x for x in check_spec(spec, tools) if "cannot be right" in x]
+    assert len(found) == 1 and "['date_of_birth']" in found[0]
+    spec = copy.deepcopy(SPEC_A)
+    spec["identity"]["questions"][0]["key"] = "Date_Of_Birth"
+    assert identity_all_at_once(spec, next(t for t in tools if t.name == "verify_identity"))
+    assert any(
+        "must be the exact request field 'date_of_birth'" in x for x in check_spec(spec, tools)
+    )
+    setting = two | {"channel": {"type": "string", "enum": ["voice", "chat"]}}
+    tools = _verify_body_tools(tmp_path, setting, list(setting))
+    assert [x for x in check_spec(SPEC_A, tools) if "identity" in x] == []
+    blank = copy.deepcopy(SPEC_A)
+    blank["identity"].update(question_field="", answer_field="", answer_ok_field="")
+    blank["identity"]["questions"][1]["key"] = "phone"
+    found = [x for x in check_spec(blank, tools) if "identity" in x]
+    assert len(found) == 1 and found[0].startswith("identity question keys ['phone'] are not")
+    selector = two | {
+        "question": {"type": "string", "enum": ["date_of_birth", "phone_last4"]},
+        "answer": {"type": "string"},
+    }
+    tools = _verify_body_tools(tmp_path, selector, ["question", "answer"])
+    per = copy.deepcopy(SPEC_A)
+    per["identity"].update(question_field="question", answer_field="answer")
+    vt = next(t for t in tools if t.name == "verify_identity")
+    assert not identity_all_at_once(per, vt)
+    assert "send question=date_of_birth" in _ident(render(per, tools, BRIEF))
+
+
+def test_negotiate_attempts_clause_follows_the_brief_too_much_rule():
+    # Engine-fixes item 2 (rehearsal P2): a brief whose "too much" floor offer is not an attempt.
+    old = "is attempt 1 with the floor amount, on attempt 1's date"
+    sep = "is not one of these attempts: make it as FACTS says, on its own date"
+    task = render(SPEC_A, TOOLS, BRIEF)["nodes"]["negotiate"]["task_message"]
+    assert old in task and sep not in task
+    spec = copy.deepcopy(SPEC_A)
+    spec["too_much"] = {"offer": "separate", "date_expr": "next_business_day(today)"}
+    wf = render(spec, TOOLS, BRIEF)
+    assert sep in wf["nodes"]["negotiate"]["task_message"] and old not in json.dumps(wf)
+    assert validate(wf) == []
+    assert check_spec(spec, TOOLS) == []
+    spec["too_much"]["date_expr"] = "tomorrow()"
+    assert any(x.startswith("too much offer date: ") for x in check_spec(spec, TOOLS))
+
+
+def test_identity_task_without_decline_explanation():
+    # U7: no `say ""`, and the brief decides what declining does.
+    task = _ident(render(_no_explain(), TOOLS, BRIEF))
+    assert 'say ""' not in task and "explain once" not in task
+    assert "do what the BANK BRIEF says for it" in task
+    assert "Such questions never end the call unless another ENDING's trigger names them" in task
+
+
+def test_identity_task_declining_and_resend_wording():
+    # U8: declining is the brief's; why-questions get X without an ending; a value given again
+    # after its result is a new answer; corrections count only before a full stop.
+    task = _ident(render(SPEC_A, TOOLS, BRIEF))
+    for text in (
+        "is only what the BANK BRIEF and the ENDING for declining say",
+        'say "These questions protect your account." without repeating',
+        "is not this explanation",
+        "as the brief says for that question",
+        "even the same value, is a new answer: send it",
+        "before any full stop",
+        "rebuild the answer from the part they now give",
+        "the number you sent for the part they now give belongs in the other part",
+        "unless a verify_identity result tells you to send it again",
+    ):
+        assert text in task, text
+    assert "(why you need it, what the call is about)" not in task
+    assert "Never send the same answer twice" not in task
+
+
+def test_identity_variants_render_deterministically_and_validate(tmp_path):
+    # U9
+    cases = [
+        (SPEC_A, TOOLS),
+        _variant("r"),
+        _variant("c"),
+        (_three_questions(), TOOLS),
+        (_one_question(), TOOLS),
+        (SPEC_A, _all_at_once_tools(tmp_path)),
+        (_no_explain(), TOOLS),
+    ]
+    for spec, tools in cases:
+        wf = render(spec, tools, BRIEF)
+        again = render(copy.deepcopy(spec), tools, BRIEF)
+        assert json.dumps(wf, sort_keys=True) == json.dumps(again, sort_keys=True)
+        assert validate(wf) == []

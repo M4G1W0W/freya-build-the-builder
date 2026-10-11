@@ -126,3 +126,109 @@ def test_floor_percent_is_checked():
     spec = copy.deepcopy(SPEC_A)
     spec["products"]["types"][0]["floor_field"] = ""
     assert any("floor field ''" in p for p in check_spec(spec, TOOLS))
+
+
+SPEC_C = json.loads((ROOT / "tests" / "fixtures" / "spec_variant_c.json").read_text())
+TOOLS_C = load_tool_api(ROOT / "tests" / "fixtures" / "briefs" / "variant-c.openapi.json")
+
+
+def with_ending_wins(**entry) -> dict:
+    """The variant-c spec with an ending_wins entry before promise_recorded (review gap 7)."""
+    spec = copy.deepcopy(SPEC_C)
+    rule = {"when": "ending_wins", "note_reason": "insolvency", "then": "row"}
+    rule |= {"row": "no_commitment_insolvency", "outcome": ""} | entry
+    rules = spec["close_precedence"]
+    rules.insert(next(i for i, c in enumerate(rules) if c["when"] == "promise_recorded"), rule)
+    return spec
+
+
+def test_ending_wins_entry_is_accepted():
+    assert schema_problems(with_ending_wins(), SPEC_SCHEMA) == []
+    assert check_spec(with_ending_wins(), TOOLS_C) == []
+    assert check_spec(with_ending_wins(note_reason=""), TOOLS_C) == []
+
+
+@pytest.mark.parametrize(
+    "entry, needle",
+    [
+        ({"then": "event_row"}, "then must be 'row'"),
+        ({"row": "ghost"}, "unknown row 'ghost'"),
+        ({"row": "transferred_senior"}, "without a queue"),
+        ({"row": "not_verified_failed"}, "negotiate-phase"),
+        ({"note_reason": "bankrupt"}, "not an add_note reason"),
+        ({"note_reason": "already_paid"}, "already used by"),
+        # review C1: the default negotiate row closes notes-done and turn-cap calls, so it would
+        # flip every such promise call (variant-c's default negotiate row is refused)
+        ({"row": "no_commitment_refused"}, "is default_rows.negotiate"),
+    ],
+)
+def test_ending_wins_guards(entry, needle):
+    problems = check_spec(with_ending_wins(**entry), TOOLS_C)
+    assert any(needle in p for p in problems), problems
+
+
+def test_ending_wins_must_follow_every_transfer():
+    # review C2: before the "transferred" entry it would cancel a transfer the agent announced
+    spec = with_ending_wins()
+    rules = spec["close_precedence"]
+    rule = rules.pop(next(i for i, c in enumerate(rules) if c["when"] == "ending_wins"))
+    rules.insert(0, rule)
+    problems = check_spec(spec, TOOLS_C)
+    assert problems == [
+        "close_precedence[0] ending_wins: must come after the 'transferred' entry at index 1"
+    ]
+    rules.insert(2, rules.pop(0))  # right after the transfer, still before promise_recorded
+    assert check_spec(spec, TOOLS_C) == []
+
+
+def test_ending_wins_note_reason_needs_notes():
+    spec = copy.deepcopy(SPEC_A)  # Brief A uses no add_note
+    rule = {"when": "ending_wins", "note_reason": "hardship", "then": "row"}
+    spec["close_precedence"].insert(1, rule | {"row": "no_promise_hardship", "outcome": ""})
+    assert any("notes are not used" in p for p in check_spec(spec, TOOLS))
+    spec["close_precedence"][1]["note_reason"] = ""
+    assert check_spec(spec, TOOLS) == []
+
+
+# --- Fix 1 (engine-fixes, 11 Oct): a per-product sentence left only in unmodeled -----------------
+
+PAID_SENTENCE = "Thank you for letting us know. Payments can take up to two business days to show."
+PAID_LINE = f'Rule 41: for an already paid product, say exactly "{PAID_SENTENCE}" and continue.'
+
+
+def _with_unmodeled(spec: dict, line: str) -> dict:
+    s = copy.deepcopy(spec)
+    s["unmodeled"] = [*s["unmodeled"], line]
+    return s
+
+
+def _unsaid(problems: list[str]) -> list[str]:
+    return [p for p in problems if p.startswith("unmodeled holds a sentence")]
+
+
+def test_check_spec_flags_a_per_product_sentence_left_only_in_unmodeled():
+    # final/spec-AB1 (ca80d52), g3-c r1-r3, p3b and variant-c fresh builds: in 6 of 16 multi-product
+    # extractions the already-paid sentence was only in unmodeled, which the agent never sees.
+    found = _unsaid(check_spec(_with_unmodeled(SPEC_C, PAID_LINE), TOOLS_C))
+    assert len(found) == 1
+    assert PAID_SENTENCE in found[0] and "['already_paid']" in found[0]
+    single = _with_unmodeled(SPEC_C, PAID_LINE.replace('"', "'"))
+    assert len(_unsaid(check_spec(single, TOOLS_C))) == 1
+
+
+def test_check_spec_per_product_sentence_guard_stays_quiet_otherwise():
+    spec = _with_unmodeled(SPEC_C, PAID_LINE)
+    paid = next(r for r in spec["rows"] if r["id"] == "already_paid")
+    paid["say_before_end"] = [PAID_SENTENCE]
+    assert _unsaid(check_spec(spec, TOOLS_C)) == []  # the row has it
+    no_reason = (
+        'Rule 30: if asked whether this is a robot, say "I am the bank\'s virtual assistant."'
+    )
+    assert _unsaid(check_spec(_with_unmodeled(SPEC_C, no_reason), TOOLS_C)) == []
+    customer = 'Rule 42: "This is not mine, I never had it." is a dispute: assign dispute.'
+    assert _unsaid(check_spec(_with_unmodeled(SPEC_C, customer), TOOLS_C)) == []
+    short = 'Rule 41: for already_paid say "Noted, thank you."'
+    assert _unsaid(check_spec(_with_unmodeled(SPEC_C, short), TOOLS_C)) == []
+    one = copy.deepcopy(SPEC_A)
+    one["unmodeled"] = [PAID_LINE.replace("already paid", "paid")]
+    assert _unsaid(check_spec(one, TOOLS)) == []  # notes unused: single-product rows already work

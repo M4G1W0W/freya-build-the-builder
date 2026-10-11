@@ -99,3 +99,33 @@ def test_a_failed_smoke_test_ends_not_ok_with_exit_3(capsys, monkeypatch):
     assert cli.run([BRIEF, API], fake_extract, fake_render, lambda *args: False) == 3
     err = capsys.readouterr().err
     assert "ok=False" in err
+
+
+def test_the_export_comes_before_a_failing_smoke_test(capsys, monkeypatch):
+    # The export is a required artefact; an outage during the optional smoke test must not cost it.
+    events = []
+    monkeypatch.setattr(cli.platform, "dry_run", lambda trace, slot, wf: None)
+    monkeypatch.setattr(
+        cli.platform, "save", lambda trace, slot, wf: {"workflow_id": "w", "agent_id": "a"}
+    )
+    monkeypatch.setattr(cli.platform, "export", lambda trace, wid, path: events.append("export"))
+
+    def failing_selftest(*args):
+        events.append("selftest")
+        return False
+
+    assert (
+        cli.run([BRIEF, API, "--export", "x.json"], fake_extract, fake_render, failing_selftest)
+        == 3
+    )
+    assert events == ["export", "selftest"]
+
+
+def test_stdout_is_flushed_before_the_end_line():
+    # Engine-fixes item 5: with 2>&1 the trace END line was glued to the --dry workflow JSON.
+    import inspect
+
+    from freya_builder import cli
+
+    src = inspect.getsource(cli.run)
+    assert src.index("sys.stdout.flush()") < src.index("trace.end(ok)")

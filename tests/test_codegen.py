@@ -542,6 +542,179 @@ def test_finalize_ignores_unused_slots():
     assert vs["close_outcome"] == "no_promise"
 
 
+# ------------------------------------- finalize: an ending that wins over a recorded promise
+# Review gap 7. Every expectation below comes from the TEXT of our own made-up brief
+# tests/fixtures/briefs/variant-c.md (cited as c:<line>); variant-c.answer.json:125 says the same.
+# The spec is the committed variant-c extraction plus the close_precedence entry that brief asks
+# for. Rule 47 (c:105) and the closing paragraph (c:126) make insolvency win over a recorded promise.
+
+ENDING_WINS = {
+    "when": "ending_wins",
+    "note_reason": "insolvency",
+    "then": "row",
+    "row": "no_commitment_insolvency",
+    "outcome": "",
+}
+
+
+def spec_c() -> dict:
+    spec = json.loads((FIXTURE.parent / "spec_variant_c.json").read_text())
+    rules = spec["close_precedence"]
+    at = next(i for i, c in enumerate(rules) if c["when"] == "promise_recorded")
+    rules.insert(at, dict(ENDING_WINS))
+    return spec
+
+
+def note_c(k: int, reason: str) -> dict:
+    """A note the model saved with add_note (variant-c names the field reason_code)."""
+    return {
+        f"add_note_p{k}_args.arg_reason_code": reason,
+        f"add_note_p{k}_response.status": "success",
+        f"add_note_p{k}_response.data.ok": "true",
+    }
+
+
+def autonoted(*slots: int, reason: str) -> dict:
+    """A note-derived ending: its ev_ node sets autonote_reason and the an_<k> nodes note every
+    product that has no promise and no note yet."""
+    out = {"autonote_reason": reason}
+    for k in slots:
+        out[f"{codegen.AUTONOTE_NODE}{k}_response.status"] = "success"
+        out[f"{codegen.AUTONOTE_NODE}{k}_response.data.ok"] = "true"
+    return out
+
+
+def closed(vs: dict) -> tuple:
+    return vs["close_outcome"], vs.get("close_reason"), vs["xfer_queue"]
+
+
+INSOLVENT = ("no_commitment", "insolvency", "none")
+NOTES_DONE = "no_commitment_refused"  # ev_notes / ev_notes_p record the default negotiate row
+
+
+def test_c_s1_promise_then_insolvency():
+    # c:105 "Promises already recorded stay, and the outcome is still no_commitment / insolvency."
+    # c:126 "rule 47 closes as no_commitment / insolvency" (an exception to promise_to_pay).
+    vs = finalize(spec_c(), {"end_event": "no_commitment_insolvency", **promise_ok(1)})
+    assert closed(vs) == INSOLVENT
+    assert "rule=ending_wins" in vs["finalize_debug"]
+
+
+def test_c_s2_promise_on_p1_insolvency_with_p2_open():
+    # c:105 "Every product without a recorded promise ends with reason insolvency" (P2's note,
+    # c:110), and the outcome is still no_commitment / insolvency (c:105, c:126).
+    extra = {
+        "end_event": "no_commitment_insolvency",
+        **promise_ok(1),
+        **autonoted(2, reason="insolvency"),
+    }
+    vs = finalize(spec_c(), extra, 2)
+    assert closed(vs) == INSOLVENT
+    assert "promises=P1; notes=P2:insolvency" in vs["finalize_debug"]
+
+
+def test_c_s2b_model_notes_p2_itself():
+    # Same call, but the model saved P2's insolvency note itself and the notes-done route closed it
+    # through the default negotiate row: c:105 and c:126 still give no_commitment / insolvency.
+    extra = {"end_event": NOTES_DONE, **promise_ok(1), **note_c(2, "insolvency")}
+    vs = finalize(spec_c(), extra, 2)
+    assert closed(vs) == INSOLVENT
+
+
+@pytest.mark.parametrize("model_notes_p2", [False, True])
+def test_c_s3_p1_refused_then_insolvency_on_p2(model_notes_p2):
+    # c:84 P1's attempts are used up: it ends with reason refused. c:110 "A product that has already
+    # ended with a reason keeps it: rules 34, 47 and 48 give their reason only to the products that
+    # have not ended yet": P1 keeps refused, P2 gets insolvency. c:126 the first-product reason
+    # applies only "outside rule 47"; rule 47 closes as no_commitment / insolvency.
+    p2 = note_c(2, "insolvency") if model_notes_p2 else autonoted(2, reason="insolvency")
+    event = NOTES_DONE if model_notes_p2 else "no_commitment_insolvency"
+    vs = finalize(spec_c(), {"end_event": event, **note_c(1, "refused"), **p2}, 2)
+    assert closed(vs) == INSOLVENT
+    assert "notes=P1:refused,P2:insolvency" in vs["finalize_debug"]
+
+
+def test_c_s4_insolvency_before_identity():
+    # c:105 "If the customer says it before identity is verified, do not answer it yet: continue
+    # with the identity questions and apply this rule once they pass."
+    passed = {"end_event": "no_commitment_insolvency", **autonoted(1, reason="insolvency")}
+    assert closed(finalize(spec_c(), passed)) == INSOLVENT
+    # The questions fail: c:42-43 (rule 14) closes not_verified / failed; c:111 "A call that never
+    # reached get_account adds no notes", so nothing can carry insolvency.
+    failed = finalize(spec_c(), {"end_event": "not_verified_failed"}, product_count=0)
+    assert closed(failed) == ("not_verified", "failed", "none")
+
+
+def test_c_s5_senior_band_insolvency_without_a_promise():
+    # c:85 the senior transfer happens on every such call: "Only an earlier transfer (rules 34, 43,
+    # 44) or rule 47 replaces it." c:105 rule 47 "comes before rules 31, 33 and 34": no transfer.
+    extra = {"end_event": "no_commitment_insolvency", **autonoted(1, reason="insolvency")}
+    assert closed(finalize(spec_c(), extra)) == INSOLVENT
+
+
+def test_c_s5b_senior_band_insolvency_after_a_promise():
+    # c:85 + c:105 as in S5, and the recorded promise stays without changing the outcome (c:105).
+    extra = {"end_event": "no_commitment_insolvency", **promise_ok(1)}
+    assert closed(finalize(spec_c(), extra)) == INSOLVENT
+
+
+def test_c_s6_p1_paid_then_insolvency_on_p2():
+    # c:99 (rule 41) P1 ends already_paid and keeps it (c:110); P2 gets insolvency (c:105);
+    # c:126 rule 47 closes as no_commitment / insolvency.
+    extra = {
+        "end_event": "no_commitment_insolvency",
+        **note_c(1, "already_paid"),
+        **autonoted(2, reason="insolvency"),
+    }
+    vs = finalize(spec_c(), extra, 2)
+    assert closed(vs) == INSOLVENT
+    assert "notes=P1:already_paid,P2:insolvency" in vs["finalize_debug"]
+
+
+@pytest.mark.parametrize(
+    "extra, count, expected",
+    [
+        # c:101 (rule 43) "Promises recorded before the request stay"; c:126 "a call that ends
+        # with a transfer closes as transferred with that transfer's reason".
+        (
+            {"end_event": "transferred_payment_plan", **promise_ok(1)},
+            1,
+            ("transferred", "payment_plan", "plan_team"),
+        ),
+        # c:85 (rule 33) the senior transfer comes after every agreed promise is recorded; c:126.
+        (
+            {"end_event": "transferred_senior", **promise_ok(1)},
+            1,
+            ("transferred", "senior", "collections_senior"),
+        ),
+        # c:119 and c:126 "promise_to_pay wins whenever at least one promise was recorded".
+        ({"end_event": NOTES_DONE, **promise_ok(1)}, 1, ("promise_to_pay", None, "none")),
+        # c:86 (rule 34) a declined hardship offer gives hardship notes, yet c:126 lists only a
+        # transfer and rule 47 as exceptions: the promise still wins.
+        (
+            {"end_event": NOTES_DONE, **promise_ok(1), **note_c(2, "hardship")},
+            2,
+            ("promise_to_pay", None, "none"),
+        ),
+        # c:120 and c:126 "if every product ended already_paid, close as already_paid".
+        (
+            {"end_event": NOTES_DONE, **note_c(1, "already_paid"), **note_c(2, "already_paid")},
+            2,
+            ("already_paid", None, "none"),
+        ),
+        # c:126 "Otherwise close as no_commitment with the reason of the first product, in
+        # get_account order, whose reason is not already_paid".
+        (
+            {"end_event": NOTES_DONE, **note_c(1, "already_paid"), **note_c(2, "refused")},
+            2,
+            ("no_commitment", "refused", "none"),
+        ),
+    ],
+)
+def test_c_controls_unchanged(extra, count, expected):
+    assert closed(finalize(spec_c(), extra, count)) == expected
+
+
 # ---------------------------------------------------------------- generality
 
 
@@ -900,6 +1073,12 @@ def test_floor_as_a_percentage_of_past_due():
     p1 = block(call(spec, [CARD])["account_facts"], "P1")
     assert "- floor (30% of past due): 126.00" in p1  # CARD: 420.00 past due
     assert "floor 126.00" in p1
+    # engine-fixes item 5 (rehearsal P1): 30% of 99.95 is 29.985; float round() said 29.98
+    for past_due, floor in (("99.95", "29.99"), ("100.01", "30.00"), ("0.05", "0.02")):
+        card = CARD | {"past_due": past_due}
+        assert f"- floor (30% of past due): {floor}" in block(
+            call(spec, [card])["account_facts"], "P1"
+        )
 
 
 @pytest.mark.parametrize("mode", MODES)
@@ -920,3 +1099,24 @@ def test_date_table_has_no_period_rows(mode):
     table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
     assert not any(x.startswith(("next week", "the week after next")) for x in table.splitlines())
     assert "Monday-to-Sunday): " not in table.replace("this <weekday> (this Monday-to-Sunday", "")
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_this_weekday_follows_the_brief(mode):
+    # Engine-fixes item 4 (rehearsal P1 I3): "this <weekday>" = the first such weekday after
+    # today. The table said the Monday-to-Sunday week, so "this Wednesday" on a Friday was past.
+    spec = spec_a()
+    spec["calendar"]["this_weekday"] = "next_occurrence"
+    table = run(codegen.setup_source(spec), {"now": "2026-10-23T11:00"}, mode)["date_table"]
+    line = next(x for x in table.splitlines() if x.startswith("this <weekday>"))
+    assert line.startswith("this <weekday> (the first such weekday after today): Mon 2026-10-26")
+    assert "Wed 2026-10-28" in line and "Fri 2026-10-30" in line and "2026-10-21" not in line
+
+
+def test_this_weekday_default_and_missing_field_keep_the_week_reading():
+    old = spec_a()
+    del old["calendar"]["this_weekday"]
+    for spec in (old, spec_a()):
+        assert codegen.setup_source(spec) == codegen.setup_source(spec_a())
+        table = run(codegen.setup_source(spec), {"now": "2026-10-23T11:00"})["date_table"]
+        assert "this <weekday> (this Monday-to-Sunday week): Mon 2026-10-19" in table
