@@ -36,6 +36,12 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 ## Results
 (filled in as blocks finish)
 
+## Candidate review (02:05): G1 = PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`)
+Generic; renders correct on 16 saved specs; only the 3 intended lines differ from F2. Unmeasured MEDIUM risks, exactly
+what the blocked M3/M4/M5/O1 were to measure: PUB-07 in pieces style (styled-a has it), customer-proposed date/amount
+(o1-a PUB-05, o1-b PUB-12), Brief B on G1 (M5). Cheap code hardening (no sim): print the line only when the attempt-1
+date is valid (today <= date <= deadline).
+
 ## Demonstrated correctness gaps (morning proposals; generic; NOT implemented overnight)
 1. **Identity: a complete security answer inside a cut-off message is not submitted** (LEDGER failures: M1 G1 r3
    d10044ef promise recorded after 3 wrong DOBs; M2 r1 79778b2e declined instead of failed). Common to every arm.
