@@ -551,3 +551,11 @@ rules 32/42 that does not depend on eng.8), and on an eng.8 build from
 `--spec tests/fixtures/fix1_audit_spec_ab4.json` (branch `cand-eng-closing`), where the fix is active for both
 the hardship lines and "Can I help you first?". A fresh eng.8 build exercises the fix only if its trace has a
 "said before the customer answers" line (12/21 fresh builds so far).
+
+**Update 13:40 UTC (user request):** cases revised against false failures (v2, `cases-eng8-paths` =
+898223d): neutral goodbyes, well-wishes and transfer announcements are explicitly allowed; the help-first
+question is required once (rule 42) while a payment attempt before it is not judged (rule 30 vs 42 unresolved,
+labelled); HU-PRE asks for a person before any security question. Stand-in judges (not Freya's judge): 52/52
+verdicts as intended on 26 synthetic transcripts. Simulation hand-off with E1 (eng.4 vs eng.8 overall) vs E2
+(closing fix isolated: the same ab4 spec on eng.6 and eng.8), cost 15 calls per candidate:
+`docs/plans/2026-10-11-path-cases-sim-handoff.md`.
