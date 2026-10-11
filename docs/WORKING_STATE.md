@@ -15,6 +15,10 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
   `runs/dev/r4/harness/`), plan file `plan.txt`, done log `plan-done.txt`, stop file `PLANSTOP`. Path cases
   `runs/cases/e1-a.json`, `e1-ab.json` (from 898223d). Methodology messaged 14:35 (challenger tag by 15:00 or eng.8;
   24-build `--dry` battery; main->challenger merge trial by 16:30). Queue (`sim/queue.txt`) still paused; not used.
+- Challenger = **cand-eng.9 b103e21** (Methodology 14:37: eng.8 + closing guard, 875 tests). eng.4 fresh builds
+  exp-eng4-fr / exp-eng4-fab (14:34-14:38, export MATCH); eng.9 fresh builds exp-ch-fr / exp-ch-fab from
+  `<this scratchpad>/wt-eng9` (detached b103e21). **`final-eng4` = 924b970** (branch, worktree
+  `<this scratchpad>/wt-final-eng4`): main merged into cfa4d9d, no builder-code diff, ruff clean, 891 passed; untagged.
 
 ## UPDATE 14:20 UTC: housekeeping (user ~14:05): E4-A-styledA COMPLETED and dequeued; challenger arm eng.6 -> eng.8 (eng.4 stays the comparison candidate); cap 789
 

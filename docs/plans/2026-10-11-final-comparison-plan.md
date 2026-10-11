@@ -15,7 +15,10 @@ Background and rationale: dossier `docs/reviews/2026-10-11-final-selection-evide
 
 Tool API `kit/tools/openapi.json`; `--save-spec runs/dev/r4/spec-<slot>.json`, `--export runs/dev/r4/exports/<slot>.json`.
 eng.4 builds 14:34-14:38 UTC: exp-eng4-fr 114 s, exp-eng4-fab 118 s, `git=cfa4d9d dirty=False`, spec check, validation
-and smoke PASS, export MATCH (0 changed, 0 render-only, 0 needs-review). Record per build: trace `git=<sha> dirty=False`, build seconds, and whether the trace has a STEP line "said before the
+and smoke PASS, export MATCH (0 changed, 0 render-only, 0 needs-review). eng.9 builds 14:39-14:43 UTC: exp-ch-fr 112 s,
+exp-ch-fab 113 s, `git=b103e21 dirty=False`, all checks PASS, export MATCH. **Closing fix: exp-ch-fr INACTIVE draw (no STEP
+line); exp-ch-fab ACTIVE draw** (STEP: "I am sorry to hear that." moved out of the transferred_support and
+no_promise_hardship goodbyes into the negotiate rules). Record per build: trace `git=<sha> dirty=False`, build seconds, and whether the trace has a STEP line "said before the
 customer answers" (the closing fix active in that extraction or not).
 
 ## Case sets per arm and round (harness: `run_one.sh` + `suite_once.py` via `plan_run.sh`; `qrun4.sh` not used)
