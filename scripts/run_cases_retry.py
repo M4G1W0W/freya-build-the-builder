@@ -17,23 +17,21 @@ simulation and whenever a new one is refused because another is running.
 A rep with calls the judge never scored ("analysis never arrived", 11 Oct 08:22 UTC) is not a measurement: it is
 discarded and repeated once with fresh bank sessions (printed as "-- run discarded", which the call ledger counts).
 
-Calls per simulation: FREYA_SIM_CONCURRENCY (the kit's own setting, default 5) is 13 here unless the environment
-sets it (user decision 11 Oct 08:25 UTC: one wave per 13-case rep).
+Calls per simulation: the kit's FREYA_SIM_CONCURRENCY (default 5). It ran at 13 on 11 Oct 08:30-09:22 UTC; on the
+13-case A+B set that made agent turns slow (20-60 s) and simulated customers hung up, so it is back to the default
+(user decision 09:25 UTC).
 """
 
 import http.client
 import json
 import logging
-import os
 import re
 import sys
 import time
 import urllib.error
 from datetime import datetime
 
-os.environ.setdefault("FREYA_SIM_CONCURRENCY", "13")  # read by kit/freya.py at import
-
-from _kit import KIT, freya  # noqa: E402
+from _kit import KIT, freya
 
 log = logging.getLogger("run_cases_retry")
 DELAYS = (5, 15, 30, 60, 120)
