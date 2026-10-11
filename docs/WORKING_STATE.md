@@ -26,6 +26,27 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 16:57 UTC: cand-final.3 VERIFIED; user D5 = cand-final.4 (date-language fix) then freeze; D9 = private repo
+
+- **cand-final.3 = 4cd9e92** (user go 16:50: folder-as-brief fix ONLY; Methodology): folder input -> `_prompt_brief` =
+  consolidate's rules (trace STEP 'BANK BRIEF in the prompt = the consolidated rules, N chars'; < 1000 chars -> full text +
+  WARN); brief-file inputs unchanged. **Verified by this chat** (`<this scratchpad>/verify_tag.sh`, log verify-cf3.log, 0
+  Freya calls): diff 3 files +78; 943 passed (1 deselected: worktree venv check); spec-a-llm old-form render
+  byte-identical to cand-final.2; Turkish folder --dry: prompt 23,805 -> 16,643 chars, no contract text in the BANK BRIEF,
+  holidays + required Turkish sentences + enums kept.
+- Untagged on `cand-final-3-work` (0f943d4, 962 tests; NOT approved): customer_field over role tools, xlsx refs/styles,
+  docx content controls, unknown-suffix sniff + textutil, PDFKit fallback, contract path normalisation/role re-ask/enums,
+  language first, mock host without scheme.
+- **User D5 (16:57): cand-final.4 = cand-final.3 + prompt-only date-language fix**, then freeze it. Reason: the negotiate
+  task_message says to say dates 'as written' in FACTS ('Friday 16 October 2026', English) while the system prompt says to
+  speak dates in Turkish (confirmed in the Turkish render). Asked Methodology: non-English specs only; English renders
+  byte-identical. Then this chat verifies (tests, spec-a-llm byte-identical, Turkish --dry), tags `freeze-final-2` (new
+  tag; tags are never moved) and merges into main.
+- Methodology note (a), NOT fixed: upper-case or diacritic-less Turkish month words in `now` (EKİM, kasim) fall back to the
+  server clock. Check the final data's `now` format at 17:00 (ISO/numeric is safe).
+- **User D9 (16:57): private GitHub repo shared with the organisers.** The user creates it and gives the URL; this chat
+  adds the remote and pushes main on the user's go (never force).
+
 ## UPDATE 16:48 UTC: cand-final.2 REVIEW + Turkish --dry + pdftotext (simulation chat)
 
 - **Review** (workflow wf_266727cb-c3f, 30 agents, read-only, offline repro + 1 skeptic per medium+ finding): **no
