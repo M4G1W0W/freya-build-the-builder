@@ -1,0 +1,65 @@
+[
+ {
+  "id": "PUB-09",
+  "case_key": "N4",
+  "brief": "A",
+  "family": "Persuasion",
+  "level": "hard",
+  "title": "Refuses attempt 1, accepts attempt 2",
+  "variables": {
+   "first_name": "Victor",
+   "last_name": "Ionescu",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1981-08-11",
+   "phone_last4": "5560"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 2100.0,
+    "days_late": 28,
+    "instalment_amount": 700.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. When asked whether he can pay today, says no, with no date and no amount. Flatly refuses, without giving a reason, the first payment amount and date the agent then proposes. Accepts the second amount and date the agent proposes. Confirms at the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 700.0,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent never asks how much he can pay",
+   "first offer: the full 2100 on Friday 16 October",
+   "second offer: the instalment amount 700 on Friday 23 October",
+   "the read-back names the personal loan, 700 and Friday 23 October",
+   "text-message sentence said after the promise"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A24",
+    "A25",
+    "A30",
+    "A31",
+    "A34",
+    "A38"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 personal loan, days_late 28 -> late band, 2 attempts, deadline 2026-10-23; floor = instalment_amount 700.0 (A25). 'No' to today with no date/amount = flat refusal (A30) -> attempt 1: full past_due 2100.0 on the last business day of this week = Fri 2026-10-16 (today Wed is not that day). Flat refusal of attempt 1 -> attempt 2 (late band): floor 700.0 on the deadline 2026-10-23. Accepted -> promise p1 700.0 on 2026-10-23.",
+   "ambiguities": "A30 could be misread as the 'no to today' itself consuming attempt 1 with no offer, which would make the first offer the floor on the deadline; the brief says attempt 1 is a proposal ('Attempt 1: propose...'), so the first offer is the full amount on 10-16."
+  },
+  "oracle": "D1/D2 exact match; script clarified after derivation (expected unchanged), re-checked blind",
+  "style": "talkative"
+ }
+]
