@@ -23,7 +23,16 @@ and eng.4g untested. Results: `docs/reviews/2026-10-11-final-comparison-results.
 1. **Methodology** (engine chat): generic builder changes BEFORE 17:00 on top of b9756fe as a NEW tag (asked by ~16:50):
    folder input (.md/.txt, .docx/.xlsx stdlib, .pdf best-effort, warn never crash), tools from the folder's service
    contract with base URL = mock_url, agent language from the brief (no hard-coded English lines/dates), old CLI kept.
-   Not yet reported back. Tags are never moved: a new freeze needs the user's call (new tag name or moving
+   **16:20 progress (Methodology):** branch `cand-final-2-work` = 2358594 (off main 81714cb; 941 passed = 931 + 10 new);
+   tag `cand-final.2` only if two `--dry` builds (kit Brief A old form; a synthetic folder with a .docx-only contract)
+   end ok=True, by ~16:45. It: reads the folder (BRIEF.md/README.md first; .md/.txt/.json/.yaml, .docx/.xlsx stdlib,
+   .pdf via pdftotext or a stdlib scan; others WARN); tools from an OpenAPI JSON in the folder, else ONE model call
+   reads the contract's operations (mapped to the 7 roles, contract names/paths/fields kept): **every tool URL =
+   mock_url + the contract's path, so the mock must serve the contract's paths and methods exactly** (trace prints one
+   `tool <name> <METHOD> <url> request=[fields]` line per tool); ONE model call detects the call language (translated
+   goodbye + month names; English briefs render as before except facts.py); facts.py reads a worded `now` in that
+   language. Not done: the 'outbound' wording; per-line translation of other verbatim lines (prompt instruction only).
+   Tags are never moved: a new freeze needs the user's call (new tag name or moving
    `freeze-final`), then re-merge into `main`.
 2. **This chat**: mock bank template `mock/` (0a8d2ad, 6fc3e51; NOT builder code): `src/bank.js` (pure logic, adapt
    `HANDLERS` after 17:00), `src/worker.js` (Worker + Durable Object per customer; admin `GET /v1/ledger/<id>`,
