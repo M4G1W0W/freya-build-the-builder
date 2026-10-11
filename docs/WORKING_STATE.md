@@ -3,10 +3,58 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 21:40 Istanbul (18:40 UTC Sun): submission candidate pushed; see the SIMULATION CHAT HANDOFF (18:40) below. Last commit: see `git log`. The final case opened 17:00 UTC;
+**Snapshot:** 2026-10-11 22:35 Istanbul (19:35 UTC Sun): **SUBMISSION SENT ~19:25 UTC**; see UPDATE 19:35 (SUBMISSION SENT) below, then the SIMULATION CHAT HANDOFF (18:40). Last commit: see `git log`. The final case opened 17:00 UTC;
 submission closes 20:00 UTC (23:00 Istanbul). Tags: `cand-f2` = bd4da7c (F2),
 `cand-f3` = a069dd2 (F3; no longer main's builder code), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0, `cand-eng.9` b103e21, `freeze-final` b9756fe, `freeze-final-2` e2635e9 (cand-final.4), `cand-final.5` 01492e0, `.6` ed112fd, `.7` eef48d2, **`cand-final.8` 279a15a = the submitted build's builder** (merged into main 8a7bd1b).
+
+## UPDATE 19:35 UTC: SUBMISSION SENT (submission readiness reviewer; READ FIRST)
+
+- **Sent:** the user e-mailed the submission at about 19:25 UTC, before the 20:00 UTC deadline.
+  - To: yavuz@freyavoice.ai (the case BRIEF.md 'What you submit' address).
+  - From: the member address in submission.json.
+  - The three attachments come from `~/Desktop/Pistalogic-submission/`.
+- **`submission.json`** (sha256 `c5b6a9e5...`):
+  - team "Team Pistalogic"; members [Atlas Deniz Akbulut];
+  - repo https://github.com/M4G1W0W/freya-build-the-builder;
+  - commit **279a15a1c822810284ab84f6c1b89ea35135b7c5** (the builder-run commit, = trace START git=279a15a dirty=False);
+  - run_command `python3 builder/build.py {case_folder} {mock_url}`;
+  - workflow `submission/final.workflow.json`; trace `traces/final.log`;
+  - mock_url **https://teampistalogic.atlasreyiz.workers.dev/voice/v1**.
+- **Other attachments:** `final.workflow.json` (sha256 `7a9de328...`) and `final.log` (sha256 `b4db6d52...`). Both are
+  byte-identical to the copies committed in **fa08cd4** on main. That commit descends from 279a15a through merge
+  8a7bd1b. The two paths do not exist at 279a15a itself.
+- **E-mail body:** the repo link; the files on main at fa08cd4; Python 3.12 + Poppler pdftotext for reproduction; the
+  mock stays online through the results.
+  - No disclosure paragraph (user decision).
+  - So the post-17:00 items that echo the case stay undisclosed:
+    - tests/test_general_review.py:114-118, customerNumber/customerNo;
+    - tests/test_general.py:21/83/143, example `now` 2026-10-12T10:30:00+01:00;
+    - src/freya_builder/general.py:23, the "do not always agree" wording.
+- **Repo PUBLIC since 18:55 UTC** (user's explicit "Go public"; changed by this chat only). Signed-out checks:
+  - the commit pages for 279a15a and fa08cd4 return 200;
+  - raw files at fa08cd4 hash-identical to the attachments;
+  - anonymous ls-remote main = cc15d25.
+- **Final checks** (19:08-19:18 UTC, read-only workflow, 4 checkers):
+  - **Live mock:** 42 requests on the 7 exported tool URLs, all exact against the pack. That covers the 404/500
+    entries, the injected productName (served verbatim), the no-statement card, and the 12 s entry (answered in 12.2 s,
+    under the 30 s tool timeout).
+  - **Fresh anonymous clone at 279a15a, `--dry`:** exit 0; the same 'read 17 document(s), 222114 chars'; the same 7
+    tools and URLs and the same workflow structure.
+  - **Secrets:** none in the attachments or the public repo.
+- **Reproduction:** pdftotext matters. With it, the extraction gives 222114 chars, matching the trace. The stdlib
+  fallback gives 216788 chars, with the flow drawing's words run together.
+- **Until results: change nothing.**
+  - **Mock** 0ea3104f stays live. /health returned 200 at 19:24 (the origin's /health; mock_url/health is 404).
+  - **No mock redeploy.** The local test-customers.json was rewritten after the deploy, so replay the pack before any
+    redeploy.
+  - **No** visibility change, no push touching submission/ or traces/, no rewrite of main / 279a15a / fa08cd4, and no
+    edits to slot final-r3 or agent c9adee73.
+  - The fallback build2 stays preserved in runs/final/build2/.
+- **Left as is (user decision):** the uncommitted `mock/data/services.json` (field aliases, deployed but not committed)
+  and the unpushed notes-only commits 3226f43 and 61c6c88. The package folder's EMAIL.txt draft and SHA256SUMS.txt
+  were moved to the reviewer session's scratchpad.
+- **Open:** the results. Organiser replies may land in the Hotmail spam folder.
 
 ## UPDATE 16:28 UTC: MOCK DEPLOYED (simulation chat)
 
