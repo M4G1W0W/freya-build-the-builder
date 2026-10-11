@@ -6,6 +6,7 @@ unavailable", 504 and 500 before a third attempt passed.
 
 import io
 import json
+import ssl
 import urllib.error
 
 import pytest
@@ -49,6 +50,7 @@ def setup(monkeypatch, tmp_path):
     waits = []
     monkeypatch.setattr(platform.time, "sleep", waits.append)
     monkeypatch.setattr(platform, "STATE_FILE", tmp_path / "state.json")
+    monkeypatch.setattr(platform.llm, "_deadline", None)  # no build budget: no time limit
     out = io.StringIO()
 
     def use(errors):
@@ -73,10 +75,12 @@ def test_dry_run_retries_503_504_500_then_succeeds(setup):
 
 def test_dry_run_retries_network_errors(setup):
     use, trace, out, waits = setup
-    fake = use([urllib.error.URLError("reset"), TimeoutError("read timed out")])
+    fake = use(
+        [urllib.error.URLError("reset"), TimeoutError("read timed out"), ssl.SSLError("eof")]
+    )
     platform.dry_run(trace, "slot", {})
-    assert fake.calls == 3 and waits == [5, 15]
-    assert "URLError" in out.getvalue() and "TimeoutError" in out.getvalue()
+    assert fake.calls == 4 and waits == [5, 15, 30]
+    assert all(n in out.getvalue() for n in ("URLError", "TimeoutError", "SSLError"))
 
 
 def test_a_rejected_workflow_is_not_retried(setup):
@@ -93,7 +97,35 @@ def test_retries_are_bounded(setup):
     with pytest.raises(RuntimeError, match="-> 502"):
         platform.dry_run(trace, "slot", {})
     assert fake.calls == len(platform.WAITS) + 1 and waits == list(platform.WAITS)
-    assert sum(waits) <= 240
+
+
+def test_no_retry_when_the_30_minute_limit_is_near(setup, monkeypatch):
+    use, trace, out, waits = setup
+    monkeypatch.setattr(platform, "time_left", lambda: 100.0)
+    fake = use([502, 502])
+    with pytest.raises(RuntimeError, match="-> 502"):
+        platform.dry_run(trace, "slot", {})
+    assert fake.calls == 1 and waits == []
+    assert "giving up: 30-minute build limit near" in out.getvalue()
+
+
+def test_time_left_counts_from_the_build_budget_start(monkeypatch):
+    monkeypatch.setattr(platform.llm.time, "monotonic", lambda: 1000.0)
+    platform.llm.start_budget()
+    try:
+        assert platform.time_left() == platform.HARD_LIMIT_S
+    finally:
+        platform.llm.start_budget(None)
+    assert platform.time_left() == float("inf")
+
+
+def test_a_secret_is_redacted_before_the_error_is_cut(setup, monkeypatch):
+    use, trace, out, waits = setup
+    monkeypatch.setenv("FREYA_BANK_TEAM_KEY", "teamkeyABCDEFGHIJKLMNOP")
+    trace = Trace(out)
+    use([(502, "x" * 160 + " teamkeyABCDEFGHIJKLMNOP")])
+    platform.dry_run(trace, "slot", {})
+    assert "teamkey" not in out.getvalue() and "***" in out.getvalue()
 
 
 def test_export_retries_a_5xx(setup, tmp_path):
@@ -103,29 +135,39 @@ def test_export_retries_a_5xx(setup, tmp_path):
     assert fake.calls == 2 and "GET /api/v2/workflow/wf1 -> 504" in out.getvalue()
 
 
-def test_save_retries_every_unprocessed_rejection(setup):
+OUTAGE_11_OCT = [(503, UNAVAILABLE), (504, "error code: 504"), (500, "Internal server error")]
+STRAY = "the failed create may have been processed; this retry can leave a stray workflow"
+
+
+def test_save_retries_every_unprocessed_rejection_without_a_warning(setup):
     use, trace, out, waits = setup
     fake = use([(503, UNAVAILABLE), 429, (503, UNAVAILABLE)])
     assert platform.save(trace, "slot", {})["workflow_id"] == "wf1"
-    assert fake.calls == 4 and "duplicate" not in out.getvalue()
+    assert fake.calls == 4 and "stray" not in out.getvalue()
 
 
-def test_save_retries_another_5xx_only_once_and_warns_of_a_duplicate(setup):
+def test_save_create_survives_the_11_oct_outage_and_warns_of_a_stray_workflow(setup):
     use, trace, out, waits = setup
-    fake = use([500, 500])
-    with pytest.raises(RuntimeError, match="-> 500"):
-        platform.save(trace, "slot", {})
-    log = out.getvalue()
-    assert fake.calls == 2 and waits == [5]
-    assert "slot 'slot' has no recorded workflow: a duplicate workflow may result" in log
+    fake = use(OUTAGE_11_OCT)
+    assert platform.save(trace, "slot", {})["workflow_id"] == "wf1"
+    assert fake.calls == 4 and waits == [5, 15, 30]
+    assert out.getvalue().count(STRAY) == 2  # the 504 and the 500, not the key-check 503
 
 
-def test_save_update_of_a_recorded_slot_retries_without_a_duplicate_warning(setup):
+def test_save_update_of_a_recorded_slot_survives_the_outage_without_a_warning(setup):
     use, trace, out, waits = setup
     platform.STATE_FILE.write_text(json.dumps({"slot": {"workflow_id": "wf1"}}))
-    fake = use([502])
-    platform.save(trace, "slot", {})
-    assert fake.calls == 2 and "duplicate" not in out.getvalue()
+    fake = use(OUTAGE_11_OCT)
+    assert platform.save(trace, "slot", {})["workflow_id"] == "wf1"
+    assert fake.calls == 4 and "stray" not in out.getvalue()
+
+
+def test_only_the_key_check_503_counts_as_unprocessed():
+    def err(status, body):
+        return RuntimeError(f"POST /api/v2/workflow -> {status}: {body}")
+
+    assert platform.unprocessed(err(503, UNAVAILABLE)) and platform.unprocessed(err(429, "x"))
+    assert not platform.unprocessed(err(503, "<h1>503 Service Temporarily Unavailable</h1>"))
 
 
 def test_save_does_not_retry_a_4xx(setup):

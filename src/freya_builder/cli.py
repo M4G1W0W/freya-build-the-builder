@@ -176,11 +176,11 @@ def run(argv: list[str], extract: Extract, render: Render, selftest=None) -> int
             count_tools(workflow),
             saved.get("version"),
         )
+        if a.export:  # first: a required artefact; the smoke test does not change the workflow
+            platform.export(trace, saved["workflow_id"], a.export)
         passed = True
         if selftest and not a.no_selftest:
             passed = selftest(trace, saved, spec, tools) is not False
-        if a.export:
-            platform.export(trace, saved["workflow_id"], a.export)
         print(json.dumps(saved))
         ok = passed
         return 0 if passed else 3  # 3: the agent is saved, but its smoke test failed: re-run

@@ -17,8 +17,10 @@ from .trace import Trace
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 # Benchmarked in exp02/exp03 (Decision log 2026-10-10 14:40). In code, so a fresh-clone re-run needs only the key.
 DEFAULT_MODELS = ("gpt-6.1-sol", "gpt-5.5", "gpt-5.4")
-# The page allows 30 min per brief including self-tests; deploy and the smoke test take ~10 s. A call
-# normally takes ~55 s; one that stalls moves on to the next model (review gap 13).
+# The page allows 30 min per brief including self-tests. The platform calls after the model calls
+# (dry run, save, export, smoke test) normally take seconds; in an outage their retries may use the
+# rest, up to the 30-minute limit (platform.time_left). A call normally takes ~55 s; one that
+# stalls moves on to the next model (review gap 13).
 BUILD_BUDGET_S = 25 * 60
 CALL_TIMEOUT_S = 240
 _deadline: float | None = None
