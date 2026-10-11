@@ -1,0 +1,59 @@
+{
+ "config": {
+  "maxWrongAnswers": 3,
+  "idleResetSeconds": 600
+ },
+ "_note": "EXAMPLE data from the public practice set (kit/public-test-set.json). Replace after 17:00 UTC with the final zip's test customers, in the service contract's field names.",
+ "customers": [
+  {
+   "customer_id": "c_example_01",
+   "name": "Daniel Reyes",
+   "identity": {
+    "date_of_birth": "1988-03-14",
+    "phone_last4": "4471"
+   },
+   "products": [
+    {
+     "product_id": "p1",
+     "type": "credit_card",
+     "card_last4": "4821",
+     "past_due": 420.0,
+     "days_late": 6,
+     "minimum_payment": 126.0
+    }
+   ]
+  },
+  {
+   "customer_id": "c_example_11",
+   "name": "Sofia Almeida",
+   "identity": {
+    "date_of_birth": "1987-06-03",
+    "phone_last4": "2288"
+   },
+   "products": [
+    {
+     "product_id": "p1",
+     "type": "credit_card",
+     "card_last4": "2288",
+     "past_due": 220.0,
+     "days_late": 9,
+     "minimum_payment": 66.0
+    },
+    {
+     "product_id": "p2",
+     "type": "personal_loan",
+     "past_due": 640.0,
+     "days_late": 9,
+     "instalment_amount": 213.0
+    },
+    {
+     "product_id": "p3",
+     "type": "car_loan",
+     "past_due": 75.0,
+     "days_late": 3,
+     "instalment_amount": 25.0
+    }
+   ]
+  }
+ ]
+}
