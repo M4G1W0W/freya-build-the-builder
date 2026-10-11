@@ -1,10 +1,60 @@
 # Overnight v2 execution report (live; morning handoff)
 
+## MORNING HANDOFF (read this first; state at 02:20 UTC, final update below)
+
+**Highest-value decision for you:** the Freya simulation `a36c1d01-1003-4b83-8d5e-b5121a82bc39` (M2 rep 2, A+B control)
+has been stuck in "running" since 01:21:29 UTC although all 13 of its calls ended by 01:21:07. It blocks every
+simulation in the workspace. Per your rule I did not PUT/pause/stop it, and simulations stopped for the night at 01:53
+after 30 min. **Until it is freed (PUT status "paused", as on 10 Oct 21:55) no measurement can run, including the
+Sunday 12:30 final validation.** Everything for the remaining blocks is built and queued-ready (see "Resume").
+
+**Recommended candidate: W = G1** = branch `cand-g1`, commit **83f8263** (tag `cand-g1.1`) = F3 a069dd2 + the restored
+too-much FACTS line. Not merged to main (merging waits for you). Deployed as exp-g1-a (workflow 5f39ed9a…, agent
+31f79439…; export verified identical to the committed render). Caveats: see "Candidate review" (unmeasured: PUB-07
+pieces, customer-proposed date/amount, Brief B on G1).
+
+**Before/after, matched strict 3/3 (M1, block-p06, 3 reps per arm, interleaved, same session, raw):**
+
+| Case [style] | F2 control (dev-a-llm2 v8) | G1 (exp-g1-a) | G2 (exp-g2-a) |
+|---|---|---|---|
+| PUB-06 [talkative] | 0/3 | **3/3** | 2/3 |
+| PUB-07 [asks_back] | 3/3 | 3/3 | 2/3 (newly failing: rule 21 re-ask) |
+| PUB-09 [talkative] | 2/3 | 3/3 | 3/3 |
+| PUB-03 [corrects] | 2/3 | 1/3 (incl. a LEDGER fail, common identity defect) | 3/3 |
+| cases at 3/3 | 1/4 | **3/4** | 2/4 |
+
+A+B control (dev-ab-llm v14 = F2, styled-ab-all, 13 cases): rep 1 12/13, rep 2 10/13; rep 3 never ran (stuck sim).
+Failures classified in `runs/dev/r4/analysis-m2.md`.
+
+**Done overnight:** M0 (G1/G2 committed; case files; all 4 exports MATCH their claimed code), M1 (W = G1), M2 2 of 3
+reps; fresh builds of W: exp-raw-w (raw-A) and exp-ab1-w (single-file A+B), both ok=True, not yet simulated;
+precedence correction gates 1-3 PASS + adversarial review SHIP-TO-O4 + 2 guards (cand-wp-g1.1 58a7473), fresh builds
+exp-raw-wp / exp-ab1-wp ok=True, not yet simulated; D1/D2 blind derivations: 12 O1 cases + 3 extra-B re-derivations
+(15/15 exact) and 4 identity regression cases (4/4 exact); failure analyses of every failing M1/M2 call; identity-gap
+sizing over all 906 stored calls; G1 candidate review; identity-fix design proposal (not implemented).
+
+**Not done (blocked by the stuck simulation):** M2 rep 3 + extra-B, M3 (G1 on styled-a), M4 and M5 simulations (fresh
+builds of W), O4 simulations (precedence fresh-build regression, gate 4), O1 (derived cases). Precedence therefore
+stays isolated (gate 4 not run).
+
+**Calls and credits:** 62 simulation calls of the 340 cap (M1 36, M2 26); credits 433.89 at 00:37 -> 428.93 at 02:20
+UTC (~0.08 per call incl. builder smoke tests). Sunday reserve (155 calls) untouched.
+
+**Running now:** no simulation of ours (only the stuck platform one). A read-only watcher logs its status every 5 min
+to `runs/dev/r4/stuck-sim-watch.log`. Offline review agents may be finishing (see the log below).
+
+### Resume (once the simulation is freed; all slots built and provenance recorded in `<scratchpad>/sim/slots.tsv`)
+Queue lines ("name slot casefile reps") for `<scratchpad>/sim/qrun.sh` (remove `<scratchpad>/sim/STOP` first), in
+priority order: M2-ABv14-xb (9), M3-G1-styledA (30), M4-rawW-styledA (30), M5-ab1W-all (39), M5-ab1W-xb (9),
+O4-rawWP-styledA (30), O4-ab1WP-all (39), O4-ab1WP-xb (9), then O1: o1-a.json on exp-g1-a x3 (27), o1-b.json on
+exp-ab1-w x3 (9). Total 231 calls (with 62 used: 293 < 340).
+
+
 Coordinator session: autonomous under the user's final authorization (00:50 UTC). Plan:
 `docs/plans/2026-10-11-overnight-plan-v2.md`. Raw results: `runs/dev/r4/` (gitignored): `<name>.json/.log/.meta.json`,
 call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 
-## Status (update at every block)
+## Event log (UTC)
 
 | UTC | Event |
 |---|---|
