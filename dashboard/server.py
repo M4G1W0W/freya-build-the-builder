@@ -3,7 +3,8 @@
     .venv/bin/python dashboard/server.py [--port 8765]
 
 GET only. It reads local files and read-only git/ps output, never calls the network, and writes nothing
-except reports/latest_snapshot.{json,md}. Data is recomputed every 12 s in a background thread.
+except reports/ (latest_snapshot.{json,md}, the conversation exports, and final_case_ledger.json: the
+final case folder's document versions). Data is recomputed every 12 s in a background thread.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import claude_activity as CA  # noqa: E402
 import compare as C  # noqa: E402
 import data as D  # noqa: E402
 import evidence as EV  # noqa: E402
+import finalcase as FC  # noqa: E402
 import rules as RC  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
@@ -60,8 +62,14 @@ def compute() -> dict:
         state["claude"] = CA.activity()
     except Exception as exc:  # the monitor must never break the testing dashboard
         state["claude"] = {"available": False, "reason": f"monitor error: {type(exc).__name__}"}
+    try:
+        state["final"] = FC.view(runs)
+    except Exception as exc:  # the final-case view must never break the rest of the dashboard
+        traceback.print_exc()
+        state["final"] = {"error": f"final-case view error: {type(exc).__name__}: {exc}"}
     state["snapshot"] = A.snapshot(state)
     state["snapshot"]["claude_session"] = CA.summary(state["claude"])
+    state["snapshot"]["final_case"] = FC.compact(state["final"])
     try:
         state["conversation"] = CA.conversation()  # every transcript, nothing cut
     except Exception as exc:
@@ -122,7 +130,10 @@ def write_reports(
     REPORTS.mkdir(exist_ok=True)
     files = [
         ("latest_snapshot.json", D.dumps(snap, indent=2)),
-        ("latest_snapshot.md", A.snapshot_markdown(snap)),
+        (
+            "latest_snapshot.md",
+            A.snapshot_markdown(snap) + FC.summary_markdown(snap.get("final_case")),
+        ),
     ]
     if convo is not None:
         files += [
@@ -234,6 +245,8 @@ class Handler(BaseHTTPRequestHandler):
                     "panels": st["panels"],
                 }
             )
+        if url.path == "/api/final-case":
+            return self._json({"refreshed": st["refreshed"], **st.get("final", {})})
         if url.path == "/api/builder":
             return self._json({"refreshed": st["refreshed"], **st["builder"]})
         if url.path == "/api/claude-sessions":

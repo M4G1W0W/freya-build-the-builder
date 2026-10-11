@@ -1,7 +1,8 @@
 # Testing Command Center (read-only)
 
 A localhost dashboard over the existing test artefacts. It never launches tests, deploys, edits files, changes git or
-calls the network. It writes only `reports/latest_snapshot.{json,md}`.
+calls the network. It writes only under `reports/` (gitignored): `latest_snapshot.{json,md}`, the
+conversation exports, and `final_case_ledger.json`.
 
 ```bash
 .venv/bin/python dashboard/server.py            # http://127.0.0.1:8765 (loopback only)
@@ -270,3 +271,62 @@ commit and any uncommitted changes. `sha256_current` is the file as it is now, n
 reported.
 
 Tests: `uv run pytest dashboard/test_rules.py`.
+
+## Final Case & Documents (`/api/final-case`, tab "★ Final Case & Documents", top of Overview)
+
+- **Case folder.** Default `~/Desktop/Freya Final case`; override it with `FREYA_FINAL_CASE_DIR`
+  (`:`-separated). Read only: files are never written, moved or locked. Hidden, `~$` lock and `__MACOSX`
+  files are skipped. **Nothing from the case is in this code.** Names, purposes and versions are read at
+  run time, and `test_finalcase.py` fails if a received file name appears in any dashboard file.
+- **Ledger.** `reports/final_case_ledger.json` (gitignored) records each file's first-seen time and every
+  content version (sha256). This is how arrivals, amendments and removals survive restarts.
+  - Files already present when the ledger started are marked so.
+  - The filesystem change time is shown next to the first-seen time. The file's own creation date can be
+    the sender's.
+- **Purpose.** In order of preference:
+  1. the pack README's line naming the file, else its line for the file's folder;
+  2. the file's title (Markdown heading, Office or PDF metadata);
+  3. a guess from the name against the kinds the official page lists.
+
+  Guesses are labelled as guesses.
+- **Review status.** In order of preference:
+  1. an optional team record `reports/final_case_review.json`, written by people, never by the dashboard:
+     `{"<rel path>": {"status", "by", "at", "notes", "sha256": "<reviewed prefix>", "contradictions": [..]}}`.
+     A sha that differs from the current file marks the review STALE.
+  2. Handoff and chat lines that name the file after it arrived: repo docs use the line's git-blame time,
+     chat exports use the message time.
+  3. Otherwise "not reviewed".
+- **Flags.**
+  - NEW: first seen in the last 20 min.
+  - AMENDED: the content changed after it was first seen.
+  - Things to check:
+    - two versions of one document in a folder (version or date in the name);
+    - the same document in another format;
+    - identical content under two names;
+    - a README entry not in the folder;
+    - a reviewed version that differs from the current file;
+    - notes in the team record.
+
+  The pack is never treated as complete.
+- **Final builds** are traces under `traces/` or `runs/` whose START `tool_api` is a URL. Each one is
+  linked to:
+  - its builder commit, plus whether that commit's code equals the newest `freeze-final*` tag and HEAD;
+  - its input-document snapshot, reconstructed from the ledger at the build's start time (the builder
+    logs only a document count);
+  - any documents that changed after the build.
+- **Final testing.** A result file counts as final testing when its workflow or agent id was created by a
+  final build, its slot starts with `final`, or it ran non-`PUB-` case ids after 17:00 UTC. Everything else
+  stays under "Historical practice results".
+- **Submission readiness** checks:
+  - the case documents and the builder version;
+  - the final build and final testing;
+  - the mock: `MOCK_URL` in `.env`, `mock/` commits since 17:00, and a deploy noted in WORKING_STATE after
+    them. It is never probed live;
+  - `submission/final.workflow.json`: its workflow id matches the trace, every URL points at the mock, and
+    it is committed and in origin/main;
+  - `traces/final.log`: END ok, dirty=False, the same builder code as HEAD, no `.env` secret values, and
+    committed and pushed;
+  - repository access: origin, ahead/behind, and the newest WORKING_STATE line about the organiser invite;
+  - a `submission.json` draft, if one exists.
+- **Ownership** comes from the newest WORKING_STATE line per engineer and the chat index state.
+- **The review snapshot** gets a "Final case readiness" section, without excerpts from the files.
