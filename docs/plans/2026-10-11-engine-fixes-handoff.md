@@ -1,4 +1,4 @@
-# Engine-fixes chat: context-save handoff (Sun 11 Oct 2026, 13:45 UTC; previous save 12:05 UTC)
+# Engine-fixes chat: context-save handoff (Sun 11 Oct 2026, 15:45 UTC; previous saves 13:45, 12:05 UTC)
 
 **If you are a restored session of the ENGINE-FIXES chat, read in this order:** `CLAUDE.md` ->
 `docs/plans/2026-10-11-engine-fixes-brief.md` (your original brief) -> this file ->
@@ -6,6 +6,48 @@
 `docs/plans/2026-10-11-path-cases-sim-handoff.md` (latest hand-off to the Simulation Developer). Run
 `date -u` and `git status` first. This file is the engine-fixes chat's handoff; `docs/WORKING_STATE.md`
 belongs to the simulation chat and this chat must not edit it.
+
+## STATE AT 15:45 UTC (read this first; hidden briefs open 17:00 UTC, submission closes 20:00 UTC)
+
+**Tags (all preserved; none adopted; adoption is the user's decision after Simulation's measurements):**
+
+| tag | sha | what | status |
+|---|---|---|---|
+| `cand-eng.4` | cfa4d9d | comparison base | arm of the final comparison |
+| `cand-eng.9` | b103e21 | eng.8 + closing guard (goodbye in >half of endings never "early") | challenger in the final comparison (decision 16:40-16:55 UTC) |
+| `cand-eng.4g` / `cand-eng.9g` | 44d4efa / b40a576 | + transfer farewell end node (`hang_up_transferred`) | user: TESTING ONLY, not adoption; farewell is spoken at hang-up, AFTER close_call (brief says goodbye BEFORE close_call): keep that difference explicit |
+| `cand-eng.4o2` / `cand-eng.9o2` | f12aa3e / 9c87bdf | + multi-product offer-1 paragraph (item 3, reworked after review) | user: TESTING ONLY; supersedes `cand-eng.4o`/`.9o` (8c1a05e / ecb4bcb, kept) |
+
+Untagged merge trial: `merge-main-eng9` = c1cbeb7 (main bccf825 into cand-eng.9): `make verify` 922 passed, fresh-clone
+`--dry` END ok=True. main has moved since (checker 98ae37b, docs 13f42ec / 1667a7b, Simulation docs): if eng.9 wins,
+merge main into it again (docs/scripts only; `src/` identical).
+
+**Delivered this session (all committed):** audit of Simulation's 4 findings (PUB-09 no goodbye, PUB-10 product-less
+read-back, PUB-07 false weekday, PUB-06 lost extraction: all shared G1/eng.4, none an eng.4 regression); `cand-eng.9`;
+transcript checker `scripts/transcript_check.py` (main 98ae37b, review flags not verdicts, 24 tests); dry battery
+`docs/plans/2026-10-11-dry-battery-eng4-vs-eng9.md` (24 builds, metrics a-e); goodbye tags; PUB-12 diagnosis (two
+separate failures: simulator date drift "tomorrow, the twenty-second" + skipped loan offers after an early blanket
+refusal, the latter predating Fix 1) and the offer-fix tags. Hand-offs for every tag: the log's last sections.
+
+**User instructions in force:** no Freya calls or deployments from this chat (Simulation owns them); goodbye and
+offer fixes are for testing, not adoption; the date-conflict change is DEFERRED; keep every existing tag unchanged.
+
+**Pending (Simulation, not this chat):** platform model step stalled since ~15:16 UTC (round 3 of both arms lost);
+on recovery Simulation runs the goodbye block (36 calls) then the offers test (24 calls: per base kit PUB-12, extra-B
+PUB-12, kit PUB-13 + extra-B X-B1 as PUB-11, x3), cut-off 16:40 UTC, so offers may be partial (partial = reported,
+not an adoption basis).
+
+**After 17:00 UTC:** nothing from a hidden brief may enter the builder; only generic bug fixes. Builder readiness is
+unaffected by this chat's tags: candidates and main's builder code are unchanged.
+
+**Open, not done:** checker gaps left (READBACK picks an earlier "confirm" question when the read-back lacks the word;
+near-copy matching is heuristic); eng.9 test hardening (vacuous reworded-goodbye assertion; no 9-of-16 case) by
+choice, the tag stays as measured; eng.9 residual: a sympathy line in ONE ending only is not moved (1/12 dry builds).
+
+**Scratchpad of this session** (may be cleaned): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/c3e3d0af-e07f-4efb-adfc-8641f469e047/scratchpad`:
+worktrees `wt-eng9` (cand-eng-guard), `wt-eng9g`, `wt-eng4g`, `wt-eng9o`, `wt-eng4o`, `wt-e4` (detached cand-eng.4),
+`wt-merge9`; `dry/` (battery runs, metrics.py, report.py; `dry/e4`, `dry/e9` hold 4 failed Python-3.9 traces I was not
+allowed to delete), `el/` (render and facts comparison scripts), `wf_result.json` (audit workflow output).
 
 ## Role and binding rules
 
