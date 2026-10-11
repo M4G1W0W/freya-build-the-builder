@@ -4,6 +4,8 @@ Brief: `docs/plans/2026-10-11-engine-fixes-brief.md`. Branch `cand-eng` (worktre
 `<scratchpad>/wt-eng`, off `cand-final.1` = ca80d52). No simulation, run_cases, deploy or non-`--dry`
 build was run by this chat. `<scratchpad>` = `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/0ff87ea7-15f5-4256-b709-1c128c353294/scratchpad`.
 
+Context-save handoff for a restored engine-fixes session: `docs/plans/2026-10-11-engine-fixes-handoff.md`.
+
 ## READ FIRST: status for the Simulation Developer (12:05 UTC; user-confirmed)
 
 Candidate tags, all preserved and unmerged; adoption needs the user's separate approval:
