@@ -3,18 +3,28 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 03:45 Istanbul (00:45 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+**Snapshot:** 2026-10-11 05:35 Istanbul (02:35 UTC Sun), after the overnight run. Last commit: see `git log`. Hidden briefs open Sun 11 Oct
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
-## OVERNIGHT EXECUTION IN PROGRESS (autonomous, user asleep; read this first)
+## OVERNIGHT RESULT (11 Oct, coordinator session; read this first)
 
-The live log and morning handoff is `docs/plans/2026-10-11-overnight-report.md`. A coordinator session runs the plan under
-the user's final authorization (00:50 UTC). Only that coordinator launches simulations (queue runner in its
-scratchpad, see the report). G1 = cand-g1 83f8263, G2 = cand-g2 0bc83c4, case files on main 322dfc9.
-**01:53 UTC: simulations STOPPED for the night** (platform simulation a36c1d01 stuck "running" since 01:21:29; per the
-user's rule no PUT/pause/stop). If it is cleared (user decision), the remaining queue is in the report: M2 rep 3 +
-extra-B, M3, M4, M5, O4 (slots exp-raw-w, exp-ab1-w, exp-raw-wp, exp-ab1-wp are already built), O1. W = G1.
+**Morning handoff: `docs/plans/2026-10-11-overnight-report.md` (top section).** Short version:
+- **Decision needed:** Freya simulation a36c1d01 is stuck `running` since 01:21:29 UTC and blocks every simulation
+  (not the submission build). Freeing it needs a PUT pause (not authorized overnight). Sims stopped 01:53 UTC.
+- **W = G1** (branch cand-g1, **83f8263**, tag cand-g1.1; slot exp-g1-a, export verified). M1 strict per case:
+  G1 3/4 cases at 3/3 (PUB-06 3/3), G2 2/4, F2 1/4. Not merged to main. Caveats: `runs/dev/r4/g1-review.md`.
+- **Precedence** (cand-wp-g1, **58a7473**, tag cand-wp-g1.1 = G1 + ending_wins + 2 guards): gates 1-3 pass, review
+  SHIP-TO-O4; gate 4 (O4 sims) not run, so it stays isolated.
+- **Built, not simulated:** exp-raw-w, exp-ab1-w (W fresh builds), exp-raw-wp, exp-ab1-wp (precedence fresh builds).
+  Resume queue pre-loaded (244 calls); command in the report.
+- **New cases (committed, never run):** `tests/fixtures/cases/o1-a.json`, `o1-b.json`, `extra-b-rederived.json`,
+  `identity-rd.json` (all D1/D2 exact matches).
+- **Top generic gap:** identity stage (LEDGER failures; corrects-style PUB-03 ~30% on every build; "why do you need
+  that?" counted as a decline). Design v2 after 3 adversarial reviews: `docs/proposals/2026-10-11-identity-fix-v2.md`
+  (not implemented; 81-call matched plan inside).
+- Calls 62/340, credits 428.93 (02:04 UTC). Worktrees: wt-g1/wt-g2/wt-f2 (old scratchpad 4f150fc6…), wt-wp/wt-wpg1
+  (scratchpad ababcede…).
 
 ## TONIGHT: execute the APPROVED overnight plan v2 (start here)
 
