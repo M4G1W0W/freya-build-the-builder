@@ -17,6 +17,9 @@ simulation and whenever a new one is refused because another is running.
 
 A rep with calls the judge never scored ("analysis never arrived", 11 Oct 08:22 UTC) is not a measurement: it is
 discarded and repeated once with fresh bank sessions (printed as "-- run discarded", which the call ledger counts).
+Before that, a run still "analyzing" takes the judge verdict already on its call record (successCriteriaResult;
+11 Oct 12:15 UTC, user-approved): printed as "VERDICT FROM CALL RECORD" and marked verdict_source "call" in the
+rows, so such results stay separable from run verdicts.
 
 Calls per simulation: the kit's FREYA_SIM_CONCURRENCY (default 5). It ran at 13 on 11 Oct 08:30-09:22 UTC; on the
 13-case A+B set that made agent turns slow (20-60 s) and simulated customers hung up, so it is back to the default
@@ -221,8 +224,9 @@ def unjudged(rows) -> list[str]:
     return [r["id"] for r in rows if any(NO_VERDICT.search(f) for f in r.get("failed", []))]
 
 
-def repeat_unjudged(run_once):
-    """Wrap the kit's run_once: a rep with an unjudged call is discarded and repeated once (fresh sessions)."""
+def repeat_unjudged(run_once, seen=frozenset()):
+    """Wrap the kit's run_once: a rep with an unjudged call is discarded and repeated once (fresh sessions).
+    Every scored row is marked with its verdict source (`seen`: calls judged from their call record)."""
 
     def checked(agent_id, cases, ids):
         out = run_once(agent_id, cases, ids)
@@ -233,9 +237,50 @@ def repeat_unjudged(run_once):
                 flush=True,
             )
             out = run_once(agent_id, cases, ids)
+        mark_verdict_source(out[0], seen)
         return out
 
     return checked
+
+
+def with_call_verdicts(get_iteration, get_call, seen):
+    """Wrap the kit's get_iteration: a run still waiting for the judge takes the verdict on its call record.
+
+    11 Oct 12:15 UTC, smoke 94c9e350: the run stayed "analyzing" (attempt 2/4) while its call record already had
+    successCriteriaResult.success=True; run_cases scored it "conversation: no verdict". A verdict the run has
+    (pass, fail, inconclusive, error) is never replaced. Calls whose verdict came from the record go into `seen`.
+    """
+
+    def wrapped(sim_id, it_id):
+        iteration = get_iteration(sim_id, it_id)
+        for run in iteration.get("runs") or []:
+            if run.get("outcome") not in (None, "", "analyzing") or not run.get("callId"):
+                continue
+            try:
+                result = get_call(run["callId"]).get("successCriteriaResult") or {}
+            except Exception as e:  # a failed read leaves the run unjudged, as before
+                log.warning("call record read for %s failed: %s", run["callId"], e)
+                continue
+            if not isinstance(result.get("success"), bool):
+                continue
+            was = run.get("outcome")
+            run["outcome"] = "pass" if result["success"] else "fail"
+            run["reason"] = f"[verdict from the call record] {result.get('reason') or ''}"
+            seen.add(run["callId"])
+            print(
+                f"VERDICT FROM CALL RECORD: run {run.get('id')} call {run['callId']}: "
+                f"{run['outcome']} (the run still said {was!r})",
+                flush=True,
+            )
+        return iteration
+
+    return wrapped
+
+
+def mark_verdict_source(rows, seen) -> None:
+    """Each scored row says whether its conversation verdict came from the run or from the call record."""
+    for r in rows:
+        r["verdict_source"] = "call" if r.get("call_id") in seen else "run"
 
 
 def wait_until_healthy(api=None, limit_s=HEALTH_WAIT_S) -> None:
@@ -262,7 +307,9 @@ def main() -> None:
     sys.argv = [str(KIT / "tools" / "run_cases.py"), *sys.argv[1:]]
     import run_cases  # kit/tools is on sys.path (scripts/_kit.py); imported, not run
 
-    run_cases.run_once = repeat_unjudged(run_cases.run_once)
+    seen: set[str] = set()
+    freya.get_iteration = with_call_verdicts(freya.get_iteration, freya.get_call, seen)
+    run_cases.run_once = repeat_unjudged(run_cases.run_once, seen)
     run_cases.main()
 
 

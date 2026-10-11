@@ -289,3 +289,102 @@ def test_gives_up_waiting_after_the_limit(monkeypatch):
     monkeypatch.setattr(rcr.time, "sleep", lambda s: None)
     with pytest.raises(RuntimeError):
         rcr.wait_until_healthy(down, limit_s=300)
+
+
+def _iteration(*runs):
+    return {"runs": [dict(r) for r in runs]}
+
+
+def test_a_run_still_analyzing_takes_the_judge_verdict_from_its_call_record(capsys):
+    # 11 Oct 12:15 UTC, smoke 94c9e350: the run stayed "analyzing" (attempt 2/4) although its call
+    # 6af560aa had successCriteriaResult.success=True; run_cases scored it "conversation: no verdict".
+    seen = set()
+    calls = {"c1": {"successCriteriaResult": {"success": True, "reason": "All criteria were met."}}}
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration(
+            {"id": "r1", "personaId": "p1", "outcome": "analyzing", "callId": "c1"}
+        ),
+        calls.__getitem__,
+        seen,
+    )
+    run = get_iteration("s1", "i1")["runs"][0]
+    assert run["outcome"] == "pass" and seen == {"c1"}
+    assert "VERDICT FROM CALL RECORD" in capsys.readouterr().out
+
+
+def test_a_failing_call_record_verdict_keeps_the_judges_reason():
+    calls = {"c1": {"successCriteriaResult": {"success": False, "reason": "floor offered twice"}}}
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration({"id": "r1", "outcome": None, "callId": "c1"}),
+        calls.__getitem__,
+        set(),
+    )
+    run = get_iteration("s1", "i1")["runs"][0]
+    assert run["outcome"] == "fail"
+    assert "floor offered twice" in run["reason"] and "call record" in run["reason"]
+
+
+@pytest.mark.parametrize("outcome", ["pass", "fail", "inconclusive", "error"])
+def test_a_run_that_has_a_verdict_is_never_overridden(outcome):
+    def get_call(call_id):
+        raise AssertionError("no call read for a judged run")
+
+    seen = set()
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration({"id": "r1", "outcome": outcome, "callId": "c1"}), get_call, seen
+    )
+    assert get_iteration("s1", "i1")["runs"][0]["outcome"] == outcome and not seen
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        {},
+        {"successCriteriaResult": None},
+        {"successCriteriaResult": {"success": None, "reason": ""}},
+    ],
+)
+def test_a_call_record_without_a_verdict_leaves_the_run_unjudged(call):
+    seen = set()
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration({"id": "r1", "outcome": "analyzing", "callId": "c1"}),
+        lambda call_id: call,
+        seen,
+    )
+    assert get_iteration("s1", "i1")["runs"][0]["outcome"] == "analyzing" and not seen
+
+
+def test_a_run_without_a_call_or_a_failed_call_read_stays_unjudged(caplog):
+    def get_call(call_id):
+        raise RuntimeError("GET /api/v2/call/c2 -> 504: error code: 504")
+
+    get_iteration = rcr.with_call_verdicts(
+        lambda s, i: _iteration(
+            {"id": "r1", "outcome": "analyzing", "callId": None},
+            {"id": "r2", "outcome": "analyzing", "callId": "c2"},
+        ),
+        get_call,
+        set(),
+    )
+    runs = get_iteration("s1", "i1")["runs"]
+    assert [r["outcome"] for r in runs] == ["analyzing", "analyzing"]
+    assert "call record read for c2 failed" in caplog.text
+
+
+def test_rows_say_where_their_verdict_came_from():
+    rows = [
+        {"id": "A", "call_id": "c1"},
+        {"id": "B", "call_id": "c2"},
+        {"id": "C", "call_id": None},
+    ]
+    rcr.mark_verdict_source(rows, {"c1"})
+    assert [r["verdict_source"] for r in rows] == ["call", "run", "run"]
+
+
+def test_every_scored_rep_is_marked_with_its_verdict_sources():
+    rows = [{"id": "PUB-01", "pass": True, "failed": [], "call_id": "c1"}]
+    seen = {"c1"}
+    out = rcr.repeat_unjudged(lambda a, c, i: (rows, "s1", "i1", "paused", 60, 2), seen)(
+        "a", [], {}
+    )
+    assert out[0][0]["verdict_source"] == "call"
