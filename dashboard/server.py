@@ -63,14 +63,56 @@ def compute() -> dict:
             "available": False,
             "reason": f"monitor error: {type(exc).__name__}",
         }
+    others_feed, others_convo = {}, {}  # every other non-archived chat of this repo
+    primary = (state["claude"].get("session") or {}).get("desktop_session_id")
+    try:
+        sessions = CA.monitored()
+    except Exception:
+        traceback.print_exc()
+        sessions = []
+    for sess in sessions:
+        sid = sess["desktop_session_id"]
+        if sid == primary:
+            continue
+        try:
+            others_feed[sid], others_convo[sid] = CA.activity(sid), CA.conversation(sid)
+        except Exception as exc:
+            others_feed[sid] = others_convo[sid] = {
+                "available": False,
+                "reason": f"monitor error: {type(exc).__name__}",
+            }
+    state["claude_others"], state["conversations_others"] = others_feed, others_convo
+    state["claude_sessions"] = [
+        _session_row(state["claude"], state["conversation"], primary, True)
+    ] + [_session_row(others_feed[sid], others_convo[sid], sid, False) for sid in others_feed]
+    state["snapshot"]["claude_sessions"] = state["claude_sessions"]
     state["snapshot"]["claude_conversation"] = (
-        "reports/latest_conversation.md (and .json): your prompts and Claude's replies"
+        "reports/conversations_index.md lists every monitored chat; reports/latest_conversation.md "
+        "is the primary chat, reports/latest_conversation_<id>.md each other chat (and .json): "
+        "your prompts and Claude's replies"
     )
     state["refreshed"] = D.iso(time.time())
     return state
 
 
-def write_reports(snap: dict, convo: dict | None = None) -> None:
+def _session_row(feed: dict, convo: dict, sid: str | None, primary: bool) -> dict:
+    row = {**CA.summary(feed), "primary": primary}
+    sid = row.get("desktop_session_id") or sid
+    row["desktop_session_id"] = sid
+    row["title"] = row.get("title") or (convo.get("session") or {}).get("title")
+    row["prompts"] = convo.get("prompts")
+    row["conversation_file"] = (
+        f"reports/{CA.report_name(sid, primary)}.md" if sid and convo.get("available") else None
+    )
+    return row
+
+
+def write_reports(
+    snap: dict,
+    convo: dict | None = None,
+    others: dict[str, dict] | None = None,
+    sessions: list[dict] | None = None,
+) -> None:
     REPORTS.mkdir(exist_ok=True)
     files = [
         ("latest_snapshot.json", D.dumps(snap, indent=2)),
@@ -81,6 +123,15 @@ def write_reports(snap: dict, convo: dict | None = None) -> None:
             ("latest_conversation.json", D.dumps(convo, indent=2)),
             ("latest_conversation.md", D.redact(CA.conversation_markdown(convo))),
         ]
+    for sid, c in (others or {}).items():
+        if c.get("available"):
+            stem = CA.report_name(sid, primary=False)
+            files += [
+                (f"{stem}.json", D.dumps(c, indent=2)),
+                (f"{stem}.md", D.redact(CA.conversation_markdown(c))),
+            ]
+    if sessions is not None:
+        files.append(("conversations_index.md", D.redact(CA.sessions_index_markdown(sessions))))
     for name, text in files:
         tmp = REPORTS / (name + ".tmp")
         tmp.write_text(text)
@@ -94,7 +145,12 @@ def refresh_loop() -> None:
             with _lock:
                 _state.clear()
                 _state.update(state)
-            write_reports(state["snapshot"], state.get("conversation"))
+            write_reports(
+                state["snapshot"],
+                state.get("conversation"),
+                state.get("conversations_others"),
+                state.get("claude_sessions"),
+            )
         except Exception:  # keep serving the last good state; the error shows in the console
             traceback.print_exc()
         time.sleep(REFRESH_S)
@@ -157,10 +213,16 @@ class Handler(BaseHTTPRequestHandler):
             )
         if url.path == "/api/builder":
             return self._json({"refreshed": st["refreshed"], **st["builder"]})
+        if url.path == "/api/claude-sessions":
+            return self._json(
+                {"refreshed": st["refreshed"], "sessions": st.get("claude_sessions", [])}
+            )
         if url.path == "/api/claude-activity":
             wanted = q.get("session", [None])[0]
             if not wanted:
                 return self._json(st["claude"])
+            if wanted in st.get("claude_others", {}):
+                return self._json(st["claude_others"][wanted])
             try:
                 return self._json(CA.activity(wanted))
             except Exception as exc:
@@ -173,6 +235,8 @@ class Handler(BaseHTTPRequestHandler):
             limit = int(raw) if raw.isascii() and raw.isdigit() and int(raw) > 0 else None
             if not wanted and limit is None:
                 return self._json(st["conversation"])
+            if wanted in st.get("conversations_others", {}) and limit is None:
+                return self._json(st["conversations_others"][wanted])
             try:
                 return self._json(CA.conversation(wanted, limit))
             except Exception as exc:
@@ -246,7 +310,12 @@ def main() -> None:
     a = ap.parse_args()
     if a.snapshot_only:
         st = compute()
-        write_reports(st["snapshot"], st.get("conversation"))
+        write_reports(
+            st["snapshot"],
+            st.get("conversation"),
+            st.get("conversations_others"),
+            st.get("claude_sessions"),
+        )
         print(f"wrote {REPORTS}/latest_snapshot.json and .md")
         return
     threading.Thread(target=refresh_loop, daemon=True).start()

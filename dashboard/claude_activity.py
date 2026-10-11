@@ -174,6 +174,26 @@ def pick_primary(sessions: list[dict], wanted: str | None) -> tuple[dict | None,
     return pick, "first pick: the non-archived session with the most completed turns (now sticky)"
 
 
+def monitored() -> list[dict]:
+    """Every non-archived session of this repo with a readable transcript: the primary (sticky) one
+    first, then the others by last activity. Archiving a chat in the app removes it."""
+    sessions = desktop_sessions() if APP_SESSIONS.exists() else []
+    primary, _ = pick_primary(sessions, None)
+    first = [primary] if primary else []
+    return first + [
+        s for s in sessions if not s["archived"] and s["_transcript_path"] and s not in first
+    ]
+
+
+def report_name(desktop_id: str, primary: bool) -> str:
+    """reports/ file stem of a session's conversation: the primary keeps the original name."""
+    return (
+        "latest_conversation"
+        if primary
+        else f"latest_conversation_{desktop_id.removeprefix('local_')[:8]}"
+    )
+
+
 def public(s: dict) -> dict:
     return {k: v for k, v in s.items() if not k.startswith("_") and k != "last_activity_ms"}
 
@@ -731,6 +751,38 @@ def conversation(wanted: str | None = None, limit: int | None = None) -> dict:
             f" Showing the last {limit} items plus every earlier prompt (?limit=)." if limit else ""
         ),
     }
+
+
+def sessions_index_markdown(rows: list[dict]) -> str:
+    """reports/conversations_index.md: which chat is which file, for the reviewer."""
+    lines = [
+        f"# Claude chats on this repo ({D.iso(time.time())})",
+        "",
+        "Every non-archived desktop chat whose folder is this repo (archive a chat in the app to drop it). "
+        "Each chat's prompts and replies, in full, are in its conversation file.",
+        "",
+        "| Chat | Role | Desktop id | Turns | Prompts | Last write | State | Conversation file |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            "| {} | {} | {} | {} | {} | {} | {} | {} |".format(
+                *(
+                    str(x if x is not None else "").replace("|", "/")
+                    for x in (
+                        r.get("title"),
+                        "primary" if r.get("primary") else "also monitored",
+                        r.get("desktop_session_id"),
+                        r.get("completed_turns"),
+                        r.get("prompts"),
+                        r.get("last_write"),
+                        r.get("state") or r.get("reason"),
+                        r.get("conversation_file") or "Not available",
+                    )
+                )
+            )
+        )
+    return "\n".join(lines) + "\n"
 
 
 def conversation_markdown(c: dict) -> str:

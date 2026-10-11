@@ -24,6 +24,7 @@ select{font:inherit;padding:4px;background:var(--card);color:var(--ink);border:1
 .bar{height:10px;background:var(--acc);border-radius:3px}.r{text-align:right}
 .msg{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:6px 0;background:var(--card)}.msg.you{border-left:4px solid var(--acc)}.msg.claude{border-left:4px solid var(--ok)}.msg pre{max-height:none;background:transparent;padding:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}.evt{color:var(--mute);font-size:11px;margin:2px 0 2px 10px}
 .cited{outline:2px solid var(--warn);background:var(--warnbg)}.kv td:first-child{color:var(--mute);white-space:nowrap;width:1%}.box{border:1px dashed var(--line);border-radius:6px;padding:6px 8px;margin:6px 0}
+.sw button{border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:4px 9px;border-radius:6px;cursor:pointer;font:inherit}.sw button.on{background:var(--acc);border-color:var(--acc);color:#fff}
 .note{color:var(--warn);background:var(--warnbg);border-radius:4px;padding:2px 6px;margin-top:4px;overflow-wrap:anywhere}
 .cmpm th,.cmpm td{white-space:nowrap}.cmpm .rh{position:sticky;left:0;z-index:2;background:var(--card);white-space:normal;min-width:230px;max-width:300px}.cmpm th.rh{z-index:4}.cmpm th{z-index:3}.cmpm tr.grp td{background:var(--code);font-weight:650}.cmpm tr.fam td{color:var(--mute)}.cmpm .ent{margin:1px 0}a.evl{margin-left:4px;font-size:11px;color:var(--acc);text-decoration:none}.cmpm .note{margin-top:1px;padding:0 4px;white-space:normal;max-width:220px}
 </style>
@@ -51,8 +52,8 @@ function nav(){document.getElementById("nav").innerHTML=TABS.map(([k,l])=>`<butt
 function go(k){tab=k;location.hash=k;nav();render()}
 async function load(){
   try{
-    const [o,r,f,b,s,c,cv]=await Promise.all(["overview","runs","failures","builder","snapshot","claude-activity","claude-conversation"].map(p=>fetch("/api/"+p).then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()})));
-    const first=!S.o;S={o,r,f,b,s,c,cv};document.getElementById("fresh").textContent="data refreshed "+o.refreshed+" · page polls every 12 s";
+    const [o,r,f,b,s,c,cv,cs]=await Promise.all(["overview","runs","failures","builder","snapshot","claude-activity","claude-conversation","claude-sessions"].map(p=>fetch("/api/"+p).then(x=>{if(!x.ok)throw new Error("server warming up or unavailable ("+x.status+"); retrying in 12 s");return x.json()})));
+    const first=!S.o;S={o,r,f,b,s,c,cv,cs};document.getElementById("fresh").textContent="data refreshed "+o.refreshed+" · page polls every 12 s";
     if(first||!["evidence","compare"].includes(tab))render();  // evidence and comparison: no re-render while reading
   }catch(e){document.getElementById("fresh").textContent="refresh failed: "+e}
 }
@@ -234,13 +235,22 @@ function builder(){
   ${[...b.traces].reverse().map(t=>`<tr><td>${esc(t.start)}</td><td class="sm">${esc(t.file)}</td><td class="sm">${esc(t.inputs.join(", "))}</td><td>${t.submission_path?pill(t.mode,"ok"):pill(t.mode,t.mode==="saved-spec"?"warn":"")}</td><td><code>${esc(t.git||"not recorded")}</code>${t.dirty?pill("dirty","bad"):""}</td><td>${t.model_calls}</td><td>${esc(t.build_seconds??"")}</td><td>${t.complete?(t.ok?pill("ok","ok"):pill("not ok","bad")):pill("incomplete","bad")}</td>
   <td class="sm">${t.tests.map(x=>`${esc(x.name)}: ${x.result==="PASS"?pill("PASS","ok"):pill("FAIL","bad")}`).join("<br>")}</td><td>${t.unresolved||""}</td><td>${t.not_enforced||""}</td><td class="sm">${t.created?`${esc(t.created.steps)} steps, ${esc(t.created.tools)} tools, v${esc(t.created.version??"?")}`:"no deploy"}</td></tr>`).join("")}</table></div>`;
 }
-function claude(){
-  const c=S.c,el=document.getElementById("claude"),old=document.getElementById("convo");
-  const atBottom=!old||old.scrollTop+old.clientHeight>=old.scrollHeight-30,prevTop=old?old.scrollTop:0;
-  if(!c||!c.available){el.innerHTML=`<div class="card">${esc(c?.reason||"Not available")}</div>`;return}
+let claudeSel=null,claudeShown=null;  // the chat shown in the Claude Session tab (null = primary)
+async function claude(){
+  const ss=(S.cs&&S.cs.sessions)||[],sel=claudeSel&&ss.some(x=>x.desktop_session_id===claudeSel)?claudeSel:(ss[0]||{}).desktop_session_id;
+  const row=ss.find(x=>x.desktop_session_id===sel)||{};
+  let c=S.c,cv=S.cv;  // the primary chat comes with the 12 s poll; any other is fetched (served from the server's cache)
+  if(sel&&!row.primary){
+    const q="?session="+encodeURIComponent(sel);
+    try{[c,cv]=await Promise.all(["claude-activity","claude-conversation"].map(p=>fetch("/api/"+p+q).then(x=>x.json())))}catch(e){c={available:false,reason:"fetch failed: "+e}}
+  }
+  const el=document.getElementById("claude"),old=document.getElementById("convo"),moved=claudeShown!==sel;claudeShown=sel;
+  const atBottom=moved||!old||old.scrollTop+old.clientHeight>=old.scrollHeight-30,prevTop=old?old.scrollTop:0;
+  const sw=ss.length?`<div class="row sw" style="margin-bottom:8px"><b>Chat</b>${ss.map(x=>`<button class="${x.desktop_session_id===sel?"on":""}" data-sid="${esc(x.desktop_session_id)}" onclick="claudeSel=this.dataset.sid;render()" title="${esc((x.state||x.reason||"")+"\n"+(x.conversation_file||""))}">${esc(x.title||x.desktop_session_id)}${x.primary?" · primary":""}</button>`).join("")}<span class="sm mute">every non-archived chat of this repo · index: <code>reports/conversations_index.md</code></span></div>`:"";
+  if(!c||!c.available){el.innerHTML=sw+`<div class="card">${esc(c?.reason||"Not available")}</div>`;return}
   const s=c.session,oc=Object.entries(c.outcome_counts_last_100||{}).map(([k,v])=>pill(k+": "+v,k==="ok"?"ok":k==="error"||k==="declined"?"bad":"")).join(" ");
   const out=o=>o==="ok"?pill("ok","ok"):o==="error"||o==="declined"?pill(o,"bad"):pill(o,"warn");
-  el.innerHTML=`<div class="card sm">Passive, read-only monitor. ${esc(c.how)}. Shown: ${esc(c.exposed)}. Never shown: ${esc(c.never_exposed)}.</div>
+  el.innerHTML=sw+`<div class="card sm">Passive, read-only monitor. ${esc(c.how)}. Shown: ${esc(c.exposed)}. Never shown: ${esc(c.never_exposed)}.</div>
   <div class="grid" style="margin-top:10px">
    <div class="card"><h3>Session</h3><div><b>${esc(s.title)}</b></div><div class="sm">${pill(s.runs,"ok")} ${esc(s.model)} · effort ${esc(s.effort)} · ${esc(s.completed_turns)} turns</div><div class="sm mute">desktop ${esc(s.desktop_session_id)}<br>transcript ${esc(s.transcript)}</div></div>
    <div class="card"><h3>State</h3><div><b>${esc(c.state)}</b></div><div class="sm">transcript last written ${esc(c.transcript_last_write)} (${ago(c.seconds_since_last_write)} ago)</div><div class="sm">agent process: ${c.processes.agent_process?pill("pid "+c.processes.agent_process.pid,"ok"):pill("not identified","warn")} <span class="mute">${esc(c.processes.agent_note)}</span></div></div>
@@ -256,12 +266,12 @@ function claude(){
    ${c.hook_errors.length?`<h2>Hook errors</h2>${c.hook_errors.map(h=>`<div class="sm">${esc(h.at)} · ${esc(h.count)} × ${esc(h.error)}</div>`).join("")}`:""}
    <h2>Desktop sessions for this repo</h2><table><tr><th>Title</th><th>Desktop id</th><th>Turns</th><th>Last activity</th></tr>${c.sessions_for_this_repo.map(x=>`<tr><td class="sm">${esc(x.title)}${x.desktop_session_id===s.desktop_session_id?" "+pill("monitored","ok"):""}</td><td class="sm"><code>${esc(x.desktop_session_id)}</code></td><td>${esc(x.completed_turns)}</td><td class="sm">${esc(x.last_activity)}</td></tr>`).join("")}</table><div class="sm mute">selection: ${esc(c.selection)} · cloud sessions: ${esc(c.cloud_sessions)}</div>
   </div></div>
-  <h2>Conversation (your prompts and Claude's replies, newest at the bottom) ${pill("also in reports/latest_conversation.md for ChatGPT","warn")}</h2>
-  ${convo()}`;
+  <h2>Conversation (your prompts and Claude's replies, newest at the bottom) ${pill("also in "+(row.conversation_file||"reports/latest_conversation.md")+" for ChatGPT","warn")}</h2>
+  ${convo(cv)}`;
   const box=document.getElementById("convo");if(box)box.scrollTop=atBottom?box.scrollHeight:prevTop;
 }
-function convo(){
-  const cv=S.cv;if(!cv||!cv.available)return `<div class="card">${esc(cv?.reason||"Not available")}</div>`;
+function convo(cv){
+  if(!cv||!cv.available)return `<div class="card">${esc(cv?.reason||"Not available")}</div>`;
   return `<div class="sm mute">${esc(cv.note)} Showing ${cv.items.length} of ${cv.total_items}.</div>
   <div id="convo" class="wrap" style="max-height:640px;padding:6px 10px;background:var(--bg)">${cv.items.map(i=>i.role==="event"?`<div class="evt">⏵ ${esc((i.at||"").slice(11,19))} ${esc(i.text)}</div>`:
    `<div class="msg ${i.role}"><div class="sm"><b>${i.role==="you"?"You":"Claude"}</b> <span class="mute">${esc((i.at||"").replace("T"," ").slice(0,19))} UTC${i.queued?" · queued while Claude was busy":""}</span></div>${i.role==="claude"&&i.text.length>1500?`<details><summary>${esc(i.text.slice(0,300))}…</summary><pre>${esc(i.text)}</pre></details>`:`<pre>${esc(i.text)}</pre>`}</div>`).join("")}</div>`;

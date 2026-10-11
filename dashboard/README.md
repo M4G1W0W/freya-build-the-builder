@@ -78,6 +78,11 @@ and are not visible.
 
 - **Which session.** `?session=<desktop or cli id>` or `DASHBOARD_SESSION`, else the non-archived session for this
   repo with the most completed turns. The choice is sticky until the server restarts.
+- **Every chat.** All non-archived chats of this repo are monitored, the primary one first; a chat switcher at the
+  top of the Claude Session tab shows each one's activity and conversation. Each chat's conversation goes to
+  `reports/latest_conversation.md` (primary) or `reports/latest_conversation_<desktop id, 8 chars>.md` (others), and
+  `reports/conversations_index.md` says which chat is which file. `GET /api/claude-sessions` lists them; archive a chat
+  in the app to drop it.
 - **Activity feed.** Tool names, Claude's own action descriptions (allowlisted fields only), outcomes, error kinds
   from a fixed vocabulary, live background processes (basenames only), and Claude's latest text. It never contains
   your prompts, thinking, tool inputs or tool output.
