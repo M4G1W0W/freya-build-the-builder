@@ -379,8 +379,8 @@ def _row(case: dict, run: dict, d: dict) -> dict:
         "id": "|".join(
             (
                 case["id"],
-                d["file"],
-                ("" if d.get("historical", True) else "unverified:") + (d["hash"] or "unknown"),
+                ("" if d.get("historical", True) else "unverified:")
+                + (d["hash"] or f"unknown:{d['file']}"),
                 style or "style-unknown",
             )
         ),
@@ -389,7 +389,7 @@ def _row(case: dict, run: dict, d: dict) -> dict:
         "brief": cdef.get("brief") or run.get("brief") or "?",
         "family": cdef.get("family") or case.get("family") or "?",
         "definition": {
-            "file": d["file"],
+            "files": [d["file"]],
             "hash": d["hash"],
             "hash_of": "sha256 of the case's JSON in the "
             + d.get("source", "git version committed at the run's start"),
@@ -518,15 +518,23 @@ def partial_runs(incomplete: list[dict], definition_of) -> list[dict]:
             parsed = parse_partial_log("")
         ts = D.parse_utc(i["time"]) if i.get("time") else 0.0
         name = i["file"].rsplit("/", 1)[-1].removesuffix(".log")
-        case_file, _ = D.case_file_for(name)
+        launch = i.get("launch") or {}
+        case_file = D.case_ref(launch["cases"]) if launch.get("cases") else D.case_file_for(name)[0]
         path = _case_path(case_file or "kit/public-test-set.json")
         for c in parsed["cases"]:
-            d = definition_of(path, c["id"], ts, ts)
+            d = with_launch_hash(definition_of(path, c["id"], ts, ts), launch.get("cases_sha256"))
             cdef = d["case"] or {}
             c.update(
                 brief=cdef.get("brief") or "?",
                 style=cdef.get("style"),
-                definition={"file": path, "hash": d["hash"], "flags": d["flags"]},
+                definition={
+                    "file": path,
+                    "hash": d["hash"],
+                    "flags": d["flags"],
+                    "chosen_by": f"launch record {launch['source']}"
+                    if launch.get("cases")
+                    else "file-name convention",
+                },
             )
         out.append(
             {
@@ -538,7 +546,13 @@ def partial_runs(incomplete: list[dict], definition_of) -> list[dict]:
                 **parsed,
                 "strict": None,
                 "strict_note": "incomplete run: never a strict score (no result JSON)",
-                "configuration": "Not determinable: the console log has no agent id; the file-name "
+                "configuration": (
+                    f"launch record {launch['source']}: slot {launch.get('slot')}, agent "
+                    f"{launch.get('agent_id') or '?'}, build {launch.get('build') or '?'} "
+                    "(not matched to a deploy trace)"
+                )
+                if launch
+                else "Not determinable: the console log has no agent id; the file-name "
                 f"label {i.get('label') or 'none'} is not evidence",
                 "call_evidence": "Not available: console logs carry no call ids",
             }
@@ -578,6 +592,8 @@ def build(
             row = rows.setdefault(new["id"], new)
             if d["commit"] and d["commit"] not in row["definition"]["commits"]:
                 row["definition"]["commits"].append(d["commit"])
+            if d["file"] not in row["definition"]["files"]:
+                row["definition"]["files"].append(d["file"])
             entries.append(_entry(run, case, cfg["id"], row["id"], d))
     return {
         "configs": configs,
@@ -677,7 +693,7 @@ def _row_order(rows: list[dict]) -> list[dict]:
             family_rank[(r["brief"], r["family"])],
             r["family"],
             num(r["case"]),
-            r["definition"]["file"],
+            r["definition"]["files"][0],
             r["style"] or "~",
             r["definition"]["hash"] or "~",
         ),
@@ -750,7 +766,7 @@ def compare(base: dict, f: dict, rows: list[dict], scope: list[dict]) -> dict:
             "row": r["id"],
             "family": r["family"],
             "brief": r["brief"],
-            "definition": f"{r['definition']['file']} #{r['definition']['hash']}",
+            "definition": f"{', '.join(r['definition']['files'])} #{r['definition']['hash']}",
             "style": r["style"] or "unknown",
             "a": _side(ea),
             "b": _side(eb),
@@ -799,8 +815,8 @@ def compare(base: dict, f: dict, rows: list[dict], scope: list[dict]) -> dict:
     return {
         "a": ca,
         "b": cb,
-        "rule": "Rows match only on the same case, the same test definition hash and a known, equal "
-        "speech style. A side's status uses comparable strict runs only (complete, 3+ reps, no "
+        "rule": "Rows match only on the same case, the same test definition hash (the case's content, "
+        "whichever case file holds it) and a known, equal speech style. A side's status uses comparable strict runs only (complete, 3+ reps, no "
         "configuration flag); runs that disagree make it 'mixed'. Reps of different runs are never "
         "added up.",
         "differences": [

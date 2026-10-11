@@ -294,12 +294,27 @@ def parse_txt(path: Path) -> dict:
 def _classification_evidence(failed: list[str], row: dict) -> list[dict]:
     out = []
     if any(NO_VERDICT.search(s) for s in failed):
+        bank_failed = any(not s.startswith("conversation:") for s in failed)
         out.append(
             {
-                "category": "Platform errors",
+                "category": "No judge verdict (bank records failed: not a platform error)"
+                if bank_failed
+                else "Platform errors",
                 "matched": "no judge verdict",
                 "context": next(s for s in failed if NO_VERDICT.search(s)),
                 "source": "structural: the judge verdict never arrived",
+            }
+        )
+    if (
+        row.get("ended") == "customer-ended-call"
+        and (row.get("slowest_turn_s") or 0) >= D.SLOW_TURN_S
+    ):
+        out.append(
+            {
+                "category": "Slow agent turn, customer hung up (latency)",
+                "matched": f"customer-ended-call after a {row.get('slowest_turn_s')} s agent turn",
+                "context": f"ended={row.get('ended')} slowest_turn_s={row.get('slowest_turn_s')}",
+                "source": "structural",
             }
         )
     if not row.get("tools") and (row.get("slowest_turn_s") or 0) == 0:
@@ -520,6 +535,9 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
     family = case.get("family") or ""
     primary = fd["category"] if fd else None
     scorer_lines = [s for s in failed if not s.startswith("conversation:")]
+    tags = list(fd["tags"] if fd else [])
+    if no_verdict and not any("No judge verdict" in t for t in tags):
+        tags.append("No judge verdict")
     if no_verdict and not scorer_lines:  # a missing verdict never hides a bank-record failure
         primary = "Platform errors"
     date_related = (
@@ -583,7 +601,7 @@ def detail(runs: list[dict], run_id: str, case_id: str, rep: int | None) -> dict
         },
         "classification": {
             "primary": primary,
-            "tags": (fd["tags"] if fd else []) + (["No judge verdict"] if no_verdict else []),
+            "tags": tags,
             "evidence": _classification_evidence(failed, row) if failed else [],
             "method": "auto: structural checks, then the ledger diff, then keywords (low confidence); the human classification is in the Score log rows below",
         },

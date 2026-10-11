@@ -175,6 +175,19 @@ def resolve(commits: list[dict], prefix: str | None) -> dict | None:
     return None
 
 
+def code_differs(commit: str) -> list[str]:
+    """Builder-code files (src/, builder/) that differ between `commit` and HEAD: a tree diff, so it also
+    sees a tested commit that is not on main."""
+    return [
+        f for f in git("diff", "--name-only", commit, "HEAD", "--", *CODE_PATHS).splitlines() if f
+    ]
+
+
+def is_ancestor(commit: str) -> bool:
+    full = git("rev-parse", "--verify", "--quiet", commit + "^{commit}").strip()
+    return bool(full) and git("merge-base", full, "HEAD").strip() == full
+
+
 def code_commits_after(commit: str) -> list[dict]:
     """Commits touching src/ or builder/ after `commit` (exclusive) up to HEAD."""
     out = git("log", "--format=%h%x09%ct%x09%s", f"{commit}..HEAD", "--", *CODE_PATHS)
@@ -399,14 +412,31 @@ def _calls_rows(d: Path) -> dict[str, dict]:
     return rows
 
 
-def launch_record(path: Path) -> dict | None:
+def _ended_before(end_utc: object, written: float | None) -> bool:
+    """A record that ended well before the file was last written belongs to an earlier attempt."""
+    if not written or not isinstance(end_utc, str) or not end_utc.endswith("Z"):
+        return False
+    try:
+        return parse_utc(end_utc[:19] + "Z") < written - 60
+    except ValueError:
+        return False
+
+
+def launch_record(path: Path, written: float | None = None) -> dict | None:
     """What the launcher wrote when it started this run: <name>.meta.json beside the result (case file
-    and its sha256, slot, agent, version, build, spec and its sha256), else the run's calls.tsv row."""
+    and its sha256, slot, agent, version, build, spec and its sha256), else the run's calls.tsv row.
+    `written` (a console log's mtime) drops a record from an earlier attempt of the same name."""
     meta_path = path.with_name(path.stem + ".meta.json")
     meta = load_json(meta_path)
-    if isinstance(meta, dict) and meta.get("cases"):
+    if (
+        isinstance(meta, dict)
+        and meta.get("cases")
+        and not _ended_before(meta.get("end_utc"), written)
+    ):
         return {**meta, "source": _shown(meta_path)}
     row = _calls_rows(path.parent).get(path.stem)
+    if row and _ended_before(row.get("end_utc"), written):
+        return None
     if row and str(row.get("casefile", "")).endswith(".json"):
         return {
             "cases": row["casefile"],
@@ -523,6 +553,14 @@ LEDGER = re.compile(
 
 def _ledger_category(failed: list[str]) -> str | None:
     """Structured first: what the bank ledger diff says, before any keyword guess."""
+    for s in failed:  # an identity outcome explains every later ledger difference
+        m = LEDGER.match(str(s))
+        if (
+            m
+            and m.group(1) == "outcome"
+            and ("not_verified" in m.group(2)) != ("not_verified" in m.group(3))
+        ):
+            return "Identity verification"
     for s in failed:
         m = LEDGER.match(str(s))
         if not m:
@@ -540,11 +578,12 @@ def _ledger_category(failed: list[str]) -> str | None:
             got, want = sorted(got), sorted(want)
             same_amounts = [tuple(x[:2]) for x in got] == [tuple(x[:2]) for x in want]
             return "Date calculations" if same_amounts else "Payment amounts"
-        if field == "outcome" and "not_verified" in actual and "not_verified" not in expected:
-            return "Identity verification"
         if field in ("notes", "callbacks", "transfers"):
             return "Tool arguments"
     return None
+
+
+SLOW_TURN_S = 30  # the kit simulator's customer hangs up on long silences
 
 
 def classify(row: dict) -> tuple[str, list[str]]:
@@ -561,6 +600,11 @@ def classify(row: dict) -> tuple[str, list[str]]:
         tags.insert(0, structured)
     if not row.get("tools") and (row.get("slowest_turn_s") or 0) == 0:
         tags.insert(0, "Platform errors")
+    elif (
+        row.get("ended") == "customer-ended-call"
+        and (row.get("slowest_turn_s") or 0) >= SLOW_TURN_S
+    ):
+        tags.insert(0, "Slow agent turn, customer hung up (latency)")
     if re.search(r"analysis never arrived|no verdict", text):
         if any(not str(s).startswith("conversation:") for s in failed):
             tags.append("No judge verdict (the bank records failed too)")
@@ -617,7 +661,7 @@ def build_runs(traces: list[dict], commits: list[dict]) -> tuple[list[dict], lis
         text = path.read_text(errors="replace")
         if any(s in text for s in sim_ids):
             continue  # console log of a run whose result JSON exists under another name
-        launch = launch_record(path)  # a launcher record makes it a run whatever the log says
+        launch = launch_record(path, path.stat().st_mtime)  # a launcher record makes it a run
         if (
             not launch
             and text
@@ -640,7 +684,15 @@ def build_runs(traces: list[dict], commits: list[dict]) -> tuple[list[dict], lis
                 "label": (re.search(r"-([0-9a-f]{7})\.log$", path.name) or [None, None])[1],
                 "launch": {
                     k: launch.get(k)
-                    for k in ("source", "slot", "agent_id", "cases", "reps", "build")
+                    for k in (
+                        "source",
+                        "slot",
+                        "agent_id",
+                        "cases",
+                        "cases_sha256",
+                        "reps",
+                        "build",
+                    )
                 }
                 if launch
                 else None,
@@ -712,6 +764,12 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
         )
     else:
         flags.append("Tested commit unknown: no build trace, Score log row or file-name label")
+    invalid = [ln for ln in score_log_rows(path.name) if re.search(r"\binvalid\b", ln, re.I)]
+    if invalid:
+        flags.append(
+            "The Score log marks this run invalid (human note; the raw result is still shown): "
+            + invalid[0][:200]
+        )
     human_all = score_log_refs(path.name)
     if (
         human_all
@@ -754,7 +812,12 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
     if launch:
         case_file = case_ref(launch["cases"])
         file_src = f"launch record {launch['source']}"
-        style = "not set by the case file (the launch record keeps --cases, not --style)"
+        styled = any(c.get("style") for c in load_cases(case_ref(launch["cases"])).values())
+        style = (
+            "styled case file (one style per case)"
+            if styled
+            else "not recorded (the launch record keeps --cases, not --style)"
+        )
         style_source = f"case file 'style' field (case file from the {file_src})"
         recorded = launch.get("cases_sha256")
         now_sha = sha256_file(ROOT / relpath(launch["cases"]))
@@ -817,11 +880,11 @@ def _run_record(path, data, deploys, log, calls, slot_by_agent, commits) -> dict
             + "; ".join(deploy["variants"])
         )
     if launch:
-        label = str(launch.get("build") or "")
-        named = re.findall(r"\b[0-9a-f]{7}\b", label)
-        if label and commit and named and not any(c.startswith(commit[:7]) for c in named):
+        build_label = str(launch.get("build") or "")
+        named = re.findall(r"\b[0-9a-f]{7}\b", build_label)
+        if build_label and commit and named and not any(c.startswith(commit[:7]) for c in named):
             flags.append(
-                f"Launch record says build '{label[:120]}'; the build trace says git={commit}"
+                f"Launch record says build '{build_label[:120]}'; the build trace says git={commit}"
                 + (" (dirty)" if (deploy or {}).get("dirty") else "")
             )
         if launch.get("agent_id") and launch["agent_id"] != agent:
@@ -1028,7 +1091,10 @@ def case_detail(runs: list[dict], run_id: str, case_id: str) -> dict | None:
         },
         "case": {k: case[k] for k in ("id", "family", "style", "reps", "strict", "category")},
         "expected": cdef.get("expected"),
-        "expected_source": f"{run['case_file']} (current version of the case file)",
+        "expected_source": f"{run['case_file']} (current version of the case file; chosen by "
+        f"{run.get('case_file_source', 'file-name convention')})",
+        "script_and_checks_source": "current version of the case file; the Config Comparison tab uses "
+        "the version committed when the run started",
         "script": cdef.get("script"),
         "checks": cdef.get("checks"),
         "reps": reps,
@@ -1103,8 +1169,10 @@ def working_state() -> dict:
 # ---------------------------------------------------------------- processes
 
 
+SIM_OUT = re.compile(r"--out\s+(\S*runs/\S+\.json)")  # any script writing a result under runs/
 EXECUTES = re.compile(
     r"(?i)python[0-9.]*(\s+-\S+)*\s+\S*(run_cases\w*\.py|builder/build\.py|smoke\w*\.py)\b"
+    r"|(?i:python)[0-9.]*(\s+-\S+)*\s+\S+\.py\b.*\s--out\s+\S*runs/\S+\.json"
     r"|(^|/)(ba|z)?sh\s+\S*(chain\d*|qrun\w*|scratchpad/\S+)\.sh\b"
 )
 
@@ -1125,12 +1193,11 @@ def running_tests() -> list[dict]:
         pid, etime, cmd = parts
         if re.match(r"\S*(ba|z)?sh\s+-l?c\b", cmd) or not EXECUTES.search(cmd):
             continue  # wrapper shells, editors, viewers and linters that merely name the file
-        if "run_cases" in cmd or re.search(r"smoke\w*\.py", cmd):
+        if "run_cases" in cmd or re.search(r"smoke\w*\.py", cmd) or SIM_OUT.search(cmd):
             out_file = re.search(r"--out\s+(\S+)", cmd)
-            agent = re.search(r"\.py\s+([0-9a-f]{8})", cmd)
-            kind = (
-                "simulation (run_cases.py)" if "run_cases" in cmd else "simulation (smoke script)"
-            )
+            agent = re.search(r"\s([0-9a-f]{8})[0-9a-f-]*(\s|$)", cmd)
+            script = re.search(r"(\w+)\.py\b", cmd)
+            kind = f"simulation ({script.group(1) if script else 'script'}.py)"
             what = f"agent {agent.group(1) if agent else '?'} -> {Path(out_file.group(1)).name if out_file else 'no --out'}"
             if out_file:
                 what += " · " + _progress(ROOT / relpath(out_file.group(1)))
