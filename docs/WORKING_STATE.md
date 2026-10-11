@@ -7,6 +7,22 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
+## UPDATE 11:37 UTC: cand-eng.4 SELECTED, DEPLOYED, MEASURING (supersedes "State now" below)
+
+- **User selected `cand-eng.4` (cfa4d9d) at 11:30 UTC** (Decision log). Worktree (detached):
+  `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-eng4`.
+  Its `--dry` renders of spec-a-llm and spec-ab-llm-c45758f differ from cand-final.1 only in the 3 FACTS code nodes.
+- Slots (in `slots.tsv`, export MATCH: 0 changed, 0 render-only, 0 needs-review):
+  `exp-eng4-a` wf 66db0b41 / agent f166447e (spec-a-llm); `exp-eng4-ab` wf 0a819c5b / agent 0988e6f1 (spec-ab-llm-c45758f).
+  Build logs `runs/dev/r4/build-eng4-{a,ab}.log`: exit 3 = chat smoke 500/504 only; the chat endpoint 504'd for the
+  G1 control too (platform). The A create POST 504'd once then retried: **a stray duplicate workflow may exist**.
+- `exp-eng4-ve`: FRESH build of `tests/fixtures/briefs/variant-e.md` (worktree) with `--save-spec
+  runs/dev/r4/spec-eng4-ve.json`; log `runs/dev/r4/build-eng4-ve.log`. Register in slots.tsv + export-check it before
+  the runner reaches E4-VE (otherwise the runner stops with "unknown slot").
+- **Queue (user D3 at 11:35):** E4-A-styledA, E4-AB-all, E4-AB-xb (x3 each), then E4-VE (eng-variant-e.json x3).
+  Old component A/Bs parked in `sim/queue-parked-1135.txt` (not to run). Runner qrun4.sh started 11:36 UTC
+  (STOP removed); results `runs/dev/r4/E4-*.{log,json,meta.json}`.
+
 ## SIMULATION CHAT HANDOFF (11 Oct 11:25 UTC; read this first after a context clear)
 
 **Roles.** This chat owns ALL deployments and simulations. The Methodology Developer (engine) chat fixes the
