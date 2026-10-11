@@ -57,7 +57,7 @@ def compute() -> dict:
     state["snapshot"] = A.snapshot(state)
     state["snapshot"]["claude_session"] = CA.summary(state["claude"])
     try:
-        state["conversation"] = CA.conversation(limit=300)
+        state["conversation"] = CA.conversation()  # every transcript, nothing cut
     except Exception as exc:
         state["conversation"] = {
             "available": False,
@@ -169,12 +169,12 @@ class Handler(BaseHTTPRequestHandler):
                 )
         if url.path == "/api/claude-conversation":
             wanted = q.get("session", [None])[0]
-            raw = q.get("limit", ["300"])[0]
-            limit = int(raw) if raw.isdigit() else 300
-            if not wanted and limit == 300:
+            raw = q.get("limit", [""])[0]
+            limit = int(raw) if raw.isascii() and raw.isdigit() and int(raw) > 0 else None
+            if not wanted and limit is None:
                 return self._json(st["conversation"])
             try:
-                return self._json(CA.conversation(wanted, min(limit, 500)))
+                return self._json(CA.conversation(wanted, limit))
             except Exception as exc:
                 return self._json(
                     {"available": False, "reason": f"monitor error: {type(exc).__name__}"}

@@ -33,6 +33,7 @@ HOME = str(Path.home())
 APP_SESSIONS = Path(HOME) / "Library" / "Application Support" / "Claude" / "claude-code-sessions"
 PROJECTS = Path(HOME) / ".claude" / "projects"
 TAIL_BYTES = 4_000_000
+SESSION_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 RECENT = 25
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -109,6 +110,11 @@ def desktop_sessions() -> list[dict]:
         transcript = (
             next(iter(glob.glob(str(PROJECTS / "*" / f"{cli}.jsonl"))), None) if cli else None
         )
+        prior = [  # earlier transcripts of this desktop session (context saves, /clear, restarts)
+            next(iter(glob.glob(str(PROJECTS / "*" / f"{pid}.jsonl"))), None)
+            for pid in meta.get("priorCliSessionIds") or []
+            if isinstance(pid, str) and SESSION_ID.fullmatch(pid)
+        ]
         out.append(
             {
                 "desktop_session_id": meta.get("sessionId"),
@@ -125,7 +131,10 @@ def desktop_sessions() -> list[dict]:
                 "last_activity_ms": meta.get("lastActivityAt") or 0,
                 "metadata_stale": stale,
                 "transcript": short_transcript(cli) if transcript else None,
+                "prior_transcripts": len(prior),
+                "prior_transcripts_missing": sum(x is None for x in prior),
                 "_transcript_path": transcript,
+                "_prior_paths": [x for x in prior if x],
             }
         )
     return sorted(out, key=lambda s: -s["last_activity_ms"])
@@ -643,44 +652,63 @@ def _dedupe(items: list[dict]) -> list[dict]:
     return [{k: v for k, v in i.items() if k != "_paired"} for i in out]
 
 
-def _human_events(path: str) -> list[dict]:
-    """Only the human-prompt entries of the whole transcript (cheap: filtered before JSON parsing)."""
+_finished: dict[str, tuple[float, int, list[dict]]] = {}
+
+
+def _transcript_items(path: str) -> list[dict]:
+    """Every conversation item of a whole transcript, cached by mtime and size (earlier transcripts
+    never change; the current one is re-parsed only after it was written)."""
+    st = os.stat(path)
+    hit = _finished.get(path)
+    if hit and hit[0] == st.st_mtime and hit[1] == st.st_size:
+        return hit[2]
     events = []
     with open(path, "rb") as f:  # read-only
         for line in f:
-            if b'"human"' not in line and b"queued_command" not in line:
-                continue
             try:
                 events.append(json.loads(line))
             except ValueError:
                 continue
-    return [e for e in events if e.get("type") in ("user", "attachment")]
+    items = _dedupe(_items(events))
+    _finished[path] = (st.st_mtime, st.st_size, items)
+    return items
 
 
-def _keep_prompts(items: list[dict], limit: int) -> list[dict]:
+def _keep_prompts(items: list[dict], limit: int | None) -> list[dict]:
     """The last `limit` items, plus every prompt of yours before them (prompts are never cut)."""
-    if len(items) <= limit:
+    if limit is None or len(items) <= limit:
         return items
     cut = len(items) - limit
     return [i for i in items[:cut] if i["role"] == "you"] + items[cut:]
 
 
-def conversation(wanted: str | None = None, limit: int = 80) -> dict:
+def conversation(wanted: str | None = None, limit: int | None = None) -> dict:
+    """The whole conversation of a desktop session: its earlier transcripts, then the current one."""
     sessions = desktop_sessions() if APP_SESSIONS.exists() else []
     primary, how_picked = pick_primary(sessions, wanted)
     if not primary:
         return {"available": False, "reason": how_picked}
     path = primary["_transcript_path"]
-    tail_only = os.stat(path).st_size > TAIL_BYTES
-    items = _dedupe(_items(read_tail(path)))
-    if tail_only:  # prompts are few: take them from the whole file so none is ever lost
-        first = items[0]["at"] if items else None
-        early = [
-            i
-            for i in _dedupe(_items(_human_events(path)))
-            if first is None or (i["at"] or "") < first
-        ]
-        items = early + items
+    blocks = [(p, _transcript_items(p)) for p in primary["_prior_paths"]]
+    blocks.sort(key=lambda b: (b[1][0]["at"] or "") if b[1] else "")
+    blocks.append((path, _transcript_items(path)))  # the current one, re-read only when it changed
+    items = []
+    for k, (p, its) in enumerate(blocks, 1):
+        items.append(
+            {
+                "at": its[0]["at"] if its else None,
+                "role": "event",
+                "text": f"transcript {k} of {len(blocks)} begins ({Path(p).stem[:8]}"
+                + (", current" if k == len(blocks) else "")
+                + ")"
+                + (
+                    ""
+                    if k == 1
+                    else ": the session continued after a context save, /clear or restart"
+                ),
+            }
+        )
+        items += its
     deduped = _keep_prompts(items, limit)
     return {
         "available": True,
@@ -692,12 +720,15 @@ def conversation(wanted: str | None = None, limit: int = 80) -> dict:
         "prompts": sum(1 for i in items if i["role"] == "you"),
         "note": "Your prompts and Claude's replies, for review (also written to reports/latest_conversation.*); "
         "system reminders, thinking, tool calls and tool output are left out; secrets redacted, e-mails masked. "
-        "Only the current transcript of the session is read: prompts from before a context save live in older "
-        "transcripts."
+        f"Every transcript of the session is included: {len(blocks) - 1} earlier one(s) (before context saves, "
+        "/clear or restarts) in full, then the current one. Prompts and replies are never cut."
         + (
-            " Claude's replies and events come from the last 4 MB of the transcript; all your prompts are read from the whole file."
-            if tail_only
+            f" {primary['prior_transcripts_missing']} earlier transcript file(s) listed by the app no longer exist."
+            if primary["prior_transcripts_missing"]
             else ""
+        )
+        + (
+            f" Showing the last {limit} items plus every earlier prompt (?limit=)." if limit else ""
         ),
     }
 

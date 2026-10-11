@@ -81,13 +81,13 @@ and are not visible.
 - **Activity feed.** Tool names, Claude's own action descriptions (allowlisted fields only), outcomes, error kinds
   from a fixed vocabulary, live background processes (basenames only), and Claude's latest text. It never contains
   your prompts, thinking, tool inputs or tool output.
-- **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events.
+- **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events. Every transcript of the session is included: the desktop app lists the earlier ones (before a context save, `/clear` or a restart) in `priorCliSessionIds`, they are read in full (cached, they no longer change) and a `transcript k of n begins` event marks each boundary. `?limit=N` returns only the last N items plus every earlier prompt.
   System reminders, thinking and tool content are left out. Secrets are redacted and e-mails masked. It is written
   to `reports/latest_conversation.{json,md}` for an external reviewer (`reports/` is gitignored).
 - **Safety.** Files are opened read-only. The only subprocess is `ps`. Requests whose Host is not
   `127.0.0.1:<port>` or `localhost:<port>` get 403 (DNS-rebinding guard).
 - **Limits.**
-  - Only the session's current transcript is read. Prompts from before a context save are in older transcripts.
+  - An earlier transcript whose file was deleted cannot be shown; the note says how many are missing.
   - "Open tasks" are background launches with no recorded completion. Only the live processes prove that work is
     running.
 
