@@ -337,3 +337,35 @@ Wed 2026-10-14, accounts reused by public case id:
 | H2 | h | PUB-06 | "too much" -> refuses -> accepts any next offer | collision after refusal (no-repeat rule) | **UNRESOLVED**: counting + whether attempt 2 repeats the refused offer |
 Decoys for extraction only: A, raw-A and variant-c ("Attempt 2 may name the floor again, on the
 deadline") must stay attempt_1 with no date; a variant with the own date in a second sentence.
+
+## Fix 3 ("the rest stays overdue"): NOT implemented; already represented on cand-eng.6/.7 (12:01 UTC)
+
+Trace (brief -> spec -> guidance), read-only:
+- Brief: required in every brief with a "too much" rule: A 26 "Say that the rest stays overdue.",
+  raw-A 5.8.3, variant-c 27, variant-e; worded differently in variant-r 4.7.3 ("states that the rest
+  remains overdue"), p1 H3 ("the remainder stays outstanding"), p2 3.8.2, p3b 26. Brief B: no own rule.
+- Pre-Fix-1 extraction (cand-final.1 ... cand-eng.5): in `unmodeled` only, in 18/18 specs (A, A+B,
+  raw-A, variant-c/r, p1, p2, p3b, variant-e); never rendered (only the raw brief in the system prompt
+  carries it). Cost seen: `runs/dev/r4/M5r2-ab1W-all-c5.log` PUB-06 (G1-era A+B build): ledger right,
+  conversation failed, "failed to mention that the remaining balance stays overdue".
+- Fix-1 extraction (cand-eng.6/.7 prompt): in `stage_rules.negotiate` (rendered in the negotiate task)
+  in **16/16** fresh builds (A x2, raw-A x2, A+B x4, variant-c x4, variant-r x2, p3b x2), quoted as the
+  brief's sentence and tied to the floor offer, e.g. "If the full amount is too much, offer the floor
+  once and say 'The rest stays overdue.'"; variant-r keeps its own wording ("The rest remains
+  overdue."); multi-product builds have it too. Nothing is hard-coded: a brief without the rule gets
+  nothing (an "absent" variant was not built).
+- Remaining gap (not an omission): placement and determinism. The line sits at ~49-60% of the
+  negotiate task, not on the FACTS "too much" line that governs the offer, and it is an LLM paraphrase
+  (16/16 so far). Whether that suffices is behavioural: measure on fresh cand-eng.6/.7 builds with the
+  A set's "too much" cases (PUB-06 styles) x3 against the pre-Fix-1 failure above. Only if the
+  sentence is still missed: a targeted change (spec `too_much.say`, appended to the FACTS "too much"
+  line only, amounts/dates/counting untouched) becomes an evidence-driven candidate. No tag created.
+
+**Correction to the cand-eng.6/.7 hand-off (important for validation):** Fix 1's prompt sentence ("The
+agent never sees this list ... a sentence the agent must say belongs in a field above") moved much more
+than the paid sentence. Median `unmodeled` lines fell 19 -> 4 (A/raw-A) and 22.5 -> 3.5 (multi-product);
+the rendered `stage_rules.negotiate` grew 565 -> 2,570 chars (A/raw-A) and 752 -> 3,254 (multi). A sampled
+fresh A build's new stage_rules is a faithful summary of rules 17-47 quoting the brief's sentences
+(nothing invented found), but it is a substantial change to Brief A's rendered negotiate guidance on
+every fresh build. cand-eng.6/.7 must therefore be validated on the full A and B sets x3 as a real
+behaviour change, not as an extraction-only tweak; investigate any A difference against cand-eng.4/.5.
