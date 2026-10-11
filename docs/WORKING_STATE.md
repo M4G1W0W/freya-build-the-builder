@@ -45,7 +45,7 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
   `scripts/sim_scenarios.py <agent> --cases ... --out ... --mock https://teampistalogic.atlasreyiz.workers.dev`.
 - Folder now also has README.md, example-scenarios.md, cloudflare-mock/, the 2026-10-08 analysis (v3?), the service
   contract, test-customers.md. Watcher (Monitor) on the folder.
-- Waiting: Methodology `cand-final.5` (case-blind generic fallback, ~18:05); analysis workflow wf_468a7131-93c.
+- Waiting: Methodology `cand-final.6` (cand-final.5 01492e0 + review fixes incl. nested request bodies and non-service token op; HOLD live builds on .5), ~18:05. **User D8 (17:47): run the 6 example scenarios once on the built agent (+ one repeat round only after a fix; max 12 calls).** Scripts: `<this scratchpad>/final_build.sh` (traces/final.log + submission/final.workflow.json), `final_sims.sh`. cand-final.5 real-folder --dry: ok=True, 282 s, 8 tools on `.../voice/v1/<service>` (+ a token op), 33 amendments, rules 30,106 chars. Mock af33d82b also accepts dotted keys + serves the token path; 617/617 exact.
 
 ## UPDATE 17:23 UTC: FINAL CASE ARRIVING; frozen builder CRASHES on it; user D6 = case-blind generic fallback
 

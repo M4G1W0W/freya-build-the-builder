@@ -1,18 +1,133 @@
 {
- "_note": "Routes of the bank's services (fill from the service contract): method, path, and the request fields holding the customer number, the card and the requested week. A service with an empty path is not served.",
+ "_note": "From the service contract (2026-10-01, sections 3-6) and test-customers.md's lookup table. Every service is POST <base>/<service>; fields come from the request's data object.",
+ "base": [
+  "/voice/v1",
+  "/v1",
+  ""
+ ],
+ "errorOrigin": "ivr-gateway-test:ivr-channel-v0",
  "services": {
-  "cards.list": {"method": "POST", "path": "", "customer": "customerNo"},
-  "cards.balance": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"},
-  "statement.week.get": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"},
-  "statement.week.decide": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber", "week": "newStatementWeek"},
-  "statement.week.change": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber", "week": "newStatementWeek"},
-  "contact.email.get": {"method": "POST", "path": "", "customer": "customerNo"},
-  "statement.pdf.send": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"}
+  "cards.list": {
+   "by": [
+    "customerNo"
+   ],
+   "required": [
+    "customerNo"
+   ],
+   "notFound": "FB_IVR_CHANNEL_102"
+  },
+  "cards.balance": {
+   "by": [
+    "cardNumber"
+   ],
+   "required": [
+    "cardNumber"
+   ],
+   "notFound": "FB_IVR_CHANNEL_120"
+  },
+  "statement.week.get": {
+   "by": [
+    "cardNumber"
+   ],
+   "required": [
+    "cardNumber"
+   ],
+   "notFound": "FB_IVR_CHANNEL_121"
+  },
+  "statement.week.decide": {
+   "by": [
+    "cardNumber",
+    "newStatementWeek"
+   ],
+   "required": [
+    "cardNumber",
+    "newStatementWeek"
+   ],
+   "notFound": null
+  },
+  "statement.week.change": {
+   "by": [
+    "cardNumber",
+    "newStatementWeek"
+   ],
+   "required": [
+    "cardNumber",
+    "newStatementWeek"
+   ],
+   "notFound": null
+  },
+  "contact.email.get": {
+   "by": [
+    "customerNo"
+   ],
+   "required": [
+    "customerNo",
+    "intAddressInfoType"
+   ],
+   "notFound": null
+  },
+  "statement.pdf.send": {
+   "by": [
+    "customerNo"
+   ],
+   "required": [
+    "customerNo"
+   ],
+   "notFound": "FB_IVR_CHANNEL_107"
+  }
  },
- "errors": {
-  "unknownCustomer": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "customer not found", "type": "WARNING"}}},
-  "notAvailable": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "service not available for this customer", "type": "WARNING"}}},
-  "unknownCard": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "card not found", "type": "WARNING"}}},
-  "unknownWeek": {"status": 400, "body": {"result": {"returnCode": "BAD_REQUEST", "message": "week not offered", "type": "WARNING"}}}
+ "fieldLabels": {
+  "cardNumber": "card number",
+  "customerNo": "customer number",
+  "newStatementWeek": "newStatementWeek",
+  "intAddressInfoType": "intAddressInfoType"
+ },
+ "codes": {
+  "INVALID_ARGUMENTS_ERROR": {
+   "status": 400,
+   "type": "ERROR",
+   "message": "invalid arguments",
+   "rootCause": "InvalidArgumentsException"
+  },
+  "FB_IVR_CHANNEL_102": {
+   "status": 404,
+   "type": "WARNING",
+   "message": "Müşteriye ait geçerli kart bilgisi bulunamadı.",
+   "rootCause": "com.freyabank.ivrgateway.ivrchannel.rest.exception.NotFoundException"
+  },
+  "FB_IVR_CHANNEL_120": {
+   "status": 404,
+   "type": "WARNING",
+   "message": "Kart bakiye servisi hatası: kart bulunamadı",
+   "rootCause": "NotFoundException"
+  },
+  "FB_IVR_CHANNEL_121": {
+   "status": 404,
+   "type": "WARNING",
+   "message": "Kart bulunamadı",
+   "rootCause": "NotFoundException"
+  },
+  "FB_IVR_CHANNEL_107": {
+   "status": 404,
+   "type": "WARNING",
+   "message": "Pdf dokümanı bulunamadı",
+   "rootCause": "com.freyabank.ivrgateway.ivrchannel.rest.exception.NotFoundException"
+  },
+  "FBE00099": {
+   "status": 500,
+   "type": "ERROR",
+   "message": "Teknik hata: ABORTED: ",
+   "rootCause": "TechnicalError"
+  }
+ },
+ "token": {
+  "paths": [
+   "/oauth2/token"
+  ],
+  "response": {
+   "access_token": "test-environment-token",
+   "token_type": "Bearer",
+   "expires_in": 1800
+  }
  }
 }
