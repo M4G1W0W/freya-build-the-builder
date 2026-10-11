@@ -26,6 +26,27 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 17:37 UTC: MOCK LIVE ON THE REAL CONTRACT (617/617); roles split
+
+- **Roles (user 17:37):** `submission.json`, members and repo access belong to the **Submission readiness reviewer**
+  session, not this chat. This chat: mock, builder-tag verification, the final build, simulations.
+- **Mock live** (version a2f658b6 + later log clear) from `sources/documents/2026-10-01-service-contract.md` +
+  `test-environment/test-customers.md` lookup table: POST `<base>/<service>` for cards.list, cards.balance,
+  statement.week.get/decide/change, contact.email.get, statement.pdf.send; bases `/voice/v1`, `/v1` and `` (so
+  `mock_url` may be the bare worker or `.../voice/v1`, whichever matches the builder's tool lines). Fields from the
+  `data` envelope or flat. Lookup by customerNo, or by cardNumber across customers (exact, else first-6/4 + last-4
+  unique), + newStatementWeek. Unknown -> the service's 404 (FB_IVR_CHANNEL_102/120/121/107) or 400
+  INVALID_ARGUMENTS_ERROR; empty required field -> 400 naming it; delaySeconds honoured (12 s on 94907600's balance).
+  **Verified live: 617/617 pack answers exact (status + body) on both `/voice/v1` and bare paths**; negatives OK.
+  Script: `<this scratchpad>/verify_mock_pack.py <base> mock/data/test-customers.json`. Generic engine committed
+  (6b874c6); **case-derived `mock/data/services.json` (filled) and `mock/data/test-customers.json` NOT committed**
+  (user decision pending; recommended: keep out of git).
+- Cases from the 6 example scenarios: `runs/cases/final-examples.json` (gitignored); harness
+  `scripts/sim_scenarios.py <agent> --cases ... --out ... --mock https://teampistalogic.atlasreyiz.workers.dev`.
+- Folder now also has README.md, example-scenarios.md, cloudflare-mock/, the 2026-10-08 analysis (v3?), the service
+  contract, test-customers.md. Watcher (Monitor) on the folder.
+- Waiting: Methodology `cand-final.5` (case-blind generic fallback, ~18:05); analysis workflow wf_468a7131-93c.
+
 ## UPDATE 17:23 UTC: FINAL CASE ARRIVING; frozen builder CRASHES on it; user D6 = case-blind generic fallback
 
 - **Case folder: `/Users/atlasdenizakbulut/Desktop/Freya Final case`** (outside the repo). The client sends documents
