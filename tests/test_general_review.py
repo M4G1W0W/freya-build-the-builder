@@ -208,3 +208,22 @@ def test_the_closing_line_of_the_rules_comes_first(monkeypatch):
 def test_setup_wording_names_no_particular_document_set():
     for word in ("flow drawing", "FAQ", "meeting", "analysis", "announcement"):
         assert word not in general.SETUP_SYSTEM
+
+
+def test_general_service_tools_wait_up_to_30_seconds(monkeypatch):
+    spec, _ = _spec(monkeypatch)
+    tools = pipeline.render(spec, LIB_TOOLS)["nodes"]["assist"]["tools"]
+    assert {t["config"]["timeoutMs"] for t in tools} == {30_000}
+    assert all(t["config"]["maxRetries"] == 0 for t in tools)
+
+
+def test_the_cut_off_reply_follows_the_call_language(monkeypatch):
+    english = pipeline.render(_spec(monkeypatch)[0], LIB_TOOLS)["system_prompt"]
+    assert (
+        '- If a customer message breaks off mid-sentence, reply "Please go on." and wait for the rest.'
+        in english
+    )
+    spec, _ = _spec(monkeypatch, {"language": "Spanish", "goodbye": "Gracias. Adiós."})
+    other = pipeline.render(spec, LIB_TOOLS)["system_prompt"]
+    assert "reply in Spanish, asking the customer to go on, and wait for the rest." in other
+    assert '"Please go on."' not in other.split("HOW TO WORK", 1)[1]

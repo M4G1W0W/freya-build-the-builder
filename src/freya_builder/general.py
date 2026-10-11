@@ -76,6 +76,10 @@ CREDENTIAL_FIELDS = {
     "refresh_token",
     "api_key",
 }
+# One attempt of a service call (D10): a slow success must not read as a failure. The kit gives no
+# maximum for timeoutMs; a request's attempts share one 30 s budget (kit/docs/tools-and-code.md,
+# Retries and timeouts). The collections flow keeps 10 s.
+TOOL_TIMEOUT_MS = 30_000
 SEP = "__"  # a nested request field 'a.b' is the flat body leaf 'a__b' (kit: flat body leaves only)
 
 
@@ -305,6 +309,8 @@ def system_prompt(spec: dict, brief_text: str) -> str:
     now = _var(spec, "now")
     when = f"now = {{{{{now}}}}}" if now else "the date and time of the call"
     goodbye = spec.get("goodbye") or language.GOODBYE_EN
+    # a fixed English line would be spoken as is: in another language, say what it means (D9)
+    go_on = '"Please go on."' if said == "English" else f"in {said}, asking the customer to go on,"
     return f"""You are {m["agent_self_description"]} ({m["bank_name"]}) on a phone call. {language.speak_line(lang)} Keep every turn to one or two short sentences.
 
 HOW TO WORK
@@ -314,7 +320,7 @@ HOW TO WORK
 - If a tool fails or returns an error, do what the RULES say for that case; if they say nothing, tell the customer you cannot do it right now and never claim it was done.
 - If the customer asks for something the RULES and the tools do not cover, say that you do not have that information or cannot do that; do not make anything up.
 - Every date decision (today, tomorrow, this week, due or overdue, how many days) uses {when}, never the system clock or your memory. Say dates, amounts and numbers the way a {said} speaker says them.
-- If a customer message breaks off mid-sentence, reply "Please go on." and wait for the rest.
+- If a customer message breaks off mid-sentence, reply {go_on} and wait for the rest.
 - To end the call: say the closing line the RULES give (if they give none, say "{goodbye}") and call transition_to_hang_up in the same turn. When a rule hands the call to a person, call that tool first, tell the customer, then end the call the same way.
 
 THE CALL GIVES YOU (never ask the customer for these)
@@ -340,6 +346,7 @@ def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
         )
         if nested:
             d["pre_process_code"] = NEST_PRE
+        d["config"]["timeoutMs"] = TOOL_TIMEOUT_MS
         tool_defs.append(d)
     opening = spec["general"]["opening_line"]
     assist = nodes.conversation(
