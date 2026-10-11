@@ -87,3 +87,10 @@ cand-eng.4g from `runs/dev/r4/spec-eng4-fr.json` / `spec-eng4-fab.json` -> slots
 from `spec-ch-fr.json` / `spec-ch-fab.json` -> exp-e9g-fr / exp-e9g-fab (`--spec`, no extraction). Per base: `e1-a.json` x3
 and `runs/cases/pub09-styled-a.json` x3 on the A agent, `e1-ab.json` x3 on the A+B agent (18 calls). Bases interleaved per
 rep, after the core rounds. Each fix tag is judged against its own base arm with rules (1)-(3) above.
+
+Goodbye-fix builds (15:10 UTC): cand-eng.4g 44d4efa (on cfa4d9d) and cand-eng.9g b40a576 (on b103e21), identical added/removed
+src lines on both bases (verified). `--spec` builds, `git=<sha> dirty=False`, all checks PASS: exp-e4g-fr / exp-e4g-fab /
+exp-e9g-fr / exp-e9g-fab. Export vs base export, all four: added node `hang_up_transferred` only, changed node `close`
+(transitions only); system prompt, global nodes and every task_message identical. Farewell: eng.4g "Thank you for your time.
+Goodbye." (spec has no closing line; builder GOODBYE), eng.9g "Thank you. Goodbye." (the spec's own closing line).
+Queued after the core in the pre-registered interleaving (E4G, E9G | E9G, E4G | E4G, E9G).
