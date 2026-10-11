@@ -9,6 +9,10 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 
 ## UPDATE 11:44 UTC: QUEUE PAUSED (platform 500/504), nothing running, no orphan simulation
 
+**USER RULE (11:50 UTC): no automatic freeze and no automatic selection of an unmeasured candidate. The 15:30 UTC
+(18:30 Istanbul) freeze is an internal target; submission closes 20:00 UTC (23:00 Istanbul). Bring the evidence
+and fallback options to the user before the final selection.**
+
 - **Paused on the user's instruction (relayed Service Check note, 11:38):** widespread 500/504. `sim/STOP` is SET
   (11:38:32); the runner exited 11:39:22. No builds or retries are running. The 3 eng.4 slots below stay deployed:
   **do not rebuild them.**
@@ -31,9 +35,9 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
     a01a17c), so the merged commit builds exactly the deployed eng.4 agent plus the current docs/RUNBOOK. Note that
     cand-eng.4's own `docs/RUNBOOK.md` is OLDER than main's: `freeze-final` must be on the merged commit (user's call).
 
-## UPDATE 11:37 UTC: cand-eng.4 SELECTED, DEPLOYED, MEASURING (superseded by the 11:44 pause above)
+## UPDATE 11:37 UTC: cand-eng.4 picked to MEASURE FIRST, DEPLOYED (superseded by the 11:44 pause above)
 
-- **User selected `cand-eng.4` (cfa4d9d) at 11:30 UTC** (Decision log). Worktree (detached):
+- **User picked `cand-eng.4` (cfa4d9d) at 11:30 UTC to deploy and measure first; NOT a final selection** (Decision log). Worktree (detached):
   `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-eng4`.
   Its `--dry` renders of spec-a-llm and spec-ab-llm-c45758f differ from cand-final.1 only in the 3 FACTS code nodes.
 - Slots (in `slots.tsv`, export MATCH: 0 changed, 0 render-only, 0 needs-review):

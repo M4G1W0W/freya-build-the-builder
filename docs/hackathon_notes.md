@@ -386,13 +386,16 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   rep 2) stayed `running` from 01:21:29 UTC after all its calls ended and blocked the workspace for 30 min. Per the
   user's rule no PUT/pause/stop; offline work continued (derivations, reviews, identity-fix design v2). Details and
   the resume queue: `docs/plans/2026-10-11-overnight-report.md`.
-- 2026-10-11 14:30 (11:30 UTC) — **User selects `cand-eng.4` (cfa4d9d) as the final candidate.** Alternatives:
+- 2026-10-11 14:30 (11:30 UTC) — **User picks `cand-eng.4` (cfa4d9d) to deploy and measure FIRST (not a final selection).** Alternatives:
   `cand-final.1` (ca80d52) and `cand-eng.5` (27f5647). Reason: cand-eng.4 is cand-final.1 plus 8 commits (ancestry
   checked) that make the builder follow a hidden brief's own rules (all-at-once identity check, the brief's own
   "too much" rule, "this <weekday>", percentage floor half-up). Its `--dry` renders of the saved A and A+B specs
   differ from cand-final.1 only in the 3 FACTS code nodes, so the public-brief prompts are unchanged. cand-eng.5
   changes Brief B FACTS (PUB-12) and needs about 6 more reps, which the degraded platform (~33 min per rep) can't
   fit before the freeze. Evidence still required: measured styled-a and A+B results (queue E4-*).
+- 2026-10-11 14:50 (11:50 UTC) — **User: no automatic freeze and no automatic selection of an unmeasured
+  candidate.** The 18:30 Istanbul (15:30 UTC) freeze is an internal target; submission closes 23:00 Istanbul
+  (20:00 UTC). The evidence and the fallback options go to the user before the final selection.
 
 ## Score log
 
