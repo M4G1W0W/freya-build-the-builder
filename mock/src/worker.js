@@ -10,8 +10,11 @@
 // GET  /                     health
 import { handle } from "./bank.js";
 import { resolve } from "./fixtures.js";
+import { serve } from "./services.js";
 import customers from "../data/customers.json";
 import fixtureData from "../data/fixtures.json";
+import pack from "../data/test-customers.json";
+import routes from "../data/services.json";
 
 // Request headers kept for debugging (which headers does the platform send per call?); credentials and IPs dropped.
 const safeHeaders = (request) =>
@@ -104,6 +107,13 @@ export default {
       } catch {
         body = raw;
       }
+    }
+    const sv = serve(pack, routes.services || {}, routes.errors || {}, request.method, url.pathname, query, body);
+    if (sv) {
+      if (sv.delaySeconds > 0) await new Promise((done) => setTimeout(done, sv.delaySeconds * 1000));
+      const entry = { at: new Date().toISOString(), method: request.method, path: url.pathname, query, body, status: sv.status, service: sv.service, delaySeconds: sv.delaySeconds, response: sv.body, headers: safeHeaders(request) };
+      ctx.waitUntil(logStub(env).fetch("https://do/", { method: "POST", body: JSON.stringify({ op: "add", entry }) }));
+      return json(sv.status, sv.body);
     }
     const r = resolve(fixtureData, request.method, url.pathname, query, body);
     if (r.endpoint) {

@@ -2,6 +2,6 @@
  "type": "module",
  "private": true,
  "scripts": {
-  "test": "node --test test/bank.test.mjs test/fixtures.test.mjs"
+  "test": "node --test test/bank.test.mjs test/fixtures.test.mjs test/services.test.mjs"
  }
 }

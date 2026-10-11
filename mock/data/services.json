@@ -1,0 +1,18 @@
+{
+ "_note": "Routes of the bank's services (fill from the service contract): method, path, and the request fields holding the customer number, the card and the requested week. A service with an empty path is not served.",
+ "services": {
+  "cards.list": {"method": "POST", "path": "", "customer": "customerNo"},
+  "cards.balance": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"},
+  "statement.week.get": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"},
+  "statement.week.decide": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber", "week": "newStatementWeek"},
+  "statement.week.change": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber", "week": "newStatementWeek"},
+  "contact.email.get": {"method": "POST", "path": "", "customer": "customerNo"},
+  "statement.pdf.send": {"method": "POST", "path": "", "customer": "customerNo", "card": "cardNumber"}
+ },
+ "errors": {
+  "unknownCustomer": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "customer not found", "type": "WARNING"}}},
+  "notAvailable": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "service not available for this customer", "type": "WARNING"}}},
+  "unknownCard": {"status": 404, "body": {"result": {"returnCode": "NOT_FOUND", "message": "card not found", "type": "WARNING"}}},
+  "unknownWeek": {"status": 400, "body": {"result": {"returnCode": "BAD_REQUEST", "message": "week not offered", "type": "WARNING"}}}
+ }
+}
