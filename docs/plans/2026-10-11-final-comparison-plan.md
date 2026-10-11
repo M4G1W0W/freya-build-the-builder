@@ -63,3 +63,18 @@ build passes validation; (e) build seconds well under 30 min. Fix-fired (STEP li
    challenger builds were "fix active" or "fix inactive" draws.
 5. Otherwise eng.4 stays. No automatic adoption: the user decides (D6) and tags `freeze-final`; merged, verified
    commits (main -> eng.4, main -> challenger) are prepared by 16:30 so only `git tag` remains.
+
+## Addendum (15:01 UTC, user decision, before any goodbye-fix data): transfer-goodbye fix as a separate tag
+
+Trigger: HA-A failed on both arms in round 1 for one reason only, no thanks/goodbye before `close_call` (Brief A
+rule 47); the transcript checker flags NO_GOODBYE on every PUB-09 transfer as well. Methodology asked (15:00) for a
+generic, render-time fix (wording from the brief's own closing rule), tagged separately on both bases (e.g.
+cand-eng.4g on cfa4d9d, cand-eng.9g on b103e21) by 15:45 UTC, existing tags untouched, with a failing-then-passing
+regression test and a render diff limited to transfer endings. This does not change the main comparison above.
+
+Proposed evaluation (runs only on the user's go, after the core rounds): build the fix tag from the SAME saved
+spec(s) as the measured arm (`--spec`, no extraction), so a difference is the fix only; run `e1-a.json` x3,
+`e1-ab.json` x3 and PUB-09 (`styled-a.json --only PUB-09`) x3 = 18 calls. Pre-registered rule: adopt the fix on top
+of the selected candidate only if (1) the render diff touches transfer endings only; (2) HA-A passes 3/3 and no path
+case or PUB-09 call fails for an agent cause that passed on the base arm; (3) every transfer transcript has a thanks
++ goodbye before `close_call` (checker NO_GOODBYE = 0). Otherwise the selected candidate ships without it.
