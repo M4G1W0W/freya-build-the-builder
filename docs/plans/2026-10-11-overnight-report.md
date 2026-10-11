@@ -91,7 +91,7 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 08:13-08:38 | **Identity fix v2 implemented** (user instruction) on branch `cand-id` off G1: c4186e7 (cand-id.1) -> 3 verifier lenses (conformance PASS-WITH-ISSUES LOW only; model-read 1 HIGH + 2 MED; replay 1 MED) -> fix round 48c8ab4 (cand-id.2: hint-retry rebuild, resend exception, year joining) -> recheck: all fixed, LOW only -> 63d1c19 (cand-id.3: neutral example year; a public case uses 1991). 778 passed; render vs G1 differs only in nodes.identity.task_message (1071 words) |
 | 08:44 | exp-i12-a deployed (agent f652db08, wf 14cbdcaf) from cand-id.3 with `--spec runs/dev/spec-a-llm.json` after 2 platform failures (503 "API key validation is temporarily unavailable", 504, 500); export MATCH; vs exp-g1-a export only identity task_message differs. Chat probes skipped (chat API 504) |
 | 08:47 | Identity A/B queued after O4, before O1 (user decision): gate R1/R2 x3 plain + asks_back on exp-i12-a; t1/t2/t3 interleaved rep by rep vs exp-g1-a; guard styled-a x3 on exp-i12-a. Runner handed over to qrun2.sh (CAP 400) |
-| 08:58 | **M4: fresh raw-A build of G1 (exp-raw-w) on styled-a x3 = 8/10 strict** (reps 10, 9, 9; slow: platform 502/503/504 on polling). Newly failing vs M3 (G1 saved spec, 10/10): PUB-03 corrects 2/3, PUB-06 talkative 2/3. Classification running (blocks promotion if agent-caused or unexplained) |
+| 08:58 | **M4: fresh raw-A build of G1 (exp-raw-w) on styled-a x3 = 8/10 strict** (reps 10, 9, 9; slow: platform 502/503/504 on polling). Newly failing vs M3 (G1 saved spec, 10/10): PUB-03 corrects 2/3, PUB-06 talkative 2/3. **Classified (09:10):** PUB-03 r2 02018082 = simulator (the 2nd scripted wrong DOB never arrived whole) + the common I1 cut-off loop: does not block. **PUB-06 r3 3f5a442c = AGENT (rule 26, floor offered twice): after a dated floor offer, a 2nd pure small-talk turn ("My cousin's wedding is on the 30th") got the offer repeated. Not extraction-caused (FACTS/negotiate texts equivalent); the gap is in the builder's ATTEMPTS text (only "a first reply to an offer that is only small talk" is exempted), so any build can hit it. Under binding condition 1 this BLOCKS W's promotion -> top of the morning list.** G1 PUB-06 so far: M1 3/3, M3 3/3, M4 2/3; F2: M1 0/3, styled-a 2/3 |
 | 08:52-08:58 | Builder retry fix (user request): cand-retry cd13eb6 + 5af8b27 (backoff 5-120 s, up to 230 s per platform call; save retries fully only when unprocessed), merged into cand-id: **cand-id.4 = 2dcd0bd**, 788 passed, render byte-identical to exp-i12-a's (so the identity A/B measures cand-id.4). Adversarial review running. Runner handover to qrun2 (CAP 400) at 08:58 |
 | 02:00 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
 | 02:02 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
@@ -119,6 +119,13 @@ The deploy path has no retry on transient platform 5xx: `platform.dry_run` -> `k
 ended ok=False (exp-i12-a needed 3 attempts). On Sunday the same outage would fail the hidden-brief build. Proposal:
 retry the dry-run validation and the publish/save calls on 503/504 and on the "temporarily unavailable" message (the
 request is rejected before it is processed), with bounded backoff inside the 30-min budget; never retry 4xx.
+
+## TOP MORNING ITEM (09:10): G1 promotion blocked by M4 PUB-06 r3 (agent-caused)
+Rule 26 "offer the floor, once": a 2nd small-talk turn after the dated floor offer made the model repeat the offer
+(call 3f5a442c, J11-J12). Builder text gap (ATTEMPTS exempts only a first small-talk reply). Decision for the user:
+promote G1 anyway (its PUB-06 record 8/9 vs F2 2/6 on the same case), or fix the ATTEMPTS gap first (generic: after an
+offer, any number of turns that are only small talk or cut off get "Please go on."/a short acknowledgement and never a
+repeated offer) and re-measure PUB-06 talkative.
 
 ## Demonstrated correctness gaps (morning proposals; generic; NOT implemented overnight)
 1. **Identity: a complete security answer inside a cut-off message is not submitted** (LEDGER failures: M1 G1 r3
