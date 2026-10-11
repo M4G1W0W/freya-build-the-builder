@@ -15,8 +15,8 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - Freeze checks: ruff clean, 931 passed, fresh-clone `--dry` OK with Python 3.12 (system python3 is 3.9.6: use a 3.10+
   interpreter for the hidden builds, e.g. `~/.local/share/uv/python/cpython-3.12*/bin/python3` or `uv run python`).
 - Next (user): hidden builds from 17:00 UTC per `docs/RUNBOOK.md`, from a checkout of `freeze-final`. Open user
-  decisions: fast-forward/merge `main` to `freeze-final` (main's builder code is still F3) and D8/D9 (organiser key,
-  remote/push).
+  decisions: D8/D9 (organiser key, remote/push). **16:06 UTC (user): `freeze-final` merged into `main` (8e251fe): main's
+  builder code and tests == freeze-final (cand-eng.9); ruff clean, 931 passed.** Hidden builds may use main or the tag.
 
 ## UPDATE 15:53 UTC: D6 = eng.9 (user 15:51); eng.9g goodbye evaluation running; freeze commits being prepared
 
