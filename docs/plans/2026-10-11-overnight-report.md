@@ -81,7 +81,7 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 01:53 | **STOP CONDITION: simulations stopped for the night.** a36c1d01 still "running" at the 30-minute mark (01:52:40). No PUT/pause/stop of the simulation (user rule). Local queue stopped (STOP flag) and the waiting M2 rep-3 client killed (it had launched nothing). Calls used: **62** (M1 36 + M2 reps 1-2 26). Not run: M2 rep 3 + M2 extra-B, M3, M4, M5 sims, O4 sims, O1. One push notification sent to the user. Offline work continues |
 | 02:05 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
 | 02:12 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
-| 02:15-02:55 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
+| 02:10-02:23 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
 
 ## Infrastructure
 - Simulation queue runner (only launcher): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.sh`, queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt`
