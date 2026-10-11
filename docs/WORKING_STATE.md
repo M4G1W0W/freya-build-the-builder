@@ -52,6 +52,16 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   analyzing, 12:09:28 error) => at most 3 more calls (~0.75 USD). Not using untested PUT completed/maxRetries or
   DELETE (destroys data); waiting for the retries to exhaust. (b) Smoke 94c9e350: its call 6af560aa ran (started
   12:01:07) but is stuck in 'analyzing' (no judge verdict) for 10+ min. Queue stays PAUSED.
+- **12:15 UTC smoke result (`runs/dev/r4/SMOKE-e4a.{log,json,call.json}`):** client exit 0 after 1256 s; it auto-paused
+  94c9e350 (UNSTUCK: call ended 632 s earlier, iteration never completed). run_cases: FAIL PUB-01 'conversation: no
+  verdict' only (bank checks passed); tools verify x2, get_account, create_promise, close_call; assistant ended the
+  call. **But the call record HAS the judge verdict**: `successCriteriaResult.success=True` ('All criteria were
+  successfully met'); the simulation run stays 'analyzing' (attempt 2/4; attempt 1 failed in the outage), so the
+  verdict never reached the run. Diagnostics: agent turns 14-37 s (platform latency, hang-up risk as in M5); DOB asked
+  3x ('didn't catch that') although given each time (talkative); no tool events in the dump, cause open. First live
+  run of eng.4's FACTS code nodes: the flow worked end to end. Ledger +2 (2 attempts): cum **287**. Cost 0.2055 USD.
+  **Queue stays PAUSED** (simulation-level result missing, latency degraded); user decides whether the call-level
+  verdict counts.
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
