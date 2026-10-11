@@ -27,8 +27,21 @@ the user's 14:48 "new case" report is resolved).
   trace, mock_url) before 20:00 UTC. Criteria, weights and tie-breaks are not published; the trace is not scored.
 - After 17:00 only bug fixes. Fixing a crash on an unexpected file type is allowed; adding the bank's announcements or
   field names to code or prompts is not.
-- A read-only gap analysis (builder input, mock, Turkish, stale docs) is running from the context-restore session;
-  its result will be appended here. **Open user decisions:**
+- **Gap analysis DONE (16:12 UTC, read-only, freeze-final b9756fe):** `docs/reviews/2026-10-11-final-format-gap.md`
+  (plan + critic). File:line evidence for 84 findings is in the `.json` next to it. Blockers [C]:
+  1. `build.py {case_folder} {mock_url}` exits 1 before any model call: the folder hits `read_bytes`, cli.py:56.
+  2. .docx/.xlsx/.pdf files are read as binary garbage (cli.py:54-62), and the builder is stdlib-only.
+  3. Tools come only from an OpenAPI JSON file (toolapi.py:107-108), and the URL from its `servers[0]`
+     (toolapi.py:85-86). spec.py:389 requires the practice tool names, so a contract with other names builds no
+     agent.
+  4. The agent is hard-wired to English: "Speak English.", render.py:225; English goodbye and verbatim lines,
+     render.py:230/492/555. The prompts assume an outbound call (render.py:225, pipeline.py:48).
+  5. There is no git remote.
+
+  Mock: template committed by another session in `mock/` (0a8d2ad). Wrangler is not installed and there are no
+  Cloudflare credentials. Filling `mock/` from the zip and committing it would put final-case content in the reviewed
+  commit: a team decision. Estimate for the minimum builder changes: about 65 min plus a contract-to-tools mapper
+  (60-90 min); 48 min were left at 16:12. **Open user decisions:**
   - whether to change the builder's input layer before 17:00 (generic folder + mock_url support);
   - the Cloudflare account and credentials;
   - D8/D9 (key, remote/push), now needed for `submission.json` `repo`.

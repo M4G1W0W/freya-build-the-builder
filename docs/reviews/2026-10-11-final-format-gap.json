@@ -1,0 +1,698 @@
+[
+ {
+  "area": "builder input path (freeze-final b9756fe): folder of bank documents + mock URL instead of brief + tool_api.json",
+  "findings": [
+   {
+    "claim": "[C] At freeze-final the builder cannot take the new run command. It takes `inputs` with nargs='+'. The LAST positional argument is treated as the tool API file and every earlier one as a brief (cli.py:31, 41-43). `build.py FreyaBank-Ekstre-Borc/ https://x.workers.dev` passes argparse with briefs=[folder] and tool_api=URL. Step by step: build.py:16-18 calls cli.main; run() runs load_dotenv, start_budget and Trace (cli.py:121-125). _sha returns 'unreadable' for both arguments without crashing, because IsADirectoryError and FileNotFoundError are both OSError (cli.py:113-117, 126). trace.start prints the START line (cli.py:127). Then read_briefs(cli.py:139) -> _read_text -> `data = path.read_bytes()` (cli.py:56) raises IsADirectoryError. The except at cli.py:187-191 logs ERROR and returns exit code 1, and finally writes END ok=False. No LLM call is made, nothing is written to Freya, and no agent is created. Even if that line passed, load_tool_api(URL) would crash at toolapi.py:108, `json.loads(Path(path).read_text())`, with FileNotFoundError on 'https:/x...'.",
+    "evidence": "git show freeze-final:src/freya_builder/cli.py lines 29-44, 47-62, 113-117, 120-140, 187-194. Local run of the extracted freeze-final functions in the scratchpad: parse_args(['case','https://x.example.workers.dev']) -> briefs=['case'] tool_api='https://x.example.workers.dev'; _sha -> 'unreadable unreadable'; read_briefs -> 'IsADirectoryError [Errno 21] Is a directory: case'; load_tool_api -> 'FileNotFoundError ... https:/x.example.workers.dev'; a single argument -> SystemExit 2 'need at least one brief file and the tool API file'.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "In parse_args/run (cli.py:29-44, 138-141), add a folder mode: if len(inputs)==2, Path(inputs[0]).is_dir() and inputs[1] starts with http:// or https://, set a.case_dir and a.mock_url, read the brief text with a new read_folder(case_dir), and get the tools from the folder (see the tool-source finding). Keep the old brief+json mode so the 931 existing tests stay valid. Make _sha hash the folder's sorted files.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Word, Excel and PDF files are never parsed. read_briefs/_read_text decodes raw bytes as utf-8-sig, then cp1252, then utf-8 with replacement (cli.py:54-62). So a .docx, .xlsx or .pdf passed as a file becomes binary garbage ('PK\\x03\\x04...', '%PDF-1.3...') and the build carries on with no warning. The builder is stdlib-only: pyproject.toml:7 has `dependencies = []`, uv.lock holds only dev packages (colorama, iniconfig, packaging, pip, pluggy, pygments, pytest, ruff), and the src imports are all stdlib. The .venv (Python 3.12) is missing docx, pypdf, PyPDF2, pdfplumber, fitz, pdfminer, openpyxl, xlrd, pandas, markitdown, mammoth and docx2txt. /usr/bin/python3 3.9.6 has pypdf 6.15.0 and openpyxl 3.1.5 in ~/Library/Python/3.9, but build.py refuses Python 3.9. No pdftotext, soffice or pandoc is installed; macOS textutil is.",
+    "evidence": "cli.py:54-62; pyproject.toml:7; `git show freeze-final:uv.lock | grep '^name = '`; `.venv/bin/python -c 'import docx'` etc. -> MISSING for all 12 modules. Local check: read_briefs(['t.docx']) -> \"'===== FILE: t.docx =====\\nPK\\x03\\x04...'\" and 'Müşteri' in text = False (same for xlsx and pdf). Scratchpad probe: stdlib zipfile+ElementTree reading word/document.xml (w:p/w:t), xl/sharedStrings.xml and xl/worksheets/sheetN.xml extracted the Turkish test text 'Müşteri ekstre borcu: ... İĞÜŞÖÇ' and 'müşteri_no | borç / c_1 | 1234.5' correctly. pypdf (system 3.9) extracted the same Turkish text from a PDF.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Add a new stdlib module (e.g. src/freya_builder/docs.py) with read_folder(dir). Use rglob, sorted, and skip hidden files, __MACOSX and ~$ lock files. Put *.md first, then the rest; BRIEF.md and README.md come from the official page, not the case, so they may be named before 17:00. Read .md/.txt/.csv/.json/.yaml through _read_text. Read .docx with zipfile + word/document.xml (one line per w:p, so table cells come out as lines). Read .xlsx with zipfile + sharedStrings + worksheets (rows joined with ' | ', sheet names from xl/workbook.xml; note that dates appear as serial numbers). Read .pdf with `try: import pypdf` and otherwise trace.warn plus skip. Alternatively add pypdf with `uv add pypdf` and run through .venv/bin/python or `uv run`. Another option [I]: send the PDF to OpenAI chat/completions as a base64 file content part (llm.py:121-138 is text-only today). Any other file type gets a WARN and is skipped, never a crash. Each file goes under a '===== FILE: <relative path> =====' header, as cli.py:50 does now.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Tool definitions come only from an OpenAPI 3 JSON file: load_tool_api reads JSON (toolapi.py:107-108) and parse_tool_api walks servers/paths/requestBody/responses['200'] (toolapi.py:84-104). Only local $ref is accepted (toolapi.py:44). Nothing reads a service contract written in Markdown, Word, PDF or YAML (no YAML parser, since the builder is stdlib-only). consolidate() and extract_spec() both need the parsed tools as text (pipeline.py:102-108, 112, 141), so tools must exist before the first LLM call.",
+    "evidence": "toolapi.py:38-49, 84-108; pipeline.py:102-112, 140-144; cli.py:140",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Order of tool sources, all generic: (1) a *.json in the folder with 'openapi' or 'paths' -> parse_tool_api unchanged (10 min). (2) Otherwise one new LLM call, 'extract the bank service contract into tools', with a strict schema tools[{name, method, path, summary, request[Field...], response[Field... with 2 levels of children]}] mirroring the Field and Tool dataclasses (toolapi.py:14-32), built straight into Tool objects and logged in the trace as a MODEL line (60-90 min with tests). (3) Emergency option, which the user must decide: the builder GETs an OpenAPI file served by OUR mock at {mock_url}/openapi.json (15 min). This is a grey area for 'the builder must work alone / bank documents as input', because a human translated the contract.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The bank base URL is not hard-coded anywhere in src or builder. It comes from the tool API file: `servers = spec.get('servers') or [{}]; base = str(servers[0].get('url') or '').rstrip('/')` (toolapi.py:85-86), url = base + path (toolapi.py:97), baked as each api_call tool's parameters.url default (toolapi.py:138). This covers model tools (model_tool, toolapi.py:149-187) and engine calls (engine_call, toolapi.py:190-202). validate.unsent_required matches tools by URL (validate.py:121-126). The practice value https://freya-bank-mock.freyavoice.workers.dev/v1 comes only from kit/tools/openapi.json servers[0]. git grep finds no 'workers.dev' in freeze-final src/builder.",
+    "evidence": "toolapi.py:84-104, 134-146; validate.py:121-126; `git grep -n workers.dev freeze-final -- src builder` -> no hits; kit/tools/openapi.json servers = [{'url': 'https://freya-bank-mock.freyavoice.workers.dev/v1'}]",
+    "status": "C",
+    "severity": "high",
+    "fix": "After the tools are loaded, rewrite every Tool with dataclasses.replace(t, url=mock_url.rstrip('/') + <contract path>). Better: add a base parameter to parse_tool_api(spec, base=None) at toolapi.py:84-86. Keep the contract's path, plus any path prefix in its server URL, so OUR mock serves exactly the contract's paths. Because the URL is baked into the workflow JSON, the exported submission/final.workflow.json points at our mock, as the Submit page requires. 10 min.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] customer_id baking: _bake_customer returns {field: '{{' + cid + '}}'} (render.py:214-217). cid is the call variable that the LLM spec gives role 'customer_id' (pipeline.py:70; spec.py:667-668). field is that same name if get_account has it, else the single field that every tool requires (spec.py:671-682). The only header baked into tools is Content-Type: application/json (toolapi.py:140-143). The team key is never sent by the phone agent: FREYA_BANK_TEAM_KEY appears only in the kit scorer (kit/tools/run_cases.py:5) and the trace redaction list (trace.py:14). [I] If the final service contract requires an auth or API-key header, the builder has no way to send one.",
+    "evidence": "render.py:214-217; spec.py:385-398, 667-682; toolapi.py:134-146; `git grep -n -E 'TEAM_KEY|team' freeze-final -- src builder` -> only trace.py:14 (and an unrelated prompt word at render.py:494)",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Our own mock should not require an auth header (simplest, and it keeps the phone agent calling only the mock). If the contract demands a header, add a generic, spec-driven static-headers map to _request_params (toolapi.py:140-143). Do not bake any team key.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Outside my area, but it blocks the input path: the builder needs the four practice tool names. check_spec flags a missing verify_identity, get_account, create_promise or close_call (spec.py:389-390). render indexes tools by those literal names: by['verify_identity'] (render.py:638, 647), by['get_account'] (render.py:654), by['create_promise'] (render.py:670), by['close_call'] (render.py:726), and ENGINE_TOOLS (spec.py:235). extract_spec deploys the best spec even with unresolved problems (pipeline.py:183-191). [I] So with differently named contract operations, render raises KeyError, cli.py:187-191 catches it, and the build exits 1 with no agent.",
+    "evidence": "spec.py:235, 385-392; render.py:569-576, 638-655, 670, 726-727; pipeline.py:183-191",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "In the tool-extraction step, have the LLM map each contract operation to a generic role (identity check, account lookup, promise/payment record, note, callback, transfer, close) and set Tool.name = role while url keeps the contract path. The role names are the builder's own generic vocabulary, not final-case content. If the contract has no counterpart for a required role, the trace should say so loudly.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Outside my area, critical for a Turkish case: the generated agent is hard-wired to English and to outbound collections. The system prompt says 'on an outbound phone call. Speak English.' (render.py:225). Fixed English utterances include 'Please go on.' and the cut-off line (render.py:230, 387-389). The answer normaliser parses English month and number words (hooks.py:40-54; sandbox/facts.py:36; sandbox/calendar_core.py:13). The LLM prompts frame the input as 'outbound collections phone calls' (pipeline.py:48, 55). The official page says the final is Turkish and 'a different call from the practice' (credit card statement-debt line).",
+    "evidence": "render.py:225, 230, 387-389; hooks.py:40-54; sandbox/facts.py:36; sandbox/calendar_core.py:13; pipeline.py:48, 55",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Add a spec field meta.language that the LLM reads from the documents, and render 'Speak {language}'. Have fixed lines either generated by the spec LLM or phrased as 'say in the call's language that ...'. Relax 'outbound collections' to 'a bank's phone-call specification'. These are behaviour changes and need at least one practice re-run before 17:00. The language is known from the official page, which was published before the case opens.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The phone agent's system prompt embeds the brief text verbatim: rules_text = brief_text when consolidate says kind=='clean' (pipeline.py:196, 207), rendered under 'BANK BRIEF (the rules you must follow)' (render.py:240-241). [I] With a whole folder as the brief, the agent prompt could contain the bank's test customers (mock data), README, Q&A and the 6 example conversations. The agent could then quote balances or dates from the test data instead of from tool results (an honesty and ledger risk), and the prompt grows a lot. In the 'raw' path only consolidated_rules is used (pipeline.py:196).",
+    "evidence": "pipeline.py:194-208; render.py:223-242",
+    "status": "C",
+    "severity": "high",
+    "fix": "In folder mode, always use consolidated_rules for the prompt (the raw path is already exercised on the perturbed raw briefs). Also add one generic instruction to CONSOLIDATE_SYSTEM (pipeline.py:48-53): documents that are test data or example conversations inform the rules but are never copied into consolidated_rules. This is a prompt change, so treat it as a behaviour change and verify it.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] `python3 builder/build.py ...` fails on this Mac as the example run_command is written: /usr/bin/python3 is 3.9.6, and build.py exits with 'builder needs Python 3.10+' (build.py:14-15). .venv/bin/python is 3.12, and .env defines FREYA_API_KEY, FREYA_API_URL, FREYA_BANK_TEAM_KEY, FREYA_WORKSPACE_ID, OPENAI_API_KEY, BUILDER_MODEL and BUILDER_MODEL_FALLBACKS (names only).",
+    "evidence": "`python3 --version` -> Python 3.9.6 (/usr/bin/python3); build.py:14-15; `grep -o -E '^(export )?[A-Z_]*=' .env`",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Run the final build with `.venv/bin/python builder/build.py <case_folder> <mock_url> --export submission/final.workflow.json 2>&1 | tee traces/final.log`. In submission.json, set run_command to the interpreter actually used, or `uv run python ...` if pypdf is added as a dependency.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Minor robustness: toolapi.py:108 read_text() has no explicit encoding (UTF-8 locale on macOS; [I] a risk on a C-locale rebuild with Turkish text). The trace input hash is 'unreadable' for a folder or URL (cli.py:113-117, 126); the trace is not scored. The slot name is derived from the folder stem (cli.py:169): Path('FreyaBank-Ekstre-Borc/').stem works, and it is runtime data, not builder code.",
+    "evidence": "toolapi.py:107-108; cli.py:113-117, 126, 169",
+    "status": "C",
+    "severity": "low",
+    "fix": "Add read_text(encoding='utf-8') in load_tool_api. Hash the folder's sorted file bytes for the START line. These are generic bug fixes, allowed after 17:00.",
+    "before_17": false
+   },
+   {
+    "claim": "[I] Minimal generic change list with effort estimates. About 55 minutes remain before 17:00, so not everything fits; do P0 first. P0-a: folder+URL mode in cli.py:29-44/138-141 (15 min). P0-b: stdlib docs reader for md/txt/docx/xlsx, pdf through an optional pypdf, unknown types WARN and skip (30 min with unit tests on generated samples; the docx/xlsx logic is already verified in the scratchpad). P0-c: base URL override at toolapi.py:84-86 (10 min). P0-d: tool source = an OpenAPI *.json in the folder if present (10 min). P1: LLM contract->tools extraction with role mapping to the 7 generic roles (60-90 min). P1: language parameterisation at render.py:225/230 and pipeline.py:48/55 (20-30 min plus one practice build). P1: folder-mode prompt hygiene at pipeline.py:196 (5 min plus verification). Total: about 70 min for P0, 2.5-3.5 h for everything. After 17:00, only crash fixes on unexpected file types are clearly allowed by the page; new features such as LLM tool extraction are a grey area.",
+    "evidence": "Anchors cited in the findings above; the timing uses `date -u` = Sun Oct 11 16:02 UTC and llm.py:24 BUILD_BUDGET_S = 25*60 (an extra tool-extraction call of about 1 min fits the budget).",
+    "status": "I",
+    "severity": "high",
+    "fix": "Commit and tag freeze-final as it stands (already done). On a branch, implement P0-a..d with unit tests on synthetic folders of practice-brief copies saved as .docx/.xlsx/.pdf (never final content). Run `uv run pytest`, then do a --dry run on a practice folder. Decide on the P1 items before 17:00.",
+    "before_17": true
+   }
+  ],
+  "summary": "The frozen builder (freeze-final, b9756fe) cannot run the new command `build.py {case_folder} {mock_url}`. Argparse treats the last argument as the tool API file and the rest as briefs (cli.py:31, 43). A folder as the first argument crashes at cli.py:56 (`path.read_bytes()`, IsADirectoryError); the error is caught and the build exits with code 1 before any model call or Freya write. A URL as the tool API would crash next at toolapi.py:108. I confirmed both locally on the extracted tag code, with no network calls.\n\n- **Reading the documents.** The builder is stdlib-only (pyproject.toml:7 `dependencies = []`), and the .venv has no docx, pdf or xlsx library. Word, Excel and PDF files would go into the brief as binary garbage with no warning (cli.py:54-62). Standard-library readers for .docx and .xlsx (zipfile + ElementTree) extracted Turkish sample text correctly in a scratchpad test. PDF needs pypdf (optional import, or added with `uv add`).\n- **Tools.** Tools come only from an OpenAPI JSON file (toolapi.py:84-108). Nothing reads a service contract in another format.\n- **Bank URL.** No bank URL is hard-coded. It comes from `servers[0].url` (toolapi.py:85-86) and is baked into every tool's url default (toolapi.py:97, 138). Pointing tools at mock_url is a 10-minute change.\n- **Customer id and team key.** The customer id is filled from the call variable the model tags as the customer id (render.py:214-217, spec.py:671-682). The only header is Content-Type (toolapi.py:140-143), and the team key is never sent.\n\nThree risks outside my area also decide whether a final agent can be built:\n- **Tool names.** The builder needs the practice tool names verify_identity, get_account, create_promise and close_call (spec.py:389, render.py:638-726). If the final contract names them differently, the build crashes with no agent.\n- **Language.** The agent is hard-wired to English (\"Speak English\", render.py:225) and to outbound collections (pipeline.py:48, 55), but the final case is Turkish.\n- **Test data in the prompt.** A \"clean\" read of the folder would copy the test customers and example conversations into the agent's prompt (pipeline.py:196, render.py:240-241).\n\nAlso, `/usr/bin/python3` on this Mac is 3.9.6, which build.py refuses (build.py:14-15). Run the build with `.venv/bin/python`.\n\nThe minimum change is about 70 minutes: folder + URL mode, the document reader, the URL override, and an OpenAPI JSON from the folder if one exists. The full version, with the model turning the contract into tools and a language setting, is 2.5 to 3.5 hours. About 55 minutes remain before 17:00 UTC, so the minimum set should start now on a branch. The rest should be decided before 17:00, because only crash fixes on unexpected file types are clearly allowed afterwards. One option needs the user's decision: having the builder fetch an OpenAPI file served by our own mock is a grey area under \"the builder must work alone\"."
+ },
+ {
+  "area": "Our own mock bank on Cloudflare Workers: what the kit mock does, what our mock must provide, local tooling, placement, and the deploy plan",
+  "findings": [
+   {
+    "claim": "[C] The submitted builder (freeze-final) cannot run the new command `build.py {case_folder} {mock_url}`. The last positional argument has to be an OpenAPI JSON file, and everything before it is read as a brief file. Given a folder and a URL, `_read_text(Path(folder)).read_bytes()` raises IsADirectoryError, which is caught, logged as ERROR, and the run exits with code 1. The URL is then opened as a file path by `load_tool_api`.",
+    "evidence": "git show freeze-final:src/freya_builder/cli.py:41-43 (a.briefs, a.tool_api = a.inputs[:-1], a.inputs[-1]), :47-51 and :54-56 (read_bytes on each brief path), :187-191 (except -> return 1); toolapi.py:107-108 (json.loads(Path(path).read_text())). Found by reading the code. I did not run the builder, as instructed.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Generic CLI change, made before 17:00. Accept `<dir> <url>`: an argument with an http(s) scheme is the mock URL and a directory is the case folder. Keep the old `<brief...> <tool_api.json>` form for the practice tests. Read every file in the folder (md/docx/pdf/xlsx) as the brief input. The builder-input area owns this, but the mock cannot be reached without it.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Tool URLs come only from `servers[0].url` in the tool API file, joined with the path. Nothing overrides them, and nothing checks that every api_call goes to the mock. If the service contract names the bank's own host, or gives a relative or empty server URL, the phone agent calls a service other than our mock and every conversation fails (rule: 'In the final it calls only your own mock').",
+    "evidence": "freeze-final:src/freya_builder/toolapi.py:85-86 (base = servers[0].url), :97 (url=base + path), :138 (url default baked into every tool); freeze-final:src/freya_builder/validate.py:38-133 has no URL check; docs/reference/hackathon_page_live_2026-10-11.md:357",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Generic change. Set base = mock_url.rstrip('/'), then append the contract's server path prefix if it has one (e.g. /v1), then the endpoint path. Add a validate() rule: every api_call url must start with the given mock_url and use https, or the build fails. On the mock side, route by the LAST path segment so that /v1/<tool>, /<tool> and a trailing slash all work.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The builder reads the tool contract only from a JSON OpenAPI file. The final zip's service contract may be Markdown, Word or PDF. The venv has no parser for docx, xlsx or pdf. macOS textutil exists, but organisers who rebuild may run Linux.",
+    "evidence": "freeze-final:src/freya_builder/toolapi.py:107-108 (json.loads only); `.venv/bin/python -c import openpyxl/docx/pypdf/pdfplumber/fitz` -> all 'no'; `which textutil` -> /usr/bin/textutil; `which pdftotext` -> not found; FAQ: 'documents in Markdown, Word, PDF and Excel' (hackathon_page_live_2026-10-11.md:395)",
+    "status": "C",
+    "severity": "high",
+    "fix": "Generic loader. If a *.json or *.yaml file in the folder contains 'openapi' or 'paths', parse it directly. Otherwise extract endpoints, fields, enums and response fields from the service-contract text with the LLM into the existing Tool dataclass. Use stdlib zipfile + xml.etree for docx/xlsx. A fallback where the mock serves GET /openapi.json is possible, but it is a rules grey area (team-written input to the builder), so treat it as a last resort and note it in the decision log.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] What the kit's hosted mock does, which a generic mock should copy. Seven POST endpoints under /v1/<tool>. The tool calls need NO key: customer_id in the body is the secret for one call. A refusal returns 200 with ok=false and an error. A service failure returns 500, records nothing, and may be repeated. The server keeps state per customer: three wrong identity answers IN TOTAL end the check; get_account is refused until both identity questions pass; one promise per product; nothing is accepted after close_call. The service does NOT enforce the brief's policy. Practice-only endpoints use the header `x-team-key`: POST /v1/practice/sessions {case} returns {variables:{customer_id,...}}, and GET /v1/practice/ledger/<customer_id> returns {outcome, reason, promises[], notes[], callbacks[], transfers[], calls[{tool,result}]}. Faults are configured per case, e.g. {tool:'create_promise', fail_first_n:1}.",
+    "evidence": "kit/tools/openapi.json:6 (no key, customer_id is the secret, does not enforce the brief), :10 (server URL), :17, :51, :83-84, :91, :174, :411; kit/tools/score.py:7-15 (x-team-key, HOST), :17-34 (ledger shape); kit/tools/run_cases.py:86 (sessions), :93 (ledger GET); kit/public-test-set.json:435-438 (faults fail_first_n)",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Copy these MECHANISMS in the skeleton (they are kit/practice facts, not final-case content): state per customer, an append-only ledger in the score.py shape, 200/ok:false versus 500 'nothing recorded', and fault injection read from customer data (fail_first_n per tool). Endpoint names, fields, enums and the state rules come ONLY from the final service contract after 17:00.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] How our generated workflows call the bank. POST. The only header is Content-Type: application/json. The body has customer_id baked from {{customer_id}}, model-filled fields as {{arg_<field>}`, and product ids as {{p1_id}}. Tool names can differ from the endpoint (create_promise_p1 posts to /create_promise). timeoutMs is 10000. Model tools have maxRetries 0. Engine calls retry: get_account 2, close_call and transfer 1. The workflow reads the results as `<tool>_response.data.<field>`, booleans arrive as the strings \"true\" or \"True\", and the get_account list is parsed by the field names taken from the contract.",
+    "evidence": "freeze-final:src/freya_builder/toolapi.py:134-146 (url/method/headers/body), :166-177 (baked vs {{arg_}}, timeout, maxRetries 0), :190-202 (engine_call retries); freeze-final:src/freya_builder/render.py:738,759-809 (engine_call retries=1); freeze-final:src/freya_builder/sandbox/facts.py:467,653 (id_field from the response); a generated export runs/dev/exp07/dev-a-llm-v6-52b947c.export.json (an Oct 10 build, not freeze-final) shows exactly these shapes; kit/docs/tools-and-code.md:250-286 (envelope, flattened keys, booleans as strings)",
+    "status": "C",
+    "severity": "high",
+    "fix": "Mock requirements: (a) route by URL path, never by tool name; (b) reply well under 10 s, with application/json and the contract's field names and types EXACTLY; (c) treat a missing field as normal (an unset baked variable is DROPPED from the request: tools-and-code.md:113-116) and return ok:false with an error, never a crash; (d) coerce numbers and booleans sent as strings, because the value types the engine sends are not documented; (e) deduplicate identical write requests within about 30 s and return the first result, because engine retries and post-hook errors cause duplicates (docs/WORKING_STATE.md:621).",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Workers isolates do not share memory. Keeping state in a global Map would split identity-verification state and the ledger across isolates, so get_account could be refused at random after a correct verification. KV is eventually consistent, and its free tier allows only about 1k writes a day. Durable Objects (SQLite-backed, on the Workers Free plan) give strongly consistent state per key.",
+    "evidence": "Cloudflare platform knowledge, not verified in this session (no network allowed). There is no repo evidence either way.",
+    "status": "I",
+    "severity": "high",
+    "fix": "Skeleton: the Worker fetch handler parses the body and sends it to env.BANK.get(env.BANK.idFromName(customer_id)). The Durable Object class keeps {session, ledger[]} in ctx.storage. wrangler.jsonc: durable_objects.bindings [{name:'BANK', class_name:'Bank'}] and migrations [{tag:'v1', new_sqlite_classes:['Bank']}]. Check it with `wrangler dev` plus curl before 17:00.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Repeated or concurrent tests with the same customer_id can break a strict mock. The practice harness gave every run a fresh session and customer_id. The organisers will load our workflow and pass their own call variables, probably the same test-customer ids across several runs. With 'nothing accepted after close_call' or 'three wrong answers in total' held per customer, the second run would be refused, and concurrent runs would interleave.",
+    "evidence": "kit/tools/run_cases.py:65-67,86 (fresh session per run); kit/tools/openapi.json:17,411; kit/docs/workflow-format.md:236 ({{call.call_id}} documented), :190 ({{var}} works in headers); the page does not say how hidden customers map to ids (hackathon_page_live_2026-10-11.md:203,393)",
+    "status": "I",
+    "severity": "high",
+    "fix": "In the skeleton, start a new session on the first request after a close_call, or after N minutes idle (about 10). Keep the ledger append-only across sessions. Optionally scope state by an `X-Call-Id: {{call.call_id}}` header: that needs a generic builder change plus one chat-turn check before 17:00 (unverified: whether it resolves in api_call headers, and whether an unresolved header is shown to the model). If the service contract defines sessions or a reset, follow it.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Local tooling: node v24.18.0, npm 11.16.0 and npx 11.16.0 are installed under ~/.nvm. wrangler is NOT installed (not on PATH, no ~/.wrangler, no ~/.config/.wrangler, no ~/Library/Preferences/.wrangler). There are NO Cloudflare credentials: the shell has no CLOUDFLARE_* or CF_* names. .env holds only FREYA_API_KEY, FREYA_API_URL, FREYA_BANK_TEAM_KEY, FREYA_WORKSPACE_ID, OPENAI_API_KEY, BUILDER_MODEL and BUILDER_MODEL_FALLBACKS. The latest wrangler on npm is 4.149.0.",
+    "evidence": "`which node npm npx wrangler` -> 3 paths + 'wrangler not found'; `node --version` v24.18.0; `npm --version` 11.16.0; `sed -E 's/=.*/=<redacted>/' .env` (names only); `env | grep -iE cloudflare|^CF_|wrangler` -> exit 1; `npm view wrangler version` -> 4.149.0",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "The USER must authenticate; an agent may not complete an OAuth grant or enter credentials. Either (a) run `npx wrangler@4 login` (browser OAuth, about 2 min) in the mock folder, or (b) create a token in the dashboard (My Profile -> API Tokens -> 'Edit Cloudflare Workers' template) and export CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the shell (or in the gitignored .env). Check with `npx wrangler whoami`. Add a Cloudflare account first if there is none (about 5 min). Pin wrangler as a devDependency in the mock's package.json.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The repo has no worker code at all, and .gitignore does not ignore node_modules/ or .wrangler/.",
+    "evidence": "`grep -ril -E 'wrangler|addEventListener\\(.fetch|export default \\{'` outside kit/.venv/runs/.git -> no hits; `find -name 'wrangler.*'` and maxdepth-2 package.json -> none; .gitignore:1-54 (no node_modules or .wrangler entries)",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Create the mock in its own directory outside this repo (see the next finding). If any template is kept in the repo, add node_modules/ and .wrangler/ to .gitignore first.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Where the mock belongs: OUTSIDE the builder repo. The team's own rule says nothing from the final case enters the repo after 17:00 except traces/ and submission/, and a reviewer checks the submitted commit for final-case content. A mock filled from the service contract and test customers is final-case content by definition. Builder code never needs to import it. The builder's dirty check covers only src, builder and pyproject.toml.",
+    "evidence": "docs/reference/final_case_2026-10-11.json:2 ('after 17:00 UTC nothing from the final case may enter the repo except traces/ and submission/'); hackathon_page_live_2026-10-11.md (Rules: 'A reviewer checks the commit for that'; Submit: an entry whose builder has the final case written into it is removed); freeze-final:src/freya_builder/cli.py:87-105 (CODE_PATHS)",
+    "status": "C",
+    "severity": "high",
+    "fix": "Use a separate folder with its own local git, e.g. /Users/atlasdenizakbulut/Desktop/freya-mock/ (package.json, wrangler.jsonc, src/index.js for the generic router, Durable Object, ledger, sessions, faults, coercion and health; src/handlers.js with one stub per endpoint returning ok:false 'not implemented'; data/customers.json = []; tools/xlsx_to_json.py; tools/conformance.py; smoke.sh). Write the generic skeleton now with zero final-case content, and fill handlers.js and customers.json only after 17:00. Only mock_url goes into submission.json.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Endpoint auth: the tool endpoints must stay unauthenticated. Any key would have to be baked into the exported workflow, which gets committed. The kit's mock needs no key, and the builder sends only Content-Type. Admin endpoints (reset, full ledger dump) can sit behind a Worker secret.",
+    "evidence": "kit/tools/openapi.json:6; freeze-final:src/freya_builder/toolapi.py:140-143; freeze-final:src/freya_builder/trace.py:14 (SECRET_ENV redacts only 4 names)",
+    "status": "I",
+    "severity": "medium",
+    "fix": "Run `npx wrangler secret put ADMIN_KEY`, and require the header x-admin-key on /admin/* routes. Unless the contract defines a scorer-facing ledger endpoint, keep it read-only and admin-gated. As a generic safety step, add CLOUDFLARE_API_TOKEN to trace.SECRET_ENV in case it is in the env during a builder run.",
+    "before_17": true
+   },
+   {
+    "claim": "[C]/[I] Robustness: the kit's own Worker failed with Cloudflare error 1101 (uncaught worker exception) and flapped for about 20 minutes. Our mock is scored live until results are out ('If it is down, the conversations that reach it fail').",
+    "evidence": "docs/WORKING_STATE.md:118-122 (1101, flapping), :619 (1101 from 15:33 to 15:54 UTC); hackathon_page_live_2026-10-11.md:335,358",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Wrap the whole handler in try/catch: business errors return 200 {ok:false,error}, internal bugs return 500 JSON, never an uncaught throw. Add GET /health. Set observability.enabled in wrangler.jsonc and watch `npx wrangler tail` during tests. Pin compatibility_date. After submission do not redeploy unless a fix has been curl-tested. Free-plan limits (about 100k requests a day, 10 ms CPU per request) are ample [I].",
+    "before_17": true
+   },
+   {
+    "claim": "[I] A response field name or type in the mock that differs from the contract breaks transitions and code nodes silently, because the builder takes the response names from the contract, not from the mock.",
+    "evidence": "freeze-final:src/freya_builder/toolapi.py:93-101 (response fields from the 200 schema); freeze-final:src/freya_builder/sandbox/facts.py:467,653; kit/docs/api.md:247 (a single chat turn without a simulation)",
+    "status": "I",
+    "severity": "medium",
+    "fix": "Write a generic stdlib script now, tools/conformance.py <openapi-or-extracted-tools.json> <mock_url>: POST a sample body to each endpoint and diff the response keys and types against the 200 schema. After the build, run one chat/message turn and watch `wrangler tail` to see the exact requests Freya sends (header behaviour and value types are currently undocumented).",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Test customers will probably arrive as Excel. No xlsx library is in the venv, so the mock data needs a converter.",
+    "evidence": "FAQ: documents in 'Markdown, Word, PDF and Excel' (hackathon_page_live_2026-10-11.md:395); venv import check -> openpyxl absent",
+    "status": "I",
+    "severity": "low",
+    "fix": "Write tools/xlsx_to_json.py now in the mock folder (stdlib zipfile + xml.etree, shared strings and sheets to a list of row dicts, about 40 lines, generic). After 17:00 convert the file to data/customers.json and import it as a JSON module in the Worker.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Open questions to answer from the zip's README.md, BRIEF.md and service contract at 17:00, before writing any handler. Are the hidden test customers' customer_ids in the test-customers file? Do the organisers read a ledger or results endpoint on OUR mock (the practice score came from the hosted mock's ledger)? What path prefix and auth does the contract expect? How are sessions or resets defined? Which faults are scripted per customer?",
+    "evidence": "kit/tools/score.py:17-34 (practice ledger scoring); hackathon_page_live_2026-10-11.md:199,203,393 (hidden customers, review of the workflow, the zip holds test customers 'for your mock')",
+    "status": "I",
+    "severity": "medium",
+    "fix": "Make these the first 10-15 minutes after 17:00. Implement exactly what the contract says. Where it is silent, keep the skeleton defaults (unauthenticated tools, session reset after close or idle, admin-gated ledger).",
+    "before_17": false
+   }
+  ],
+  "summary": "This was a read-only check: I edited no files and made no calls to Freya, the mock bank or Cloudflare. One deviation: I ran `npm view wrangler version`, a read-only lookup against the npm registry, which breaks the no-network rule.\n\n**Two blockers in the submitted builder (freeze-final b9756fe), both generic fixes that should land before 17:00:**\n1. **It cannot run the new command.** In cli.py:41-43, the last argument must be an OpenAPI JSON file. A folder argument crashes the run with IsADirectoryError and exit code 1 (cli.py:54-56, 187-191).\n2. **Tool URLs come only from `servers[0].url`** (toolapi.py:85-86, 97, 138). Nothing overrides them with mock_url and nothing checks that every call goes to the mock (validate.py). If the service contract names the bank's own host, every conversation fails.\n\nThe service contract may also not be OpenAPI JSON, and the venv has no reader for docx, xlsx or pdf.\n\n**What the kit's hosted mock does** (kit/tools/openapi.json, score.py, run_cases.py):\n- Seven POST /v1/<tool> endpoints. They need no key: customer_id in the body is the secret.\n- 200 with ok=false is a refusal. 500 means nothing was recorded and the call may be repeated.\n- The server keeps state per customer: three wrong answers in total, get_account gated on identity, one promise per product, nothing accepted after close_call.\n- Practice-only endpoints use an x-team-key header: POST /v1/practice/sessions and GET /v1/practice/ledger/<id>, which returns outcome, promises, notes, callbacks, transfers and calls.\n- Faults are set per case (fail_first_n, public-test-set.json:435-438).\n\n**How our workflows call it:** POST with only Content-Type, customer_id baked in, model fields filled as {{arg_*}}, a 10 s timeout, and retries on engine-run writes. The workflow reads `<tool>_response.data.*` using the field names from the contract.\n\n**Tooling:** node v24.18.0 and npm/npx 11.16.0 are installed. wrangler is not installed. There are no Cloudflare credential names in .env or the shell, and no worker code anywhere in the repo.\n\n**Placement:** under the team's own rule (docs/reference/final_case_2026-10-11.json:2), the filled mock contains final-case content, so it must live outside this repo, e.g. /Users/atlasdenizakbulut/Desktop/freya-mock with its own git. A generic skeleton with no final-case content can be written now.\n\n**Skeleton design:**\n- One Durable Object per customer_id. In-memory state or KV would split or lag state across isolates.\n- Route on the last path segment, so /v1/<tool> and /<tool> both work.\n- Tolerant body parsing and type coercion; missing fields give ok=false, never a crash.\n- An append-only ledger in the kit's shape, plus fault injection from customer data.\n- A session resets after close_call or after about 10 minutes idle, because the organisers will likely test the same customer ids several times.\n- Duplicate writes within about 30 s are ignored, because engine retries cause duplicates.\n- A top-level try/catch: the kit's own Worker threw Cloudflare 1101 errors.\n- GET /health, admin routes behind a `wrangler secret`, observability on, and `wrangler tail` for live logs.\n- Stubs in handlers.js are filled from the contract after 17:00.\n\n**Steps before 17:00 (it is about 16:05):**\n- S1, user, 5-10 min: create a Cloudflare account if needed, then run `npx wrangler@4 login`, or export CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Check with `npx wrangler whoami`. An agent cannot do the OAuth grant.\n- S2, 25-35 min: write the skeleton: package.json with wrangler pinned, wrangler.jsonc with the Durable Object binding and new_sqlite_classes migration, index.js, handlers.js stubs, an empty customers.json, xlsx_to_json.py, conformance.py and smoke.sh.\n- S3, 5 min: test locally with `wrangler dev` and curl.\n- S4, 5 min: `npx wrangler deploy`, which registers the workers.dev subdomain. Curl /health. The mock URL is then fixed and the builder fix can be wired to it.\n- S5, optional, about 15 min: rehearse the builder-to-mock link with practice semantics only.\n\n**Steps after 17:00 (about 55-75 min, so the builder run starts by about 18:15):**\n- A1, 10-15 min: read README.md, BRIEF.md, the service contract and the test customers. Answer the open questions: are the hidden customers' ids in the file, is there a ledger endpoint on our mock, what are the path prefix, auth and session rules?\n- A2, 5 min: convert the test customers to JSON.\n- A3, 25-40 min: fill the handlers with the exact field names and enums from the contract.\n- A4 and A5, about 15 min: deploy, then curl and conformance checks.\n- A6: run the builder with the case folder and mock_url, then one chat turn while watching `wrangler tail`.\n- A7: reset the mock's state, keep it running, and do not redeploy anything untested until results are out."
+ },
+ {
+  "area": "language (Turkish final case vs the English-only builder at freeze-final b9756fe)",
+  "findings": [
+   {
+    "claim": "[C] The workflow system prompt hard-codes 'Speak English.' Turkish customers would get English replies from the phone agent, while its fixed TTS lines (the opening, the disclosure) stay in Turkish. The kit says the language belongs in system_prompt.",
+    "evidence": "src/freya_builder/render.py:225 'on an outbound phone call. Speak English. Keep every turn...'. probe: render(spec_a) gives SYSTEM first line '...on an outbound phone call. Speak English.' kit/docs/workflow-format.md:130 says system_prompt holds 'Identity, language, tone'.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Take the language from the documents, not from code. Simplest deterministic version: system_prompt says 'Speak the language of your opening line, <quoted opening_line(spec)>, for the whole call.' This changes nothing for the English practice briefs. Alternative: add a 'language' string to CONSOLIDATE_SCHEMA (the language the bank's calls are held in, per the documents) and render 'Speak <language>.', falling back to the opening-line rule when it is empty.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Phrases are quoted in English and the model is told to say them word for word: 'Please go on.', the cut-off line 'Sorry, your message was cut off. Could you give me the whole answer in a few words?', 'I see. Please go on.', 'Just <W>, please.' and 'Just the year, all four digits, please.'. Even with a Turkish language directive the agent may say them in English in a Turkish call. They fire often with the pieces, talkative and in_words customer styles.",
+    "evidence": "render.py:230 (HOW TO WORK cut-off rule), render.py:324 (short ask 'Just {short}, please.'), render.py:369, render.py:491 (PARTS), render.py:492 (WAITING 'I see. Please go on.'). probe4 on a spec with Turkish strings: 'Please go on.' occurs 8 times in the workflow, and 'I see. Please go on.', the cut-off line and 'Just the year...' once each.",
+    "status": "C",
+    "severity": "high",
+    "fix": "Add one HOW TO WORK rule: 'Lines quoted in these instructions give their meaning; say them in the language of the call. Only sentences from the BANK BRIEF are said word for word, in the brief's language.' The quoted text can stay as it is, so tests/test_render.py:387, 399 and 719 still pass.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The fixed closing GOODBYE = 'Thank you for your time. Goodbye.' is spoken by TTS, with no model in between, on the notes-done nodes ev_notes_p (after the brief's promise sentence) and ev_notes. A Turkish call would end in mixed Turkish and English.",
+    "evidence": "render.py:555 defines GOODBYE; render.py:712-723 set on_enter tts. probe4 (spec with Turkish strings): ev_notes_p TTS 'Ödeme sözünüz kaydedildi. Thank you for your time. Goodbye.'; ev_notes TTS 'Thank you for your time. Goodbye.'",
+    "status": "C",
+    "severity": "high",
+    "fix": "Take the farewell from the spec. Use the closing sentence common to most rows' say_before_end (the 'closing line' notion in spec.early_lines, spec.py:617-647, where a line common to more than half the rows counts as a closing). Or add a farewell field (a short thanks and goodbye in the documents' language) to the consolidate output. Keep GOODBYE only as the fallback when neither exists. Update tests/test_render.py:238-239.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] The consolidation prompt never says to keep the source language. The final zip is raw material, so the pipeline uses consolidated_rules both as the spec-extraction input and as the phone agent's BANK BRIEF. The consolidator could write that list in English and translate the required Turkish sentences, so the agent's verbatim lines would no longer be the bank's wording, and an English BANK BRIEF would also undo a 'speak the brief's language' fix.",
+    "evidence": "pipeline.py:48-53 CONSOLIDATE_SYSTEM (English, says 'every required sentence quoted verbatim' but nothing on language); pipeline.py:196 rules_text = consolidated_rules when kind != 'clean'; pipeline.py:207 spec['_prompt_brief'] = rules_text; render.py:241 puts it in the system prompt.",
+    "status": "I",
+    "severity": "high",
+    "fix": "Append to CONSOLIDATE_SYSTEM: 'Write consolidated_rules in the language of the material. Quote every sentence the agent must say exactly as written, in its original language; never translate.' This is generic and changes nothing for English input.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] SPEC_SYSTEM says nothing about the language of the fields the agent speaks (opening.line, identity ask, failed_line, decline_explain, rows' say_before_end, disclosure.*, success_lines.promise, products.types.label). The extractor writes fields such as the confirmation question, the ask and the label itself, and may write them in English. Line 79 also gives an English phrase to insert ('say \"we are recording this call\"'), which could replace the bank's Turkish recording sentence in the opening.",
+    "evidence": "pipeline.py:55-90 SPEC_SYSTEM; pipeline.py:59 only says 'Copy sentences ... verbatim'; pipeline.py:79 (opening rule with the English phrase); pipeline.py:87 disclosure. These fields reach customers verbatim: render.py:611 (opening TTS), render.py:702 with facts.py:695-697 (disclosure TTS).",
+    "status": "C",
+    "severity": "high",
+    "fix": "Add a GENERAL line: 'Every text the agent says must be in the language of the specification, copied verbatim where the specification gives it.' Rephrase line 79 so it does not depend on language, e.g. 'if the specification's opening says the call is recorded in a way that could read as a claim that something was recorded, keep its wording', or make it apply only to English. This is a change to the extraction prompt, so compare fresh specs before relying on it.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Date wording is English, and the agent is told to say dates exactly as written. FACTS, the DATE TABLE and the callback slots use English weekday and month names (spoken(), WEEKDAYS, strftime %B). The negotiate prompt says to 'say them as written there' and to start replies with '<weekday> <day> <month> <year>'. The disclosure {deadline} placeholder is spoken verbatim by TTS as e.g. 'Friday 23 October 2026'.",
+    "evidence": "sandbox/calendar_core.py:13 (WEEKDAYS) and :75-77 (spoken uses %B); facts.py:148-153 and :223-225 (_ds, _short, _wd); facts.py:622 values['deadline']=spoken(deadline); render.py:493 '...take both from the DATE TABLE or FACTS and say them as written there...'. probe3: product_sentence with {deadline} gives the disclosure '...son tarih Friday 23 October 2026.'",
+    "status": "C",
+    "severity": "high",
+    "fix": "Keep the FACTS text in English: it is internal instruction text, about 20 assertions in tests/test_codegen*.py and test_calendar_core.py:61 check it, and datecheck's regexes depend on it. Change render.py:493 to 'say them in the language of the call, translating weekday and month names, with exactly the weekday, day, month and year from the DATE TABLE or FACTS'. In facts.py:622 render {deadline} as a numeric date following calendar.numeric_date_order (e.g. dd.mm.yyyy for dmy), which reads correctly in any language. No practice fixture uses {deadline}, so the practice briefs are unaffected.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The 'now' parser knows only English month names and ASCII letters. If the final's 'now' carries a Turkish month or weekday name, setup and account fall back to the server clock: today is wrong, the time is wrong (UTC vs UTC+3), and every date rule and callback slot follows from that. ISO, dd.mm.yyyy and '+03:00' forms parse correctly. Whether the final uses ISO is unknown (practice used ISO).",
+    "evidence": "facts.py:35-48 (MONTH_NAMES), facts.py:88 and :92 (regex [a-z]+), facts.py:117 (datetime.now() fallback). probe3: '14 Ekim 2026 Çarşamba 11:00' -> 'Today is Sunday 11 October 2026 ... 19:06' with debug 'now unreadable; server clock used'; '2026-10-14T11:00', '14.10.2026 11:00' and '2026-10-14T11:00:00+03:00' all parse. kit/docs/api.md:247 shows now='2026-10-14T11:00'.",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Before 17:00, check the actual 'now' format in the example conversations. If it is not ISO or numeric, make _parse_when match Unicode words ([^\\W\\d_]+) and accept month names in more than one language. Month names are general language knowledge, not final-case content, but add them before 17:00 so a reviewer cannot read them as tuning. Keep the server-clock fallback loud in the debug variable.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Amount parsing assumes English number format. _num deletes every comma, so a Turkish-format string from the mock such as '2.125,10' becomes 2.13 in FACTS and in the spoken disclosure. Spoken amounts also use a decimal point ('2125.10'), which Turkish readers take as a thousands separator.",
+    "evidence": "facts.py:120-128 _num: float(str(value).replace(',', '')); facts.py:141-145 _spoken_amount. probe3 with past_due '2.125,10' -> disclosure '... 2.13 TL ...'. The comma-decimal logic in hooks.py:753-760 (_PROMISE_PRE) is not wired.",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Our own mock should return amounts as JSON numbers. Also make _num read the format generically, as _PROMISE_PRE already does: when both '.' and ',' appear, the last one is the decimal separator, and a lone ',' followed by 1-2 digits is a decimal. Optionally format spoken amounts with the decimal separator the documents use (a spec or consolidate field). Fixing the parser is a generic bug fix.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] The identity and cut-off rules use English word lists and English number grammar: years in words ('nineteen seventy-six', a tens word, 'thousand' or 'and' may still go on), correction words ('sorry', 'I mean', 'no', 'wait', 'actually'), cut-off words ('and', 'because', 'the', 'of'), and non-answers ('I don't know', 'maybe', 'we'll see'). Turkish years ('bin dokuz yüz yetmiş altı') and corrections ('pardon', 'yani', 'hayır') do not fit these rules. With pieces or in_words customers this risks sending partial or uncorrected answers, which count as wrong security answers, or English re-asks.",
+    "evidence": "render.py:230 (cut-off words), render.py:354 (correction words), render.py:365-377 (English year-in-words rules), render.py:380-382, render.py:462-463 (non-answer examples).",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Write these rules without depending on English: e.g. 'A full year has four digits, in figures or in words of the call's language that include the thousands; a year in words at the very end of a message that could still take another number word may still go on.' Add '(or their equivalents in the call's language)' after each English word list. Keep the English examples, so the practice behaviour stays the same.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] The relative-day vocabulary is fixed to English 'this <weekday>' and 'next <weekday>', with a single spec switch. Turkish has several phrases ('bu', 'haftaya', 'önümüzdeki', 'gelecek'), and the documents could define two of them with different meanings. The spec can hold only one meaning, and the DATE TABLE labels its rows with the English phrase.",
+    "evidence": "spec.py:113-114 (next_weekday / this_weekday enums); pipeline.py:72 (calendar instructions phrased in English); facts.py:254-268 (DATE TABLE rows labelled 'this <weekday>' / 'next <weekday>').",
+    "status": "I",
+    "severity": "medium",
+    "fix": "Generic: always print both rows in the DATE TABLE, labelled by meaning rather than by English phrase ('that weekday in the following Monday-Sunday week' and 'the first such weekday after today'), and tell the model to map the customer's phrase using the BANK BRIEF's definitions. Allowed after 17:00 only if it is triggered as a bug fix; better before.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Input reading breaks before any Turkish text reaches the model (this overlaps the format area). A folder argument crashes. .docx, .xlsx and .pdf files are read as raw bytes and decoded as cp1252, so the LLM gets ZIP or PDF binary instead of Turkish text. Turkish legacy-encoded text (cp1254, common in Excel CSV exports) turns into mojibake: ş->þ, ı->ý, ğ->ð, Ş->Þ. Those letters would then be copied into the 'verbatim' sentences.",
+    "evidence": "cli.py:47-62 (read_briefs, _read_text tries utf-8-sig then cp1252). probe5: read_briefs(['casefolder']) -> IsADirectoryError; docx decoded sample 'PK\\x03\\x04...' with no Turkish text; cp1254 CSV 'Şube;Iğdır' -> 'Þube;Iðdýr'.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Walk the folder (README.md and BRIEF.md first). Extract .docx and .xlsx text with the stdlib (zipfile + xml.etree on word/document.xml, xl/sharedStrings.xml and the sheets). Extract PDFs with an available extractor. Decode text files as UTF-8 first; if that fails and cp1252 output contains ÐÝÞðýþ, use cp1254. 'Fixing a crash on a file type' is explicitly allowed after 17:00, but the builder cannot run on the final at all without it, so do it now.",
+    "before_17": true
+   },
+   {
+    "claim": "[I] Tool names are hard-coded in English (verify_identity, get_account, create_promise, close_call, add_note, schedule_callback, transfer_to_agent). If the Turkish service contract names its operations differently, check_spec returns 'tool API has no verify_identity' and render raises KeyError, so no agent is built. The final also supplies a contract document instead of tool_api.json (format area).",
+    "evidence": "spec.py:389 need = ['verify_identity','get_account','create_promise','close_call']; render.py:638, 647, 654, 670 (by['verify_identity'], by['get_account'], by['create_promise']); spec.py:437-547 (more literal names).",
+    "status": "I",
+    "severity": "high",
+    "fix": "Add a role-mapping step: an LLM maps each of the 7 roles to the contract's operation name, and the result is checked against the parsed API. Render then looks tools up by role and keeps the bank's names in the workflow. Keep the identity mapping when the names already match.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The Fix-1 checker's SAID regex only fires on English verbs (say, tell, state). For a fully Turkish 'unmodeled' line the check is skipped silently, so a required per-product sentence left in 'unmodeled' (which the agent never sees) would not be sent back for repair.",
+    "evidence": "spec.py:338-343 SAID; spec.py:356-382 _unsaid_note_sentences. probe4: SAID on a Turkish line with a quoted sentence -> []; on 'If already_paid, say \"Ödemeniz ...\"' -> the match is found.",
+    "status": "C",
+    "severity": "low",
+    "fix": "On an 'unmodeled' line that names a note reason, also match any quoted sentence of 4 or more words, whatever the verb (keep the apostrophe guard).",
+    "before_17": false
+   },
+   {
+    "claim": "[C] The _words normaliser keeps only [a-z0-9], so Turkish letters become word breaks. early_lines still groups sentences consistently, but two sentences that differ only in Turkish letters could collide.",
+    "evidence": "spec.py:613-614 re.sub(r'[^a-z0-9]+', ' ', text.lower()). probe4: _words('Zamanınız için teşekkür ederim, iyi günler.') -> 'zaman n z i in te ekk r ederim iyi g nler'.",
+    "status": "C",
+    "severity": "low",
+    "fix": "Use re.sub(r'[\\W_]+', ' ', text.casefold()).",
+    "before_17": false
+   },
+   {
+    "claim": "[C] The chat smoke test opens with the English 'Hello?'. Its forbidden-word check uses str.lower(), which mishandles Turkish dotted and dotless I/İ, so a forbidden word containing İ or I could pass unnoticed. The test is advisory only.",
+    "evidence": "pipeline.py:233 body message 'Hello?'; pipeline.py:246-248 w.lower() in reply.lower(). probe4: 'KİMLİK'.lower() in 'kimlik' -> False; 'ISIK'.lower() in 'ışık' -> False.",
+    "status": "C",
+    "severity": "low",
+    "fix": "Compare with casefold() and also compare after dropping combining marks (unicodedata NFKD). Optionally open with a neutral '...' instead of an English greeting.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Not a problem: no code parses customer words at run time. The English normalisers (MONTHS, NUMBER_WORDS, TIME_WORDS) feed only the pre-hooks, and no tool has a pre-hook at freeze-final, so the Freya LLM does all reading of Turkish speech. The 'recorded' rewrite regex does nothing on Turkish text. Turkish strings pass intact through the hook literals and code-node CONFIG. check_dates and the trace output also cope with Turkish strings.",
+    "evidence": "hooks.py:40-63 (word lists); render.py:548 sets pre_process_code only when pre is non-empty; callers pass '' at render.py:675 and :689; render.py:520-538 (verify and callback tools) set none. render.py:556-562 (RECORDED_DISCLOSURE, English). probe: verify_post with Turkish ask -> isascii True, what_to_do_next 'Correct. Now ask: Doğum tarihiniz nedir?'. probe6: Turkish disclosure renders correctly; check_dates with a Turkish 'now' example -> [].",
+    "status": "C",
+    "severity": "low",
+    "fix": "None needed. Do not wire the English pre-hook normalisers for the final.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] No test fixture breaks on Turkish input: all fixtures are English unit data. The fixes above would require updating some tests, and a few couplings need care.",
+    "evidence": "test_render.py:238-239 assert the GOODBYE text. If date or amount wording in facts.py changes: test_calendar_core.py:61, test_codegen.py:228 and 250-350, test_codegen_integration.py:77-236, and datecheck.py:17-21 and 120-158 (regexes and substrings over the English FACTS wording). test_no_brief_values.py:10-26 DENY list (e.g. 'Freya Bank', 'collections team').",
+    "status": "C",
+    "severity": "low",
+    "fix": "Prefer the fixes that leave the FACTS wording unchanged (language directive, 'say in the call's language' rules, numeric {deadline}). If GOODBYE becomes derived, update test_render.py:238-239. Any example text added to prompts must be invented and generic: never final-case wording, and never a DENY token.",
+    "before_17": false
+   }
+  ],
+  "summary": "At freeze-final (b9756fe) the builder assumes English throughout, but nothing crashes on Turkish strings: hooks, code nodes, check_dates and the trace all handle them (local probes in the scratchpad, repo untouched).\n\nWhat would fail Turkish conversations, most severe first:\n1. The system prompt says 'Speak English.' (render.py:225). This is the blocker.\n2. The model is told to say English phrases word for word: 'Please go on.', the cut-off line, 'I see. Please go on.', 'Just W, please.' and the year re-ask (render.py:230, 324, 369, 491, 492).\n3. A fixed English TTS goodbye, 'Thank you for your time. Goodbye.', is spoken after the brief's promise sentence on the notes-done nodes (render.py:555, 712-723).\n4. The consolidation and spec-extraction prompts never say to keep the documents' language. The final is raw material, so consolidated_rules becomes the agent's BANK BRIEF, and an English-written list could translate the required sentences (pipeline.py:48-53, 79, 196, 207).\n5. Dates are worded in English (spoken(), WEEKDAYS, %B) and the prompt says to 'say them as written'. The disclosure {deadline} is spoken by TTS as e.g. 'Friday 23 October 2026' (render.py:493, facts.py:622).\n6. The 'now' parser knows only English month names and falls back to the server clock on a worded Turkish date (facts.py:68-117). ISO and dd.mm.yyyy formats parse correctly.\n7. _num misreads Turkish number formatting: '2.125,10' becomes 2.13 (facts.py:120-128). Have our mock return JSON numbers.\n8. The identity and cut-off rules depend on English word lists and English year grammar (render.py:354, 365-382).\n\nOverlapping the format area: a folder argument crashes, .docx/.xlsx/.pdf files reach the LLM as binary, cp1254 text becomes mojibake (cli.py:47-62), and the tool names are hard-coded in English (spec.py:389, render.py:638-670). Lower-severity items: the SAID regex and _words handle only English/ASCII, and the smoke test's lower() mishandles Turkish I/İ.\n\nNo code parses customer words at run time: the English pre-hook normalisers (hooks.py:40-63) are not wired.\n\nFastest safe fixes before 17:00 touch render.py and pipeline.py only:\n- Language directive taken from the opening line or the documents.\n- One rule that quoted instruction lines are said in the call's language.\n- Farewell taken from the spec's common closing sentence.\n- A 'keep the source language, never translate' line in CONSOLIDATE_SYSTEM and SPEC_SYSTEM.\n- Dates spoken in the call's language, and a numeric {deadline}.\n\nKeep the FACTS wording in English so about 20 codegen assertions and the datecheck regexes keep passing. Only test_render.py:238-239 would need an update. Fixture files: none break."
+ },
+ {
+  "area": "Stale documentation on main vs the new official final format (CLAUDE.md, docs/PROJECT_OVERVIEW.md, docs/RUNBOOK.md, README.md incl. 'Organiser re-run', docs/hackathon_requirements.md, docs/hackathon_notes.md top sections + Submission, docs/WORKING_STATE.md lines 1-150, builder/README*)",
+  "findings": [
+   {
+    "claim": "[C] RUNBOOK step 6 lists the old submission form fields: plural workflows/traces with hidden-1/hidden-2 paths and the {brief_path} {tool_api_path} command. It has no members, no mock_url and no submission.json. Followed as written, the submission is malformed.",
+    "evidence": "docs/RUNBOOK.md:94-100 'send the form (JSON) ... `run_command`: `python3 builder/build.py {brief_path} {tool_api_path}`; `workflows`: `submission/hidden-1.workflow.json` and `submission/hidden-2.workflow.json`; `traces`: `traces/hidden-1.log` and `traces/hidden-2.log`'; :101 'the form must be in before 20:00 UTC'",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Before 20:00 UTC send submission.json to the address in the kit email: {team: \"Pistalogic\", members: [{name, email}], repo, commit, run_command: \"python3 builder/build.py {case_folder} {mock_url}\", workflow: \"submission/final.workflow.json\", trace: \"traces/final.log\", mock_url}. The page marks the command and paths as examples.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK says each hidden brief is one file and must be built from that file only. The page FAQ says the opposite: the final case is one zip containing a folder of documents in Markdown, Word, PDF and Excel, and {case_folder} is that folder.",
+    "evidence": "docs/RUNBOOK.md:31-32 'Each hidden brief is **one file** (FAQ); build each from exactly its own file.'; :114 'The FAQ says each hidden brief is one file and `{brief_path}` is that file. Build from that one file only.'",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Step 1: at 17:00 UTC download the zip from the Submit tab or the e-mail and unzip it outside the repo. Read BRIEF.md first; README.md says what each document is. {case_folder} is that folder (MD, Word, PDF, Excel). Replace row :114 with 'The case is a folder of documents; build from the whole folder.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK build commands are two hidden-1/hidden-2 builds taking a brief file plus a tool API file. The final is one build that takes {case_folder} and {mock_url}. Note [C]: the freeze-final CLI still takes 'brief file(s) followed by the tool API JSON', so the doc and the code must be aligned together. That code side belongs to another area.",
+    "evidence": "docs/RUNBOOK.md:33 'The official run command is `python3 builder/build.py {brief_path} {tool_api_path}`'; :40-41 '--slot hidden-1 --export submission/hidden-1.workflow.json ... | tee traces/hidden-1.log' / hidden-2; :44-46 'Run them one after the other ... keep the two agents in separate workflows'; code: git show freeze-final:src/freya_builder/cli.py:31 'brief file(s) followed by the tool API JSON', :42-43 'a.briefs, a.tool_api = a.inputs[:-1], a.inputs[-1]'",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "One build, page example: `python3 builder/build.py <case_folder> <mock_url> [--slot final --export submission/final.workflow.json] 2>&1 | tee traces/final.log`. It may run more than once; submit one run's agent with that run's trace. Make the documented command match whatever interface the builder actually accepts.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK has no mock step at all (no 'mock' or 'Cloudflare' anywhere). Official step 2 is to write the bank's services as a mock on Cloudflare Workers from the service contract and test customers, deploy it before running the builder, and keep it running until the results are out.",
+    "evidence": "grep of docs/RUNBOOK.md for mock|Cloudflare|mock_url: no hits (only the WORKING_STATE.md:121 'Cloudflare worker exception' hit, which is about the organiser bank). Also grep for case_folder|mock_url|submission.json|BRIEF.md|Turkish|members across all 7 target docs: no hits.",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "Add a step between download and build: 'Write and deploy our mock of the bank's services on Cloudflare Workers from the service contract + test customers in the zip; record its URL as mock_url; keep it running until results are out (a wrong or unreachable mock fails conversations).'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md's hard rule says the phone agent may call only the kit's tool API. In the final it may call only our own mock, and calling the organiser practice bank would fail every conversation.",
+    "evidence": "CLAUDE.md:36 'The phone agent may call **only the kit's tool API**. Any other service fails the case.'",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "'In the final the phone agent calls only our own mock (Cloudflare Workers, built from the case's service contract + test customers); a call to any other service fails the conversation. Keep the mock running until results are out. (Practice: the kit's tool API.)'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW repeats 'only the kit's bank tool API' as a hard rule.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:49 'The phone agent may call only the kit's bank tool API. Its model is fixed: `experimental-5`'",
+    "status": "C",
+    "severity": "blocker",
+    "fix": "'In the final the phone agent may call only our own mock (mock_url). Its model is the Freya LLM set in kit/freya.py (AGENT_LLM); do not change it.'",
+    "before_17": true
+   },
+   {
+    "claim": "[I] The RUNBOOK hard rule says nothing about where the mock code lives. The mock is built from final-case material (service contract, test customers), and 'A reviewer checks the commit' for final-case content in the builder. Mock code inside the repo, and especially inside src/, builder/, tests/ or prompts, risks a disqualification finding.",
+    "evidence": "docs/RUNBOOK.md:27-29 'write nothing from a hidden brief into the repo except `traces/` and `submission/`. That means no rule, value, name, date or code in `src/`, `builder/`, `tests/`, fixtures or prompts.' Page: 'Nothing from the final case may be written into it. A reviewer checks the commit for that.'",
+    "status": "I",
+    "severity": "high",
+    "fix": "'Write nothing from the final case into the builder repo except traces/final.log and submission/final.workflow.json. Write the mock in a separate folder or repo outside this repo, and submit only its URL as mock_url.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md gives the old two-argument builder command.",
+    "evidence": "CLAUDE.md:17 'One command: `python3 builder/build.py <brief> <tool_api.json>`'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'One command, the bank's documents as input, a phone agent as output: `python3 builder/build.py {case_folder} {mock_url}` (page example). No manual edits after it runs.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md says scoring is in English, over 60 hidden cases (2x30), with 3 reps that must all pass and a ledger read from the mock bank. The final is one Turkish case: hidden customers plus a workflow review, with criteria and weighting not published.",
+    "evidence": "CLAUDE.md:22-25 'Simulated customers talk to the phone agent **in text, in English** ... ledger is right (read from the mock bank) ... 60 hidden cases (2 briefs × 30), **3 reps each, all must pass**. Tie-breaks: ...'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'Final: one case, Freya Bank's credit card statement-debt line, in Turkish. We submit one phone agent; they load our workflow JSON into their workspace, test it with simulated customers we never see (its tools call our mock) and review the workflow. Test customers, success criteria and weighting are not published. Practice scoring was ledger + policy + honesty, all three; a correct refusal counts.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md describes the hidden-brief input as one clean brief and one raw-material brief with the same 7 tool names. The final input is one folder of the bank's documents.",
+    "evidence": "CLAUDE.md:26-28 'Hidden briefs. Unseen; one is clean, one is raw material (email, policy extract, an amending memo, a code list). Same 7 tool names, but fields and allowed values can change.'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'Final case: one zip with a folder of the bank's own documents (Markdown, Word, PDF, Excel), in Turkish: BRIEF.md (read first), README.md (what each document is), analysis, flow drawing, announcements, service contract, test customers, Q&A, 6 example conversations. The call's date and time arrive as `now`.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md's 'Bank tools' kit fact presents the organiser mock URL as the tool target. That is true only for practice.",
+    "evidence": "CLAUDE.md:107-108 '`api_call` tools posting to `https://freya-bank-mock.freyavoice.workers.dev/v1/<tool>`, with `customer_id` baked from `{{customer_id}}`'",
+    "status": "C",
+    "severity": "high",
+    "fix": "Prefix with 'Practice only:' and add 'Final: tools must post to our own mock (mock_url on Cloudflare Workers); the organiser bank is not the final's tool target.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md's run_command rule uses the old {brief_path} {tool_api_path} arguments and the 'organisers re-run the top 10' model.",
+    "evidence": "CLAUDE.md:130-132 'It takes `{brief_path} {tool_api_path}`, finishes in ≤30 min, and reads secrets from env vars. The organisers re-run the top 10.'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'It takes `{case_folder} {mock_url}` (page example) and reads secrets from env vars. Top entries may be rebuilt, but the score comes from the phone agent we export and submit. Entries with a hand-edited agent, or with the final case written into the builder, are removed.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's task statement says the builder reads a collections brief plus a tool API (OpenAPI) and is tested in English.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:11-13 'reads a bank's collections **brief** plus the bank's **tool API** (OpenAPI) ... simulated customers **in text, in English**.'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'Practice: brief + tool API, English. Final: the builder reads a folder of the bank's documents (credit card statement-debt line, Turkish) and builds a phone agent whose tools call our own Cloudflare Workers mock.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's timeline row still says two hidden briefs, each with a tool API file.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:21 '**Hidden briefs released** (2 briefs, each with its own tool API file)'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'**Final case opens**: one zip of the bank's documents (Submit tab or e-mail), in Turkish.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's scoring section describes 2x30=60 cases, 3 reps, passed/60, published tie-breaks, and two clean/raw briefs with the same 7 tool names.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:32-33 '2 hidden briefs × 30 customers = 60 cases. **Each case runs 3 times and must pass all 3.** Score = passed / 60.'; :34-35 'Tie-breaks: (1) total promised amount ...; (2) shorter builder build time (from the trace)'; :36-38 'The two hidden briefs. One is a clean spec. The other is raw bank material ... The 7 tool names stay the same'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'Final: one case, one submitted agent, hidden simulated customers plus a workflow review; test customers, success criteria and weighting are not published; the trace is not scored. Input: one folder (BRIEF.md, README.md, analysis, flow drawing, announcements, service contract, test customers, Q&A, 6 example conversations). `now` still carries the call date.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's submission rule has the old run command, hidden-N file globs, and 'remove entries that score clearly lower'.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:54-57 'The run command is `python3 builder/build.py {brief_path} {tool_api_path}`. The organisers **re-run the top 10** and remove entries that score clearly lower'",
+    "status": "C",
+    "severity": "high",
+    "fix": "'Submit submission.json (team, members, repo, commit, run_command `python3 builder/build.py {case_folder} {mock_url}`, workflow `submission/final.workflow.json`, trace `traces/final.log`, mock_url) to the kit-email address before 20:00 UTC. Top entries may be rebuilt; the score comes from the submitted agent; removal is for hand edits or final-case content in the builder.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] README's submitted command and argument description use brief files plus a tool API as the last argument. This matches the freeze-final CLI but not the official {case_folder} {mock_url} form.",
+    "evidence": "README.md:16 'python3 builder/build.py <brief file(s)> <tool_api.json> 2>&1 | tee traces/<name>.log'; :33-34 'Brief files. Several brief files are read in order ... The last argument is always the tool API.'; code: freeze-final src/freya_builder/cli.py:31,42-43",
+    "status": "C",
+    "severity": "high",
+    "fix": "'python3 builder/build.py {case_folder} {mock_url} 2>&1 | tee traces/final.log' and '{case_folder} is the folder of the bank's documents (Markdown, Word, PDF, Excel); {mock_url} is our mock on Cloudflare Workers.' Change this only together with the builder interface.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] hackathon_notes' Submission section, which the RUNBOOK names as its source, describes the old flow. That includes the hidden-1 tee command, one agent per brief, form fields, and a top-10 rerun with removal if the rerun scores clearly lower.",
+    "evidence": "docs/hackathon_notes.md:99-100 '`python3 builder/build.py briefs/hidden-1.md briefs/hidden-1.openapi.json 2>&1 | tee traces/hidden-1.log`'; :101 'Submit **one phone agent per brief**'; :103-104 'Send the form (JSON) ... `team`, `repo` (GitHub URL), `commit`, `run_command`, the workflow file paths, and the trace paths'; :114-118 'For the top 10, the organisers clone ... rerun the builder on the same briefs ... If their rerun scores clearly below ours, the entry is removed'; docs/RUNBOOK.md:3 'The requirements come from `docs/hackathon_notes.md` → Submission'",
+    "status": "C",
+    "severity": "high",
+    "fix": "Replace with the page's 5 steps: (1) download the zip at 17:00, read BRIEF.md then README.md; (2) write and deploy the mock on Cloudflare Workers, keep it running until results; (3) run the builder on the folder, keep everything it prints as the trace, submit one run's agent with that run's trace; (4) freya.export_workflow, commit with the trace; (5) send submission.json {team, members, repo, commit, run_command, workflow, trace, mock_url} before 20:00 UTC. Verification: top entries may be rebuilt; the score comes from the submitted agent; entries are removed for hand edits or final-case content in the builder. The trace is not scored.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The hackathon_notes limits table still says the phone agent may use only the kit's tool API and that calls are in English.",
+    "evidence": "docs/hackathon_notes.md:91 'Phone agent tools | **Only the kit's tool API.** Calling any other service fails the case'; :93 'Calls are in **English**.'",
+    "status": "C",
+    "severity": "high",
+    "fix": ":91 → 'Final: only our own mock (Cloudflare Workers); any other service fails the conversation.' :93 → 'Practice calls are in English; the final case is in Turkish. `now` carries the call date and time; every date rule uses it.'",
+    "before_17": false
+   },
+   {
+    "claim": "[C] WORKING_STATE's open user decisions omit the new final-format prerequisites: a Cloudflare Workers account and subdomain for the mock, the mock_url, and members[{name,email}] for submission.json.",
+    "evidence": "docs/WORKING_STATE.md:17-19 'Next (user): hidden builds from 17:00 UTC per `docs/RUNBOOK.md` ... Open user decisions: fast-forward/merge `main` to `freeze-final` ... and D8/D9 (organiser key, remote/push).'",
+    "status": "C",
+    "severity": "high",
+    "fix": "Add these open user decisions: the Cloudflare Workers account/subdomain for the mock (deploy before the build, keep it up until results), the submission.json members list (name, email), and the repo URL/visibility (repo + commit are still required).",
+    "before_17": true
+   },
+   {
+    "claim": "[C] WORKING_STATE still frames 17:00 as 'hidden briefs' and 'hidden builds per RUNBOOK', and the RUNBOOK is stale.",
+    "evidence": "docs/WORKING_STATE.md:6-7 'Hidden briefs open **17:00 UTC**'; :17 'hidden builds from 17:00 UTC per `docs/RUNBOOK.md`'; :29 'then the RUNBOOK hidden builds from 17:00'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'Final case (one zip, Turkish) opens 17:00 UTC: deploy our mock from the service contract + test customers, then one final build from freeze-final per the updated RUNBOOK.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK's verification, secret-check and commit steps use hidden-N file names and 'both briefs/both traces'.",
+    "evidence": "docs/RUNBOOK.md:51-55 'traces/hidden-N.log'; :79-80 'commit it, then **re-run both briefs**, so both agents come from the same commit'; :82-85 'both traces must show `dirty=False`, and the builder code of the form's commit must equal theirs ... traces/hidden-*.log'; :89-90 'check_secrets.py traces/hidden-*.log submission/hidden-*.workflow.json ... \"Submission: hidden briefs 1-2 agents + traces\"'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Use traces/final.log and submission/final.workflow.json (page example paths). 'After a generic fix, re-run the final build; the one submitted trace must show dirty=False and match submission.json's commit.' Commit message e.g. 'Submission: final agent + trace'.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK checks memo amendments 'for the raw-material brief'. The final has no raw-material brief, but its folder includes announcements.",
+    "evidence": "docs/RUNBOOK.md:58 'For the raw-material brief, read the `amendment:` lines. **Every memo change must be listed.**'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'The final folder includes announcements: check that the trace's amendment lines cover each announcement.' Generic wording only; never copy announcement content into the repo.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] The RUNBOOK title, the 17:00 section heading and its re-run question still say 'hidden briefs' and 'organisers re-run the top 10'.",
+    "evidence": "docs/RUNBOOK.md:1 '# RUNBOOK: Sunday 11 Oct, hidden briefs'; :25 '## 17:00: the hidden briefs arrive'; :118 'The organisers re-run the top 10 builders.'",
+    "status": "C",
+    "severity": "low",
+    "fix": "'RUNBOOK: Sunday 11 Oct, final case'; '17:00: the final case zip opens'; 'Top entries may be rebuilt (so the OpenAI-key question stands); the score comes from the submitted agent.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] Several docs still cite tie-breaks (promised amount, build time from the trace, submission time). The new page publishes no weighting and says the builder's trace is not scored.",
+    "evidence": "CLAUDE.md:24-25 'Tie-breaks: total promised amount ... → shorter build time → earlier submission'; CLAUDE.md:166 '(build time is a tie-break)'; docs/PROJECT_OVERVIEW.md:34-35; docs/hackathon_notes.md:76-77, :157 'Builder speed is the second tie-break'; docs/hackathon_requirements.md:12 (#1 '...honesty of the trace and build time'), :66-68 (#35-37), :121 (#65 '(build time breaks ties)'), :204-205; docs/RUNBOOK.md:112 '(build time is a tie-break; a re-run adds nothing)'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'Weighting is not published. The builder's trace is not scored, but it is still required: start/end time, every model call (model + one-line ask), workflow id, agent id, steps, tools, any self-test with result; API keys removed.'",
+    "before_17": false
+   },
+   {
+    "claim": "[C] CLAUDE.md calls the three-part, 3/3 'Correct' definition official, but that is the practice definition. Final criteria are unpublished.",
+    "evidence": "CLAUDE.md:154 '\"Correct\" is defined officially: ledger right **and** policy followed **and** honest, 3/3 reps.'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'Practice scoring: outcome=ledger, policy, honesty, all three; a correct refusal counts. Final success criteria and weighting are not published; the six example conversations show the kind of call tested.'",
+    "before_17": false
+   },
+   {
+    "claim": "[C] CLAUDE.md's project structure names the submission artefacts hidden-N.workflow.json and hidden-N.log.",
+    "evidence": "CLAUDE.md:90 'submission/ ... hidden-N.workflow.json'; :91 'traces/ ... hidden-N.log'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'submission/final.workflow.json' and 'traces/final.log' (page example; one agent, one trace).",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md's window line says 'hidden briefs at Sun 17:00 UTC'. Its hidden-brief rule lacks the page's new examples: crash on an unexpected file type allowed; announcements or field names forbidden.",
+    "evidence": "CLAUDE.md:15 'hidden briefs at **Sun 17:00 UTC**'; :33-35 'Nothing from a hidden brief may ever be written into the builder ...'",
+    "status": "C",
+    "severity": "medium",
+    "fix": ":15 → 'the final case (one zip, Turkish) opens Sun 17:00 UTC'. :33-35 → 'Nothing from the final case (no rule, value, name) may be written into the builder. Fixing a crash on a file type the builder did not expect is allowed; adding the bank's announcements or field names to code or prompts is not. A reviewer checks the commit.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] CLAUDE.md rule 11 says the builder must read 'a brief and a tool API file'. The final input is a folder of Turkish documents in mixed formats.",
+    "evidence": "CLAUDE.md:68-70 'It must read a brief and a tool API file it has never seen.'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "'It must read a folder of bank documents it has never seen (Markdown, Word, PDF, Excel; the final is in Turkish), plus the mock URL.'",
+    "before_17": false
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's 3-hour note omits mock deployment, and its ledger definition says 'the mock bank's records' without saying the final mock is ours.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:24 'The last 3 hours are only for **running the builder and fixing generic bugs**.'; :29 'Ledger right: the mock bank's records hold the correct outcome ...'",
+    "status": "C",
+    "severity": "medium",
+    "fix": ":24 → 'The three hours are for deploying our mock, running the builder on the final case and fixing bugs, not tuning to the case.' :29 → mark as the practice definition; in the final the tools call our mock and the criteria are unpublished.",
+    "before_17": true
+   },
+   {
+    "claim": "[C] PROJECT_OVERVIEW's build command mirrors the freeze-final CLI (brief(s) + tool_api.json), which differs from the official {case_folder} {mock_url}. Its practice score command cannot score the final: the FAQ says the final has no practice cases for the scorer.",
+    "evidence": "docs/PROJECT_OVERVIEW.md:143 'Build: `.venv/bin/python builder/build.py <brief(s)> <tool_api.json> --slot NAME ...`'; :144 'Score: ... run_cases.py <agent_id> --brief A|B --reps 3'; code: freeze-final src/freya_builder/cli.py:31",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Build: `builder/build.py {case_folder} {mock_url} ...` once the interface supports it. Note under Score: 'practice only; the final zip has no scorer cases (test customers are for the mock; six example conversations show the call type).'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] README's 'Organiser re-run' section says only two values are needed and that the builder reads a brief plus a tool API. A rebuild also needs the case folder and a reachable mock URL.",
+    "evidence": "README.md:4-5 'reads a bank's collections brief and the bank's tool API (OpenAPI)'; :21 'Only two values are needed. Nothing has to be installed.'; :26 'it reads the brief and writes the spec'",
+    "status": "C",
+    "severity": "medium",
+    "fix": ":4-5 → 'reads a folder of the bank's documents and our mock URL'. :21 → 'Two env keys (FREYA_API_KEY, OPENAI_API_KEY) plus the two positional inputs {case_folder} {mock_url}; our mock stays running until results. Top entries may be rebuilt; the score comes from the submitted agent.'",
+    "before_17": true
+   },
+   {
+    "claim": "[C] hackathon_notes' objective, timeline and inputs/outputs describe the 2-brief model: brief + tool API (seven tools), English, passed/60 at 3/3, hidden-N files, clean/raw briefs, and 30 customers per brief.",
+    "evidence": "docs/hackathon_notes.md:16-22 'takes a **brief** ... plus the bank's **tool API file** (`openapi.json`, seven tools) ... simulated customers in text (English) on their mock bank API ... Score = hidden cases passed / 60 ... 3 out of 3'; :30 'Hidden briefs released (2 briefs, each with its own tool API file)'; :31 'form sent'; :38-41 '`python3 builder/build.py <brief_path> <tool_api_path>` ... `submission/hidden-N.workflow.json` ... `traces/hidden-N.log`'; :43-48 'seven tool names stay the same ... Hidden brief 1 is a clean specification. Hidden brief 2 is raw bank material ... Each hidden brief has 30 customers'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Add a 'Final format (11 Oct page)' summary above the practice text: one Turkish case (credit card statement-debt line); input = folder of bank documents + our mock URL; output = final.workflow.json + final.log; hidden customers + workflow review; criteria unpublished; six example conversations; submission.json by e-mail.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] hackathon_notes' scoring and limits sections state final scoring as passed/60 with 3 reps and 10 workflows per workspace, and they phrase the post-17:00 rule around hidden briefs and 'unexpected table'.",
+    "evidence": "docs/hackathon_notes.md:66-75 'A case passes only when Outcome AND Policy AND Honesty ... Final score is passed / 60 (2 hidden briefs × 30 customers), 3 reps per case'; :88 'One command, brief in'; :89 'Workflows per workspace | **10**'; :94 'After the hidden briefs open | ... (e.g. a crash on an unexpected table) ... no rule, value or name'",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Scoring → 'Practice scoring (all three; correct refusal counts). Final: criteria and weighting unpublished.' :88 → 'the bank's documents as input'. :89 → '200' (page). :94 → 'After the final case opens: fixing a crash on a file type the builder did not expect is allowed; adding announcements or field names is not.'",
+    "before_17": false
+   },
+   {
+    "claim": "[C] The hackathon_notes engineering implications assume a tool API file and a memo-amended brief, and the open questions ask about 'hidden brief 2' on disk. The new page answers that question.",
+    "evidence": "docs/hackathon_notes.md:152-154 'It must parse the tool API file on each run ... handle a messy multi-document brief in which a memo overrides earlier text'; :164 'what form hidden brief 2 takes on disk'",
+    "status": "C",
+    "severity": "low",
+    "fix": "'Final input: a folder of documents in Markdown, Word, PDF and Excel (Turkish), including announcements and a service contract.' Mark the on-disk question answered: one zip, one folder = {case_folder}.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Several hackathon_requirements rows still state the input, output and submission format as two hidden briefs: two positional args, clean/raw briefs, own tool API, hidden-1/2 paths, a 10-workflow limit, traces per brief, the hidden-1 tee command, and form fields workflows/traces {hidden-1, hidden-2}.",
+    "evidence": "docs/hackathon_requirements.md:27 (#11 'exactly two positional arguments: the brief path and the tool API'), :28 (#12 '2 hidden briefs ... clean ... raw'), :29 (#13 'seven tool names stay the same'), :40-43 (#19-22 'submission/hidden-1.workflow.json', 'only 10', 'traces/hidden-1.log'), :100 (#54 'one builder trace per hidden brief'), :111-114 (#60-63 'briefs/hidden-1.md briefs/hidden-1.openapi.json', 'one phone agent per brief', 'workflows {hidden-1, hidden-2}, traces {hidden-1, hidden-2}', \"'{brief_path} {tool_api_path}' form\"), :125 (#69 'Commit one trace per hidden brief')",
+    "status": "C",
+    "severity": "medium",
+    "fix": "Add a header note: 'Superseded for the final by the 11 Oct page.' Restate as: input {case_folder} {mock_url}; one agent; submission/final.workflow.json + traces/final.log; 200 workflows; submission.json {team, members[{name,email}], repo, commit, run_command, workflow, trace, mock_url}.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] hackathon_requirements still places the organiser mock as the tool target and English as the language. It also states scorer/rerun rules that contradict the page: scorer reads the mock bank, /60 at 3 reps, top-10 rerun with 'clearly below' removal, organiser-hosted mock bank.",
+    "evidence": "docs/hackathon_requirements.md:101 (#55 'may call only the tool API from the kit ... Tools must point only at the kit's bank API'), :105 (#59 'Calls are in English. Generated prompts and fixed phrases are in English.'), :50-54 (#24/#25/#28 'Score = cases passed / 60 ... 3 times'), :132 (#71 'top ten ... If their run scores clearly below yours, the entry is removed'), :141 (#75 'Organisers host the mock bank API'), :76-77 (#40 'two hidden briefs', #41 'form ... two builds')",
+    "status": "C",
+    "severity": "medium",
+    "fix": "#55 → 'only our own mock'. #59 → 'practice English; final Turkish'. #24/25/28 → 'practice scoring; final criteria unpublished'. #71 → 'top entries may be rebuilt; score from the submitted agent; removal for hand edits or final-case content'. #75 → 'final: we write and host the mock on Cloudflare Workers'. #40/41 → 'one zip; submission.json; one build plus mock deploy'.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Several open questions in hackathon_requirements are now answered by the page but remain unchecked.",
+    "evidence": "docs/hackathon_requirements.md:199-200 (brief as one file vs directory), :201 (how exported workflows authenticate to the organiser mock), :202 (self-test on hidden brief), :203 ('clearly below'), :204-205 (tie-break details), :211 ('10-workflow limit')",
+    "status": "C",
+    "severity": "low",
+    "fix": "Mark these answered: the case is one folder = {case_folder}; tools call our own mock_url; the final has no scorer cases; the score comes from the submitted agent and removal is for hand edits or final-case content; the trace is not scored and weighting is unpublished; 200 workflows per workspace.",
+    "before_17": false
+   },
+   {
+    "claim": "[I] The '30 min per brief' build limit appears throughout the docs, but the new page's Limits list (1 phone agent, mock until results, 200 workflows, any builder model, Freya LLM) does not restate it. The final is also one case, so 'per brief' no longer applies. This is not a direct contradiction; it may simply be omitted from the excerpt.",
+    "evidence": "CLAUDE.md:19 '≤30 min per brief, including self-tests'; CLAUDE.md:131 'finishes in ≤30 min'; docs/PROJECT_OVERVIEW.md:52 '≤ 30 min per brief'; docs/hackathon_notes.md:87 '30 min per brief'; docs/hackathon_requirements.md:85 (#44); docs/RUNBOOK.md:111 '(the page allows 30 per brief)'",
+    "status": "I",
+    "severity": "low",
+    "fix": "'The final page does not restate a time limit; keep the builder's internal 25/30-min budget as our own safeguard.' Drop 'per brief'.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] Smaller stale items: CLAUDE.md validates tools against 'the brief's tool API file' (the final zip lists a service contract, not a tool API file); PROJECT_OVERVIEW 'classify the brief as clean or raw' describes code designed for the 2-brief model; WORKING_STATE reserves budget for 'hidden-brief' simulations although the final has no scorer cases (FAQ).",
+    "evidence": "CLAUDE.md:54 'the brief's tool API file'; CLAUDE.md:149-150 'its tools against the brief's tool API file'; docs/PROJECT_OVERVIEW.md:62-63 'classify the brief as clean or raw'; docs/WORKING_STATE.md:63 '50 hidden-brief reserve'",
+    "status": "C",
+    "severity": "low",
+    "fix": "'...against the case's service contract and our deployed mock'; tag the pipeline text as the practice design and note that final input is a document folder; 'reserve for final-case chat/self-tests only (no scorer cases exist for the final)'.",
+    "before_17": false
+   },
+   {
+    "claim": "[C] There is no builder/README* on main or at freeze-final. The nearest builder-side doc is the build.py docstring, which still shows the old interface. It is not a listed file; it is mentioned for completeness.",
+    "evidence": "ls builder/ → build.py only; git ls-tree -r --name-only freeze-final builder/ → builder/build.py; git show freeze-final:builder/build.py:1 'Submission entry point: python3 builder/build.py <brief.md> [...] <tool_api.json>'",
+    "status": "C",
+    "severity": "low",
+    "fix": "If the builder interface changes, update that docstring in the same generic commit, e.g. 'python3 builder/build.py <case_folder> <mock_url>'.",
+    "before_17": false
+   }
+  ],
+  "summary": "I compared the docs on main with the new official final format. Every doc still describes the old model: 2 hidden briefs × 30 cases, 3 reps, English, a brief plus a tool API file, tools calling the organiser mock bank, and hidden-1/hidden-2 submission files and form fields. None of the target docs mentions Turkish (for the final), case_folder, mock_url, submission.json, BRIEF.md, members or a Cloudflare mock. I checked this by grep [C].\n\nThe most urgent items are in docs/RUNBOOK.md, which is the operational script for 17:00-20:00. If followed as written it would:\n- treat the case as one file (:31-32, :114);\n- run two builds with {brief_path} {tool_api_path} (:33, :40-41);\n- skip deploying the mock entirely (no mock step exists);\n- send the wrong submission fields (:94-100: plural workflows/traces with hidden-N paths, no members, no mock_url, no submission.json).\n\nCLAUDE.md:36 and docs/PROJECT_OVERVIEW.md:49 still bind the phone agent to 'only the kit's tool API'. In the final the agent must call only our own mock. CLAUDE.md:107-108 presents the organiser freya-bank-mock URL as the tool target, which is true only for practice.\n\nDependency to resolve first, outside this docs area [C]: the freeze-final builder CLI takes 'brief file(s) followed by the tool API JSON' (git show freeze-final:src/freya_builder/cli.py:31, :42-43). It does not take {case_folder} {mock_url}. The documented run command can only change together with that interface. Related [C, cli.py:53-61]: the builder decodes every input file as text, so Word, PDF and Excel inputs would arrive as garbled text. That is for the engine area.\n\nTwo further points:\n- [I] The mock is written from final-case material, so keep its code outside this repo and submit only mock_url. The reviewer checks the commit.\n- Doc edits that use only the page's general wording are not builder changes and may be made after 17:00. They must never copy content from the final zip (field names, announcements, customers).\n\nI edited nothing.\n\nFiles: /Users/atlasdenizakbulut/Desktop/Freya Hackathon/CLAUDE.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/docs/PROJECT_OVERVIEW.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/docs/RUNBOOK.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/README.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/docs/hackathon_requirements.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/docs/hackathon_notes.md, /Users/atlasdenizakbulut/Desktop/Freya Hackathon/docs/WORKING_STATE.md"
+ }
+]
