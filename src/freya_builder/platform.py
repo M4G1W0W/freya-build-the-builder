@@ -26,7 +26,9 @@ NETWORK_ERRORS = (
     ConnectionError,
     http.client.HTTPException,
 )
-WAITS = (5, 15, 30)  # seconds before attempts 2, 3 and 4: at most 50 s of extra wait per call
+# Seconds before attempts 2-6: at most 230 s of waiting per call, enough for the ~5-minute outage of
+# 11 Oct 08:38-08:43 UTC; three such calls still fit the 30-minute build budget.
+WAITS = (5, 15, 30, 60, 120)
 
 
 def kit():

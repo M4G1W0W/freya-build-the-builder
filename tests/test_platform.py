@@ -92,7 +92,8 @@ def test_retries_are_bounded(setup):
     fake = use([502] * 10)
     with pytest.raises(RuntimeError, match="-> 502"):
         platform.dry_run(trace, "slot", {})
-    assert fake.calls == 4 and sum(waits) < 120
+    assert fake.calls == len(platform.WAITS) + 1 and waits == list(platform.WAITS)
+    assert sum(waits) <= 240
 
 
 def test_export_retries_a_5xx(setup, tmp_path):
