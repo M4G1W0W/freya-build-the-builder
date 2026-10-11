@@ -32,7 +32,8 @@ reps; fresh builds of W: exp-raw-w (raw-A) and exp-ab1-w (single-file A+B), both
 precedence correction gates 1-3 PASS + adversarial review SHIP-TO-O4 + 2 guards (cand-wp-g1.1 58a7473), fresh builds
 exp-raw-wp / exp-ab1-wp ok=True, not yet simulated; D1/D2 blind derivations: 12 O1 cases + 3 extra-B re-derivations
 (15/15 exact) and 4 identity regression cases (4/4 exact); failure analyses of every failing M1/M2 call; identity-gap
-sizing over all 906 stored calls; G1 candidate review; identity-fix design proposal (not implemented).
+sizing over all 906 stored calls; G1 candidate review; identity-fix design v2 after a 3-lens adversarial review
+(`docs/proposals/2026-10-11-identity-fix-v2.md`, not implemented; 81-call matched plan inside).
 
 **Not done (blocked by the stuck simulation):** M2 rep 3 + extra-B, M3 (G1 on styled-a), M4 and M5 simulations (fresh
 builds of W), O4 simulations (precedence fresh-build regression, gate 4), O1 (derived cases). Precedence therefore
@@ -78,6 +79,9 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 01:21 | **PLATFORM: M2 rep-2 simulation a36c1d01 stuck in "running"** (all 13 calls ended by 01:21:07, iteration completed, status not updated since 01:21:29). M2 rep 3 waits ("another simulation is running"). Per the user's rule: report only, no PUT/pause/stop; if still blocked at 01:52 UTC (30 min) simulations stop for the night |
 | 01:15-01:21 | M2 A+B control (dev-ab-llm v14) styled-ab-all: rep 1 12/13 (PUB-03 identity), rep 2 10/13 (PUB-05 no tool calls, PUB-12 judge, PUB-13 asks_back declined). Analysis running |
 | 01:53 | **STOP CONDITION: simulations stopped for the night.** a36c1d01 still "running" at the 30-minute mark (01:52:40). No PUT/pause/stop of the simulation (user rule). Local queue stopped (STOP flag) and the waiting M2 rep-3 client killed (it had launched nothing). Calls used: **62** (M1 36 + M2 reps 1-2 26). Not run: M2 rep 3 + M2 extra-B, M3, M4, M5 sims, O4 sims, O1. One push notification sent to the user. Offline work continues |
+| 02:05 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
+| 02:12 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
+| 02:15-02:55 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
 
 ## Infrastructure
 - Simulation queue runner (only launcher): `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.sh`, queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt`
