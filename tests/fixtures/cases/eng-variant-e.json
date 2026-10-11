@@ -1,0 +1,193 @@
+[
+ {
+  "id": "PUB-01",
+  "case_key": "ENG-E1",
+  "brief": "A",
+  "family": "Offer",
+  "level": "medium",
+  "title": "Too much: the floor on the next business day (not an attempt)",
+  "note": "Engine-fixes behavioural case. Run ONLY against an agent built from tests/fixtures/briefs/variant-e.md + kit/tools/openapi.json (Brief A with rules 22, 25, 26 changed). The account is the mock bank's PUB-01 account. Expected outcome derived blind from variant-e.md by 2 independent agents (wf_e03c9060-5bf), both equal to the author's derivation.",
+  "variables": {
+   "first_name": "Daniel",
+   "last_name": "Reyes",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1988-03-14",
+   "phone_last4": "4471"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "4821",
+    "past_due": 420.0,
+    "days_late": 6,
+    "minimum_payment": 126.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. When asked whether he can pay today, says the full amount is too much for him. Accepts the first lower amount the agent offers, with the date the agent proposes, and confirms the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 147.0,
+     "date": "2026-10-15"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after 'too much' the first lower offer is the floor 147.00 (35% of 420.00) on Thursday 15 October 2026, the next business day, with the sentence that the rest stays overdue",
+   "the agent never offers the 126.00 minimum payment or any other amount below the full amount except the floor",
+   "the read-back names the credit card, 147.00 and Thursday 15 October 2026 and asks for confirmation before create_promise"
+  ]
+ },
+ {
+  "id": "PUB-07",
+  "case_key": "ENG-E2",
+  "brief": "A",
+  "family": "Offer",
+  "level": "hard",
+  "title": "Too much refused, then attempt 1 on its own date",
+  "note": "Engine-fixes behavioural case. Run ONLY against an agent built from tests/fixtures/briefs/variant-e.md + kit/tools/openapi.json (Brief A with rules 22, 25, 26 changed). The account is the mock bank's PUB-07 account. Expected outcome derived blind from variant-e.md by 2 independent agents (wf_e03c9060-5bf), both equal to the author's derivation.",
+  "variables": {
+   "first_name": "Samuel",
+   "last_name": "Ortiz",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1975-12-05",
+   "phone_last4": "7093"
+  },
+  "products": [
+   {
+    "type": "personal_loan",
+    "past_due": 540.0,
+    "days_late": 5,
+    "instalment_amount": 180.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. When asked whether he can pay today, says the full amount is too much for him. Refuses the first lower amount the agent offers (\"No, I can't do that.\"). If the agent then makes another offer, accepts it as proposed and confirms the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 189.0,
+     "date": "2026-10-16"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "after 'too much' the agent offers the floor 189.00 (35% of 540.00) on Thursday 15 October 2026 and says the rest stays overdue",
+   "after that refusal the agent makes attempt 1: the floor 189.00 on Friday 16 October 2026 (the 'too much' offer was not a persuasion attempt)",
+   "no other offer is made, and no offer repeats an amount and date the customer already refused"
+  ]
+ },
+ {
+  "id": "PUB-08",
+  "case_key": "ENG-E3",
+  "brief": "A",
+  "family": "Dates",
+  "level": "medium",
+  "title": "'This Monday' said on a Wednesday is the coming Monday",
+  "note": "Engine-fixes behavioural case. Run ONLY against an agent built from tests/fixtures/briefs/variant-e.md + kit/tools/openapi.json (Brief A with rules 22, 25, 26 changed). The account is the mock bank's PUB-08 account. Expected outcome derived blind from variant-e.md by 2 independent agents (wf_e03c9060-5bf), both equal to the author's derivation.",
+  "variables": {
+   "first_name": "Hannah",
+   "last_name": "Schmidt",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1993-04-28",
+   "phone_last4": "3317"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "5512",
+    "past_due": 180.0,
+    "days_late": 5,
+    "minimum_payment": 54.0
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Cannot pay today, but says he can pay the full amount this Monday. Confirms the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 180.0,
+     "date": "2026-10-19"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "'this Monday' is taken as Monday 19 October 2026 (the brief: the first such weekday after today), never Monday 12 October",
+   "the agent accepts the customer's date without pushing for an earlier one and makes no persuasion offer",
+   "the read-back names the credit card, 180.00 and Monday 19 October 2026 and asks for confirmation before create_promise"
+  ]
+ },
+ {
+  "id": "PUB-06",
+  "case_key": "ENG-E4",
+  "brief": "A",
+  "family": "Offer",
+  "level": "hard",
+  "title": "Floor rounding: 35% of 2125.10 is 743.785, rounded half up",
+  "note": "Engine-fixes behavioural case. Run ONLY against an agent built from tests/fixtures/briefs/variant-e.md + kit/tools/openapi.json (Brief A with rules 22, 25, 26 changed). The account is the mock bank's PUB-06 account. Expected outcome derived blind from variant-e.md by 2 independent agents (wf_e03c9060-5bf), both equal to the author's derivation.",
+  "variables": {
+   "first_name": "Priya",
+   "last_name": "Nair",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1986-05-17",
+   "phone_last4": "1502"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "1903",
+    "past_due": 2125.1,
+    "days_late": 12,
+    "minimum_payment": 637.5
+   }
+  ],
+  "script": "Confirms the name and gives both security answers correctly. Says no to paying today and gives no date and no amount. Flatly refuses the next offer (\"No.\"). Accepts the offer after that as proposed and confirms the read-back.",
+  "expected": {
+   "outcome": "promise",
+   "reason": null,
+   "promises": [
+    {
+     "product_id": "p1",
+     "amount": 743.79,
+     "date": "2026-10-23"
+    }
+   ],
+   "notes": [],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "attempt 1 is the full 2125.10 on Friday 16 October 2026",
+   "after its refusal, attempt 2 is the floor 743.79 (35% of 2125.10 = 743.785, half a cent rounded up) on the deadline, Friday 23 October 2026",
+   "the agent never offers 743.78 or the 637.50 minimum payment"
+  ]
+ }
+]
