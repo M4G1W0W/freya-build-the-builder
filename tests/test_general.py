@@ -91,7 +91,7 @@ LIB_TOOLS = tools_from_operations(OPERATIONS, MOCK)
 
 
 def _fake_llm(trace, purpose, system, user, schema, name, **k):
-    if "tool API" in purpose:
+    if "tool API" in purpose or "contract" in purpose:
         return {"operations": OPERATIONS}
     if "call setup" in purpose:
         return copy.deepcopy(SETUP)
@@ -224,3 +224,65 @@ def test_a_renamed_id_field_is_still_baked(monkeypatch):
     upper = copy.deepcopy(spec)
     upper["meta"]["call_vars"][0]["name"] = "MemberNumber"
     assert general.baked_fields(upper, tools) == {"memberNumber": "MemberNumber"}
+
+
+def _op(name, path):
+    return {
+        "name": name,
+        "path": path,
+        "method": "POST",
+        "summary": "",
+        "request": [],
+        "response": [],
+    }
+
+
+def test_a_contract_without_the_roles_is_read_again_with_its_own_names(monkeypatch):
+    # 17:27 UTC live dry run: the role reading returned 2 of 3 operations, one misnamed.
+    from freya_builder import contract
+
+    answers = [
+        {"operations": [_op("get_account", "/api/list_loans"), _op("title", "/api/renew_loan")]},
+        {
+            "operations": [
+                _op("list_loans", "/api/list_loans"),
+                _op("renew_loan", "/api/renew_loan"),
+                _op("transfer_to_librarian", "/api/transfer_to_librarian"),
+            ]
+        },
+    ]
+    purposes = []
+
+    def fake(trace, purpose, *a, **k):
+        purposes.append(purpose)
+        return answers.pop(0)
+
+    monkeypatch.setattr(llm, "chat_json", fake)
+    out = io.StringIO()
+    tools = contract.contract_tools(Trace(out), [("c.md", CONTRACT)], MOCK)
+    assert [t.name for t in tools] == ["list_loans", "renew_loan", "transfer_to_librarian"]
+    assert purposes[1] == "re-read the contract with its own operation names"
+    assert "reading the contract with its own names" in out.getvalue()
+
+
+def test_a_contract_with_every_role_is_read_once(monkeypatch):
+    from freya_builder import contract
+
+    ops = [_op(n, "/" + n) for n in general.REQUIRED]
+    calls = []
+    monkeypatch.setattr(llm, "chat_json", lambda *a, **k: calls.append(1) or {"operations": ops})
+    tools = contract.contract_tools(Trace(io.StringIO()), [("c.md", "c")], MOCK)
+    assert len(calls) == 1 and [t.name for t in tools] == list(general.REQUIRED)
+
+
+def test_an_oversized_document_is_cut_for_the_model(tmp_path):
+    case = tmp_path / "c"
+    case.mkdir()
+    (case / "BRIEF.md").write_text("brief")
+    (case / "records.json").write_text("[" + ",".join(['{"id": 1}'] * 20_000) + "]")
+    warnings: list[str] = []
+    docs = dict(cli.read_documents([str(case)], warnings.append))
+    assert docs["BRIEF.md"] == "brief"
+    assert len(docs["records.json"]) < cli.MAX_DOC_CHARS + 100
+    assert docs["records.json"].endswith("more chars]")
+    assert any("records.json" in w and "the model reads the first" in w for w in warnings)

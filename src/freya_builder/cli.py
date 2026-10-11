@@ -45,6 +45,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return a
 
 
+MAX_DOC_CHARS = 60_000  # a data dump (thousands of records) would swamp every model call
+
+
+def capped(name: str, text: str, warn: Callable[[str], None]) -> str:
+    """A document's text for the model calls: an oversized one keeps its first MAX_DOC_CHARS."""
+    if len(text) <= MAX_DOC_CHARS:
+        return text
+    warn(f"{name}: {len(text)} chars; the model reads the first {MAX_DOC_CHARS}")
+    cut = len(text) - MAX_DOC_CHARS
+    return text[:MAX_DOC_CHARS] + f"\n[... cut by the builder: {cut} more chars]"
+
+
 def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[str, str]]:
     """(name, text) per document: a file as given, a folder as every readable file in it."""
     docs = []
@@ -56,7 +68,7 @@ def read_documents(paths: list[str], warn: Callable[[str], None]) -> list[tuple[
             docs.append((path.name, casefolder.read_file(path)))
         else:
             docs.append((path.name, casefolder.decode_text(path.read_bytes())))
-    return docs
+    return [(name, capped(name, text, warn)) for name, text in docs]
 
 
 MIN_RULES_CHARS = 1000  # shorter consolidated rules for a whole case folder cannot be complete

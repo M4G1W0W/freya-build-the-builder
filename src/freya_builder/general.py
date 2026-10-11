@@ -14,10 +14,10 @@ import re
 from urllib.parse import urlsplit
 
 from . import hooks, language, llm, nodes
+from .contract import REQUIRED
 from .toolapi import Tool, model_tool
 from .trace import Trace
 
-REQUIRED = ("verify_identity", "get_account", "create_promise", "close_call")  # spec.check_spec
 MIN_RULES_CHARS = 200
 
 SETUP_SYSTEM = """You prepare a company's documents for a phone agent that answers or makes one kind of phone call, so that it can follow them. The documents may be one clean specification or raw material (e-mails, several versions of an analysis, memos, announcements, a flow drawing, FAQ, meeting notes) written at different times that do not always agree. Return:
