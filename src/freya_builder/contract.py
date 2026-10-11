@@ -135,9 +135,13 @@ def on_mock(doc: dict, mock_url: str) -> list[Tool]:
 
 def join_mock(mock_url: str, path: str) -> str:
     """mock_url + the contract path, without repeating the mock's own path: a model reading may
-    give '/op' or '/x/v1/op' for the same operation; with mock .../x/v1 both give .../x/v1/op."""
+    give '/op', '/x/v1/op' or 'https://host/x/v1/op' for the same operation; with mock .../x/v1
+    all three give .../x/v1/op."""
     base = mock_url.rstrip("/")
-    p = "/" + str(path).strip().lstrip("/")
+    p = str(path).strip()
+    if "://" in p:  # a full URL from the contract: its path only, the host is always the mock
+        p = urlsplit(p).path
+    p = "/" + p.lstrip("/")
     prefix = urlsplit(base).path.rstrip("/")
     if prefix and p.startswith(prefix + "/"):  # segment-aligned: '/x/v10' keeps its prefix
         p = p[len(prefix) :]
