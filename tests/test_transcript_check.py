@@ -249,3 +249,99 @@ def test_cli_reads_a_folder_and_maps_cases(tmp_path, capsys):
     printed = capsys.readouterr().out
     assert "PUB-09" in printed and "NO_GOODBYE" in printed and "1 calls" in printed
     assert json.loads(out.read_text())[0]["flags"][0]["code"] == "NO_GOODBYE"
+
+
+def test_an_end_node_farewell_after_close_call_is_info():
+    c = _transfer(None)
+    c["messages"].append(say(3.7, "Thank you. Goodbye."))
+    flags = check_call(c)
+    assert [(f["code"], f["level"]) for f in flags] == [("NO_GOODBYE", "info")]
+    assert "end node said the goodbye after close_call" in flags[0]["note"]
+
+
+def test_a_goodbye_said_only_after_close_call_by_the_model_without_routing_is_not_counted_early():
+    c = call(
+        say(2.0, "Payments can take one business day to appear."),
+        start(3.0, "close_call", {"outcome": "paid"}),
+        say(4.5, "Thank you. Goodbye."),
+    )
+    assert [(f["code"], f["level"]) for f in check_call(c)] == [("NO_GOODBYE", "info")]
+
+
+def test_weekday_with_an_iso_date_or_month_the_day():
+    assert codes(call(say(1.0, "Can you pay 637.50 on Monday 2026-10-20?"))) == ["WEEKDAY"]
+    assert codes(call(say(1.0, "Can you pay 637.50 on Tuesday 2026-10-20?"))) == []
+    assert codes(call(say(1.0, "Can you pay on Friday, October the 17th?"))) == ["WEEKDAY"]
+
+
+def test_readback_wrong_amount_wrong_date_and_tomorrow():
+    rb = "I will record a payment of 356.00 for your credit card ending 7740 on Friday 16 October 2026. Do you confirm?"
+    assert "amount" in check_call(promise_call(rb))[0]["note"]
+    rb = "I will record a payment of 365.00 for your credit card ending 7740 on Friday 23 October 2026. Do you confirm?"
+    assert "date" in check_call(promise_call(rb))[0]["note"]
+    c = promise_call(
+        "I will record 365.00 for your credit card ending 7740 tomorrow. Do you confirm?"
+    )
+    c["messages"][0] = _sys(
+        0.0, {"event": "route_evaluated", "variable_table": {"now": "2026-10-15T11:00"}}
+    )
+    assert codes(c) == []
+
+
+def test_reasking_an_answered_question_is_review_even_when_the_tool_lists_it():
+    q = "What is your date of birth?"
+    listed = "Correct. Now ask the next security question. The questions in order: 1. What is your date of birth?"
+    c = call(
+        say(1.0, q),
+        hear(2.0, "The 19th of October 1983."),
+        done(2.2, {"verified": True, "what_to_do_next": listed}, function="verify_identity"),
+        say(2.3, f"Correct. {q}"),
+    )
+    assert [(f["code"], f["level"]) for f in check_call(c)] == [("SAID_TWICE", "review")]
+
+
+def test_a_repeat_after_the_customers_question_is_info():
+    ask = "Am I speaking with Mr Bell?"
+    c = call(
+        say(1.0, f"I am a digital assistant calling from Freya Bank. {ask}"),
+        hear(2.0, "Hello?"),
+        say(2.1, ask),
+    )
+    assert [(f["code"], f["level"]) for f in check_call(c)] == [("SAID_TWICE", "info")]
+
+
+def test_a_repeated_offer_after_complete_refusals_is_review():
+    offer = "Can you pay 365.00 on Friday 16 October 2026?"
+    c = call(
+        say(1.0, "Hello."),
+        hear(1.2, "Hi there"),
+        say(2.0, offer),
+        hear(3.0, "No, I can't"),
+        say(4.0, offer),
+        hear(5.0, "No, not right now"),
+        say(6.0, offer),
+    )
+    assert codes(c, "review") == ["SAID_TWICE"]
+
+
+def test_more_refusal_wordings_make_an_unverified_close_info():
+    for words in (
+        "None of your business.",
+        "I'm not giving you that.",
+        "Forget it, I'm hanging up.",
+    ):
+        c = call(
+            say(1.0, "What is your date of birth?"),
+            hear(2.0, words),
+            say(2.1, "Thank you. Goodbye."),
+            start(2.5, "close_call", {"outcome": "not_verified", "reason": "declined"}),
+        )
+        assert [(f["code"], f["level"]) for f in check_call(c)] == [("UNVERIFIED", "info")], words
+
+
+def test_an_unreadable_file_is_skipped(tmp_path, capsys):
+    (tmp_path / "a.json").write_text('{"id": "x", "messages": [')
+    (tmp_path / "b.json").write_text(json.dumps(_transfer(None)))
+    assert main([str(tmp_path)]) == 0
+    printed = capsys.readouterr().out
+    assert "skipped" in printed and "NO_GOODBYE" in printed

@@ -45,14 +45,19 @@ STOP = set(
 )
 REFUSAL = re.compile(
     r"\b(don'?t want|do not want|won'?t|will not|not going to|refuse|rather not|no thanks|"
-    r"not comfortable|why do you need|not answering|not telling)\b",
+    r"not comfortable|why do you need|not answering|not telling|not giving|prefer not|"
+    r"none of your business|not doing this|forget it|hang(?:ing)? up)\b",
     re.I,
 )
 _WD = r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
 _MO = r"(january|february|march|april|may|june|july|august|september|october|november|december)"
 _DAY = r"(\d{1,2})(?:st|nd|rd|th)?"
 DAY_FIRST = re.compile(rf"\b{_WD},?\s+(?:the\s+)?{_DAY}\s+(?:of\s+)?{_MO}(?:,?\s+(\d{{4}}))?", re.I)
-MONTH_FIRST = re.compile(rf"\b{_WD},?\s+{_MO}\s+{_DAY}(?:,?\s+(\d{{4}}))?", re.I)
+MONTH_FIRST = re.compile(rf"\b{_WD},?\s+{_MO}\s+(?:the\s+)?{_DAY}(?:,?\s+(\d{{4}}))?", re.I)
+ISO_DATE = re.compile(rf"\b{_WD},?\s+(?:the\s+)?(\d{{4}})-(\d{{2}})-(\d{{2}})\b", re.I)
+FAREWELL_ONLY = re.compile(
+    r"^(thank(s| you)( very much)?( for (your|the) (time|call))?[.!,]?\s*)?(good ?bye[.!]?)?$", re.I
+)
 
 
 def _words(text: str) -> str:
@@ -150,12 +155,16 @@ def _numbers(text: str) -> set[float]:
     return out
 
 
-def _says_date(text: str, iso: str) -> bool:
+def _says_date(text: str, iso: str, now: dt.date | None = None) -> bool:
     try:
         d = dt.date.fromisoformat(str(iso)[:10])
     except ValueError:
         return True  # nothing to compare against
     low = text.lower()
+    if now and (
+        (d == now and "today" in low) or (d == now + dt.timedelta(1) and "tomorrow" in low)
+    ):
+        return True
     month = MONTHS[d.month - 1]
     return iso[:10] in text or bool(
         re.search(rf"\b{d.day}(?:st|nd|rd|th)?\s+(?:of\s+)?{month}\b", low)
@@ -163,7 +172,7 @@ def _says_date(text: str, iso: str) -> bool:
     )
 
 
-def check_readback(turns: list[dict], tools: list[dict]) -> list[dict]:
+def check_readback(turns: list[dict], tools: list[dict], now: dt.date | None = None) -> list[dict]:
     flags, seen = [], set()
     products = {str(p.get("product_id")): p for p in _products(tools)}
     starts = [x for x in tools if x["kind"] == "start" and x["name"] == "create_promise"]
@@ -209,7 +218,7 @@ def check_readback(turns: list[dict], tools: list[dict]) -> list[dict]:
                     missing.append(f"amount ({amount})")
             except (TypeError, ValueError):
                 pass
-            if date and not _says_date(text, str(date)):
+            if date and not _says_date(text, str(date), now):
                 missing.append(f"date ({date})")
         if missing:
             flags.append(
@@ -245,6 +254,16 @@ def check_weekdays(turns: list[dict], now: dt.date | None) -> list[dict]:
                         _flag("WEEKDAY", "review", u["t"], m.group(0),
                               f"{d.isoformat()} is a {WEEKDAYS[d.weekday()].title()}")
                     )  # fmt: skip
+        for m in ISO_DATE.finditer(u["text"]):
+            try:
+                d = dt.date(int(m.group(2)), int(m.group(3)), int(m.group(4)))
+            except ValueError:
+                continue
+            if WEEKDAYS[d.weekday()] != m.group(1).lower():
+                flags.append(
+                    _flag("WEEKDAY", "review", u["t"], m.group(0),
+                          f"{d.isoformat()} is a {WEEKDAYS[d.weekday()].title()}")
+                )  # fmt: skip
     return flags
 
 
@@ -255,41 +274,66 @@ def check_goodbye(turns: list[dict], tools: list[dict]) -> list[dict]:
         if (x["kind"] == "routing" and x["name"].startswith("transition_to_ev_"))
         or (x["kind"] == "start" and x["name"] in ("close_call", "transfer_to_agent"))
     ]
-    if not any(x["kind"] == "start" and x["name"] == "close_call" for x in tools) or not ends:
+    closes = [x["t"] for x in tools if x["kind"] == "start" and x["name"] == "close_call"]
+    if not closes or not ends:
         return []
     end = min(ends)
-    said = [u for u in turns if u["role"] == "assistant" and u["t"] <= end + 2.0]
-    if not said:
-        return [_flag("NO_GOODBYE", "review", end, "", "the agent said nothing before closing")]
-    last = said[-1]
-    lacks = [w for w, rx in (("thanks", r"\bthank"), ("goodbye", r"good ?bye|\bbye\b"))
-             if not re.search(rx, last["text"], re.I)]  # fmt: skip
+    # The goodbye is said in the same message as the closing transition (logged just after it).
+    routed = any(x["kind"] == "routing" and x["t"] == end for x in tools)
+    grace = 2.0 if routed else 0.0
+    said = [
+        u
+        for u in turns
+        if u["role"] == "assistant" and u["t"] <= end + grace and u["t"] < min(closes)
+    ]
+    last = said[-1] if said else {"t": end, "text": ""}
+    lacks = _lacks_goodbye(last["text"])
     if not lacks:
         return []
     note = "no " + " and no ".join(lacks) + " before the call was closed"
-    if any(u["role"] == "user" and last["t"] < u["t"] <= end for u in turns):
+    if not said or any(u["role"] == "user" and last["t"] < u["t"] <= end for u in turns):
         note += "; the agent said nothing after the customer's last message"
+    farewell = [u for u in turns if u["role"] == "assistant" and u["t"] >= min(closes)]
+    if farewell and not _lacks_goodbye(farewell[-1]["text"]):
+        return [
+            _flag("NO_GOODBYE", "info", farewell[-1]["t"], farewell[-1]["text"],
+                  note + "; the end node said the goodbye after close_call (the last agent message)")
+        ]  # fmt: skip
     return [_flag("NO_GOODBYE", "review", last["t"], last["text"], note)]
+
+
+def _lacks_goodbye(text: str) -> list[str]:
+    return [w for w, rx in (("thanks", r"\bthank"), ("goodbye", r"good ?bye|\bbye\b"))
+            if not re.search(rx, text, re.I)]  # fmt: skip
 
 
 ASK_AGAIN = re.compile(r"\b(ask|say|repeat)\b[^.]{0,40}\b(again|same)\b", re.I)
 
 
-def _tool_between(tools: list[dict], t0: float, t1: float, sentence: str) -> str:
-    """A tool result between t0 and t1 that asks to repeat, or carries half the sentence's words."""
-    want = _content(sentence)
+def _tool_between(tools: list[dict], t0: float, t1: float) -> str:
+    """A tool result between t0 and t1 that tells the agent to ask again."""
     for x in tools:
         if x["kind"] not in ("complete", "error") or not t0 <= x["t"] <= t1:
             continue
-        raw = json.dumps(x["raw"].get("result") or x["raw"].get("error") or "")
-        if ASK_AGAIN.search(raw) or (want and len(want & _content(raw)) * 2 >= len(want)):
-            return f"{x['name'] or 'tool'} result at {x['t']:.1f}s"
+        if ASK_AGAIN.search(json.dumps(x["raw"].get("result") or x["raw"].get("error") or "")):
+            return f"a tool result asked for it again ({x['name'] or 'tool'} at {x['t']:.1f}s)"
     return ""
 
 
+CUT_WORDS = set(
+    "the a an of on to for in at and or but my i is was it this that with by from".split()
+)
+
+
 def _fragment(text: str) -> bool:
-    """A customer message cut off mid-sentence (no closing punctuation)."""
-    return bool(text.strip()) and not re.search(r"[.?!][\"')\]]*$", text.strip())
+    """A customer message cut off mid-sentence: it ends on a comma, a dash, '...' or a word that
+    cannot end a sentence ("It is the 12th of"). "No, I can't" is a complete reply."""
+    s = text.strip()
+    if not s or re.search(r"[.?!][\"')\]]*$", s):
+        return False
+    return bool(re.search(r"(,|-|\u2014|\.\.\.)$", s)) or _words(s).split()[-1:] in [
+        [w] for w in CUT_WORDS
+    ]
 
 
 def check_said_twice(turns: list[dict], tools: list[dict]) -> list[dict]:
@@ -309,7 +353,7 @@ def check_said_twice(turns: list[dict], tools: list[dict]) -> list[dict]:
         (u["t"], s, u["text"])
         for u in msgs
         for s in sentences(u["text"])
-        if len(_words(s).split()) >= 4
+        if len(_words(s).split()) >= 4 and not FAREWELL_ONLY.match(s.strip())
     ]
     flags = []
     exact: dict[str, list[tuple[float, str]]] = {}
@@ -320,15 +364,20 @@ def check_said_twice(turns: list[dict], tools: list[dict]) -> list[dict]:
         if len(times) < 2:
             continue
         s = occ[0][1]
-        why = [_tool_between(tools, a, b, s) for a, b in pairwise(times)]
         note = f"said {len(times)} times ({', '.join(f'{t:.1f}s' for t in times)})"
         if times[-1] == last_t:
             note += ", the last time in the agent's final message"
+        why = []  # each repeat on its own: a tool asked again, a cut-off, or a customer question
+        for a, b in pairwise(times):
+            prev = before.get(b, "")
+            why.append(
+                _tool_between(tools, a, b)
+                or ("a cut-off customer message" if _fragment(prev) else "")
+                or ("a customer question" if prev.strip().endswith("?") else "")
+            )
         level = "review"
         if all(why):
-            level, note = "info", note + f"; a tool result asked for it again ({why[0]})"
-        elif all(_fragment(before.get(t, "")) for t in times):
-            level, note = "info", note + "; each time it answered a cut-off customer message"
+            level, note = "info", note + "; each repeat followed " + "; ".join(sorted(set(why)))
         flags.append(_flag("SAID_TWICE", level, times[0], s, note))
     seen = set()
     confirm = re.compile(r"\bconfirm\b", re.I)
@@ -343,12 +392,12 @@ def check_said_twice(turns: list[dict], tools: list[dict]) -> list[dict]:
                 continue  # a read-back restates the offer it confirms
             if len(small) >= 4 and len(small & big) >= 0.8 * len(small):
                 seen.add((a, b))
-                why = _tool_between(tools, t0, t1, a)
+                why = _tool_between(tools, t0, t1)
                 note = f"said again in other words at {t1:.1f}s"
                 if t1 == last_t:
                     note += ", in the agent's final message"
                 if why:
-                    note += f"; a tool result asked for it again ({why})"
+                    note += f"; {why}"
                 flags.append(
                     _flag("SAID_TWICE", "info" if why else "review", t0, f"{a} | {b}", note)
                 )
@@ -393,7 +442,7 @@ def call_now(call: dict) -> dt.date | None:
 def check_call(call: dict) -> list[dict]:
     turns, tools = parse(call)
     return (
-        check_readback(turns, tools)
+        check_readback(turns, tools, call_now(call))
         + check_weekdays(turns, call_now(call))
         + check_goodbye(turns, tools)
         + check_said_twice(turns, tools)
@@ -440,7 +489,11 @@ def main(argv: list[str] | None = None) -> int:
     cases = case_ids(a.rows)
     report, counts = [], {}
     for f in call_files(a.paths):
-        call = json.loads(f.read_text())
+        try:
+            call = json.loads(f.read_text())
+        except (OSError, ValueError) as e:
+            print(f"skipped {f}: {type(e).__name__}: {e}")
+            continue
         if not isinstance(call, dict) or not isinstance(call.get("messages"), list):
             continue
         cid = str(call.get("id") or f.stem)
