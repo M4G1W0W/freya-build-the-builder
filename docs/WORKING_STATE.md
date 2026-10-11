@@ -7,7 +7,31 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
-## UPDATE 11:37 UTC: cand-eng.4 SELECTED, DEPLOYED, MEASURING (supersedes "State now" below)
+## UPDATE 11:44 UTC: QUEUE PAUSED (platform 500/504), nothing running, no orphan simulation
+
+- **Paused on the user's instruction (relayed Service Check note, 11:38):** widespread 500/504. `sim/STOP` is SET
+  (11:38:32); the runner exited 11:39:22. No builds or retries are running. The 3 eng.4 slots below stay deployed:
+  **do not rebuild them.**
+- E4-A-styledA attempt 1: `POST /api/v2/simulations` -> 504, client exited 1, no rep. Ledger counted 10 calls
+  conservatively (cum **267**). Files kept as `runs/dev/r4/E4-A-styledA.attempt1-post504.{log,meta.json}`.
+  **Service Check (peer session) confirmed at 11:40:34: no simulation created after 11:30 UTC** (no orphan). It polls
+  `GET /api/v2/simulations` every 3 min read-only (up to ~2 h), re-checks for late-created simulations, and reports
+  recovery after 3 OK answers in a row. This chat does NOT poll in parallel.
+- `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
+- **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
+  result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases
+  runs/dev/r4/smoke-pub01.json --reps 1 --out runs/dev/r4/SMOKE-e4a.json > runs/dev/r4/SMOKE-e4a.log 2>&1` (1 call,
+  PUB-01 talkative, slot exp-eng4-a); add it to calls.tsv; then `rm sim/STOP` and restart qrun4.sh + monitor.
+- **Offline prep done during the pause:**
+  - Fresh-clone `--dry` rehearsal of cand-eng.4 (uv python 3.12.13, no venv): exit 0, 98 s, 2 model calls,
+    `git=cfa4d9d dirty=False`, spec check round 1 PASS, validation PASS, secrets CLEAN
+    (`runs/dev/r4/fc-eng4-a.trace.log`).
+  - Trial merge main -> cand-eng.4 (throwaway, removed): **no conflicts**, 872 passed, ruff check + format clean.
+    Main's side changes NO builder code (src/, builder/, kit/, pyproject, uv.lock untouched since the merge base
+    a01a17c), so the merged commit builds exactly the deployed eng.4 agent plus the current docs/RUNBOOK. Note that
+    cand-eng.4's own `docs/RUNBOOK.md` is OLDER than main's: `freeze-final` must be on the merged commit (user's call).
+
+## UPDATE 11:37 UTC: cand-eng.4 SELECTED, DEPLOYED, MEASURING (superseded by the 11:44 pause above)
 
 - **User selected `cand-eng.4` (cfa4d9d) at 11:30 UTC** (Decision log). Worktree (detached):
   `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-eng4`.
