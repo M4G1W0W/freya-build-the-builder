@@ -427,6 +427,7 @@ def snapshot(state: dict) -> dict:
             "end_times": "kit/results/log.jsonl (machine-local time, converted to UTC)",
             "tested_commit": "build trace START git= > deploy-log file name > Score log Git ref > result file name (each labelled)",
             "transcripts": "only call dumps already saved under runs/; no network",
+            "configuration_comparison": "GET /api/comparison (dashboard/README.md): scenario variants x exact configurations, two-version diff with a=<id>&b=<id>",
             "counts": {
                 "result_files": len(state["runs"]),
                 "build_traces": len(state["builder"]["traces"]),

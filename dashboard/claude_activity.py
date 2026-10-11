@@ -544,20 +544,15 @@ NOTIFY = re.compile(r"<summary>(.*?)</summary>", re.S)
 NOT_HUMAN = re.compile(
     r"\s*(<task-notification>|\[Request interrupted|<local-command-std(out|err)>|<bash-std(out|err)>)"
 )
-MSG_LIMIT = 8000
 
 
 def _clean_message(text: str) -> str:
+    """Full text, never cut (the reviewer reads every prompt and reply in full)."""
     s = REMINDER.sub("", text)
     s = PASTE_TAG.sub("", s)
     s = ANSI.sub("", s)
     s = D.redact(s).replace(HOME, "~")
-    s = EMAIL.sub("[email]", s).strip()
-    return (
-        s
-        if len(s) <= MSG_LIMIT
-        else s[:MSG_LIMIT] + f"\n… [truncated, {len(s) - MSG_LIMIT} more characters]"
-    )
+    return EMAIL.sub("[email]", s).strip()
 
 
 def _human_text(e: dict) -> str | None:

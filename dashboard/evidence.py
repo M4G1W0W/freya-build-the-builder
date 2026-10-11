@@ -744,6 +744,7 @@ def index(runs: list[dict], incomplete: list[dict]) -> dict:
                         "family": c["family"],
                         "rep": f["rep"],
                         "style": c["style"],
+                        "style_source": r["style_source"],
                         "category": f["category"],
                         "commit": r["commit"],
                         "version": r["version"],

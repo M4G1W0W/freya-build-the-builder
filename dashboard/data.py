@@ -78,6 +78,23 @@ def redact(text: str) -> str:
     return text
 
 
+def redact_obj(obj: object) -> object:
+    """Redact every string inside a JSON-like value. Redact before json.dumps, never after: a pattern
+    run over serialised JSON can swallow a closing quote and make the body unparseable."""
+    if isinstance(obj, str):
+        return redact(obj)
+    if isinstance(obj, dict):
+        return {redact(k) if isinstance(k, str) else k: redact_obj(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [redact_obj(v) for v in obj]
+    return obj
+
+
+def dumps(obj: object, **kw) -> str:
+    """json.dumps with every string redacted first (and non-JSON values redacted as strings)."""
+    return json.dumps(redact_obj(obj), default=lambda o: redact(str(o)), **kw)
+
+
 # ---------------------------------------------------------------- small helpers
 
 _cache: dict[str, tuple[float, int, object]] = {}

@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import analysis as A  # noqa: E402
 import claude_activity as CA  # noqa: E402
+import compare as C  # noqa: E402
 import data as D  # noqa: E402
 import evidence as EV  # noqa: E402
 
@@ -42,6 +43,13 @@ def compute() -> dict:
     state["panels"] = A.panels(runs)
     state["failures"] = A.failures(runs)
     state["builder"] = A.builder(traces, runs)
+    try:
+        state["comparison"] = C.build(
+            runs, state["overview"]["incomplete_runs"], traces, git["commits"]
+        )
+    except Exception:  # the comparison view must never break the rest of the dashboard
+        traceback.print_exc()
+        state["comparison"] = None
     try:
         state["claude"] = CA.activity()
     except Exception as exc:  # the monitor must never break the testing dashboard
@@ -65,12 +73,12 @@ def compute() -> dict:
 def write_reports(snap: dict, convo: dict | None = None) -> None:
     REPORTS.mkdir(exist_ok=True)
     files = [
-        ("latest_snapshot.json", D.redact(json.dumps(snap, indent=2, default=str))),
+        ("latest_snapshot.json", D.dumps(snap, indent=2)),
         ("latest_snapshot.md", A.snapshot_markdown(snap)),
     ]
     if convo is not None:
         files += [
-            ("latest_conversation.json", D.redact(json.dumps(convo, indent=2, default=str))),
+            ("latest_conversation.json", D.dumps(convo, indent=2)),
             ("latest_conversation.md", D.redact(CA.conversation_markdown(convo))),
         ]
     for name, text in files:
@@ -115,7 +123,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, obj) -> None:
-        self._send(200, D.redact(json.dumps(obj, default=str)).encode(), "application/json")
+        self._send(200, D.dumps(obj).encode(), "application/json")
 
     def do_GET(self) -> None:  # noqa: N802
         url = urlparse(self.path)
@@ -199,6 +207,18 @@ class Handler(BaseHTTPRequestHandler):
                     "application/json",
                 )
             return self._json(found)
+        if url.path == "/api/comparison":
+            if not st.get("comparison"):
+                return self._send(
+                    500,
+                    b'{"error":"comparison unavailable (see server console)"}',
+                    "application/json",
+                )
+            try:
+                found = C.view(st["comparison"], q)
+            except C.QueryError as exc:
+                return self._send(400, D.dumps({"error": str(exc)}).encode(), "application/json")
+            return self._json({"refreshed": st["refreshed"], **found})
         if url.path == "/api/case":
             detail = D.case_detail(st["runs"], q.get("run", [""])[0], q.get("case", [""])[0])
             return (

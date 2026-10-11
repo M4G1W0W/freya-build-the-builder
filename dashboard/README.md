@@ -19,6 +19,7 @@ Data is recomputed every 12 s. The page polls every 12 s.
 | `/api/failures` | Failed reps by category, persistence, introduced, resolved, awaiting retest, and an infra-adjusted interpretation |
 | `/api/overview`, `/api/builder` | Overview panels; build traces |
 | `/api/case?run=<run id>&case=<PUB-xx>` | Per-rep detail: ledger diff, judge text, tools, a transcript when a call dump exists locally, and the case history |
+| `/api/comparison?...` | Configuration comparison: scenario variants × exact configurations, plus a two-version diff (see below) |
 
 ## How numbers are derived
 
@@ -80,7 +81,7 @@ and are not visible.
 - **Activity feed.** Tool names, Claude's own action descriptions (allowlisted fields only), outcomes, error kinds
   from a fixed vocabulary, live background processes (basenames only), and Claude's latest text. It never contains
   your prompts, thinking, tool inputs or tool output.
-- **Conversation.** Your prompts (every one is kept), Claude's replies, and one-line background-task events.
+- **Conversation.** Your prompts (every one is kept, in full; never cut), Claude's replies (in full), and one-line background-task events.
   System reminders, thinking and tool content are left out. Secrets are redacted and e-mails masked. It is written
   to `reports/latest_conversation.{json,md}` for an external reviewer (`reports/` is gitignored).
 - **Safety.** Files are opened read-only. The only subprocess is `ps`. Requests whose Host is not
@@ -139,3 +140,74 @@ More detail on the evidence fields:
 - **Judge field.** A missing judge verdict ("analysis never arrived") is classified as a platform error. A failed rep
   without a judge line means the judge passed and the failure is in the ledger.
 - **Simulation id.** run_cases records only the last rep's simulation id, so earlier reps report *Not available*.
+
+## Configuration comparison (`/api/comparison`, tab "Config Comparison")
+
+A matrix of scenario variants (rows) × exact configurations (columns), plus a two-version comparison. It is built
+from the same run records as the other views (`dashboard/compare.py`), the build traces, and `git log`/`git show`
+of the case files. It makes no Freya calls and writes nothing.
+
+```
+GET /api/comparison?brief=A&case=PUB-06&style=talkative&config=<id>,<id>&from=2026-10-10&to=2026-10-11&a=<id>&b=<id>
+```
+
+Every parameter is optional; `a` and `b` go together. `style` takes a style name or `unknown`. `from`/`to` are UTC
+`YYYY-MM-DD` (inclusive days) or `YYYY-MM-DDTHH:MM[:SS]Z` and filter on the run's end time. Configuration ids are in
+`options.configs`. A bad parameter returns 400 with `{"error": ...}`.
+
+**Configuration (column).** One deployment: the build trace that published the agent before the run. Its id is
+`deploy:<trace path>`. It carries:
+- the commit and its source, and the dirty flag;
+- the in-memory experiment variants written in the trace (`exp07 variant=...`);
+- the agent, slot and version (with source);
+- fresh extraction vs saved spec, the spec path and its status;
+- the input sha256 recorded by the trace at build time.
+
+A run without a usable trace gets `untraced:<agent>:<claimed commit>`, and so does a run whose time-matched trace
+predates the tested commit. No current spec hash is shown: the trace does not hash the spec, and the current file
+is not evidence of what was deployed.
+
+**Scenario variant (row).** It is grouped by brief and policy family and made of:
+- the case id;
+- the test definition: the case file, plus a sha256 of that case's JSON in the version committed when the run
+  started (`git log`/`git show`);
+- the speech style.
+
+The style comes only from a styled case file's `style` field. Run-file name tokens (`-talkative`, `-asks`) are
+never used, so those runs show `unknown`.
+
+**Cell.** Every run of that configuration on that variant stays a separate entry. Each entry has:
+- passes/reps;
+- strict (complete run, 3+ reps, every rep passed), or `null` with the reason;
+- the failed reps, with `/api/failure-detail` links;
+- the configuration and definition flags;
+- whether the run is comparable;
+- the platform interpretation, beside the raw result and never changing it.
+
+The cell `status` (pass, fail or mixed) uses comparable runs only. Reps of different runs are never added up, and
+no retry is preferred over another.
+
+**Two-version comparison (`a`, `b`).** Rows match only on the same case, the same definition hash and a known,
+equal style. The buckets are:
+- `newly_failing`, `newly_passing`, `unchanged_pass`, `unchanged_fail`;
+- `inconsistent`: the runs of one configuration disagree;
+- `untested`: tested on one side only, or no comparable strict result on one side (1-rep, incomplete, or a
+  configuration flag such as a redeploy during the run or an agent-version mismatch);
+- `unmatched_coverage`: shown, never counted. The case ran under another definition or style, or the style was not
+  recorded on either side.
+
+`untested_by_both` lists the case ids of the involved briefs that neither side ran. `differences` and
+`provenance_warnings` show what differs between the two configurations and what is uncertain about each. There is
+no ranking: columns are ordered by deploy time.
+
+**Incomplete runs.** These are runs with no result JSON. They are listed separately with the per-case reps parsed
+from their console log: a rep counts once its `-- run k of N` line is written. They are never strict, and their
+configuration is not determinable (the log has no agent id).
+
+**Limits.**
+- `run_cases` records neither `--cases` nor `--style`. The case file is attributed by the run file's name
+  (`styled*`/`extraB`, else the kit's public set).
+- The real arguments sit in launcher scripts in session scratchpads, outside the repo, and are not read.
+- Uncommitted edits to a case file cannot be detected.
+
+Tests: `uv run pytest dashboard/test_compare.py` (synthetic records, no network).
