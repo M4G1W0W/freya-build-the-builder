@@ -26,6 +26,23 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 18:18 UTC: SELECTED build (cand-final.7 on the complete folder) + round 2 (3/6)
+
+- User 18:06: case folder complete (19 files; fingerprint 10ffe8464f3eb5de, gated in the build script). New files after
+  build 1: 2026-10-10 follow-up transcript (call rules only); test-customers.json description text only (data identical);
+  BRIEF.md inputs wording; kickoff e-mail policy text. No mock change.
+- **cand-final.7 = eef48d2** (cand-final.6 + D9 cut-off line in the call language + D10 30 s general-flow tool timeout):
+  974 tests, spec-a-llm render byte-identical, no case words. Merged into main LOCALLY: **2efc338** (not pushed).
+- **Selected build:** START 18:09:39Z, END 18:14:11Z, git=2efc338 dirty=False, mock_url
+  `https://teampistalogic.atlasreyiz.workers.dev/voice/v1`, ok=True 271 s, 4 model calls; workflow ad052130 (version 2) /
+  agent 2276b4c7; platform dry-run + smoke PASS; export updated_at 18:14:06.878Z; timeoutMs 30000 / maxRetries 0 on all 7
+  tools. This run read the paths WITH the base: tool URLs are `.../voice/v1/voice/v1/<service>` -> served by the mock's
+  suffix routing (verified 200 live on 6 services). **The mock must keep suffix routing until the results.**
+  traces/final.log + submission/final.workflow.json in the working tree (uncommitted).
+- **Round 2 (D8 repeat): 3/6** (EX-3/4/5 PASS again; EX-1/2/6 FAIL on adherence: no offer after the reading, week options
+  not listed, year left off dates; judge also flags end_call vs "routed to the main menu"). No English line in any agent
+  turn (D9 fix works). Results runs/final/R2.*. Ledger cum 537; the D8 budget (12 calls) is used.
+
 ## UPDATE 18:08 UTC: build 1 + round 1 (3/6); user D9/D10 -> cand-final.7 (cut-off line language + 30 s timeout)
 
 - **Build 1 (candidate, NOT final):** main 0531102 (= cand-final.6 ed112fd), 17:50:40-17:54:54 UTC, mock_url
