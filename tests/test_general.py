@@ -194,3 +194,33 @@ def test_a_folder_with_a_non_collections_contract_builds(tmp_path, monkeypatch, 
     assert "building a general agent" in err and "local workflow validation: PASS" in err
     assert "END     ok=True" in err
     assert Path(API).exists()
+
+
+def _post_result(data, **envelope):
+    result = {"data": data, **envelope}
+    exec(general.post_hook(), {"result": result})
+    return result["data"]["what_to_do_next"]
+
+
+def test_a_read_with_false_fields_is_done_and_errors_are_not():
+    assert _post_result({"loans": [], "overdue": False}).startswith("The service answered")
+    assert _post_result({"renewed": False, "ok": True}).startswith("The service answered")
+    assert "did NOT do this" in _post_result({"ok": False})
+    assert "did NOT do this (bank error: down)" in _post_result({"error": "down"})
+    assert "did NOT do this" in _post_result({"x": 1}, status_code=503)
+
+
+def test_a_renamed_id_field_is_still_baked(monkeypatch):
+    spec, _ = _spec(monkeypatch)
+    ops = copy.deepcopy(OPERATIONS)
+    for op in ops:
+        op["request"][0]["name"] = "member_no"
+    tools = tools_from_operations(ops, MOCK)
+    assert general.baked_fields(spec, tools) == {"member_no": "memberNumber"}
+    wf = pipeline.render(spec, tools)
+    body = wf["nodes"]["assist"]["tools"][0]["function"]["parameters"]["properties"]["body"]
+    assert body["properties"]["member_no"]["default"] == "{{memberNumber}}"
+    tools = tools_from_operations(OPERATIONS, MOCK)
+    upper = copy.deepcopy(spec)
+    upper["meta"]["call_vars"][0]["name"] = "MemberNumber"
+    assert general.baked_fields(upper, tools) == {"memberNumber": "MemberNumber"}

@@ -13,7 +13,7 @@ import dataclasses
 import re
 from urllib.parse import urlsplit
 
-from . import language, llm, nodes
+from . import hooks, language, llm, nodes
 from .toolapi import Tool, model_tool
 from .trace import Trace
 
@@ -116,6 +116,49 @@ def extract(trace: Trace, brief_text: str, tools: list[Tool]) -> dict:
     }
 
 
+# A service result is NOT done only on an HTTP error, a failed status, ok false or an error text
+# (hooks._ENVELOPE): unlike a collections write, a read may hold false fields (e.g. "late": false).
+_POST = """
+_gdone = (not _fail) and _okv is not False and not _err
+if _gdone:
+    _d['what_to_do_next'] = $SUCCESS
+else:
+    _d['what_to_do_next'] = $FAIL_HEAD + _bank + $FAIL_TAIL
+"""
+POST_TEXT = {
+    "SUCCESS": "The service answered. Tell the customer only what this result says, as the RULES "
+    "say; never add a value it does not contain. Then answer, ask or end as the RULES say.",
+    "FAIL_HEAD": "The service did NOT do this",
+    "FAIL_TAIL": ". Do not say it was done and do not give values you did not receive. Do what the "
+    "RULES say when a service fails; if they say nothing, say you cannot do it right now.",
+}
+
+
+def post_hook() -> str:
+    return hooks._post("", _POST, {k: hooks.lit(v) for k, v in POST_TEXT.items()})
+
+
+def baked_fields(spec: dict, tools: list[Tool]) -> dict[str, str]:
+    """Request field -> call variable: same name (any case); else, for the caller's id, the one
+    field every tool requires (a renamed id, as spec.customer_field does for collections)."""
+    by_lower = {v["name"].lower(): v["name"] for v in spec["meta"]["call_vars"]}
+    out = {
+        f.name: by_lower[f.name.lower()]
+        for t in tools
+        for f in t.request
+        if f.name.lower() in by_lower
+    }
+    cid = _var(spec, "customer_id")
+    if cid and cid not in out.values():
+        common: set[str] | None = None
+        for t in tools:
+            names = {f.name for f in t.request if f.required}
+            common = names if common is None else common & names
+        if common and len(common) == 1:
+            out[next(iter(common))] = cid
+    return out
+
+
 def _var(spec: dict, role: str) -> str:
     return next((v["name"] for v in spec["meta"]["call_vars"] if v["role"] == role), "")
 
@@ -152,12 +195,14 @@ RULES
 
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
     tools = named_by_path(tools)
-    given = {v["name"] for v in spec["meta"]["call_vars"]}
+    bake = baked_fields(spec, tools)
+    post = post_hook()
     tool_defs = [
         model_tool(
             t,
             t.summary or t.name,
-            {f.name: "{{" + f.name + "}}" for f in t.request if f.name in given},
+            {f.name: "{{" + bake[f.name] + "}}" for f in t.request if f.name in bake},
+            post_process_code=post,
         )
         for t in tools
     ]
