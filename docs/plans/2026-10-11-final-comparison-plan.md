@@ -22,7 +22,8 @@ customer answers" (the closing fix active in that extraction or not).
 - A+B agent: `tests/fixtures/cases/styled-ab-all.json` (13 cases)
 - A agent: `tests/fixtures/cases/styled-a.json` (10)
 - A agent: `runs/cases/e1-a.json` = HA-A (PUB-05), HU-A (PUB-01), HU-PRE (PUB-06) from `cases-eng8-paths` 898223d (3)
-- A+B agent: `runs/cases/e1-ab.json` = HA-B (PUB-13), HU-B (PUB-12) from 898223d (2), **round 1 only** (pre-planned cut)
+- A+B agent: `runs/cases/e1-ab.json` = HA-B (PUB-13), HU-B (PUB-12) from 898223d (2), **every round** (amended 14:37
+  UTC by the user, before any run: 3 reps per candidate, +8 calls approved)
 
 Each item is one simulation (`--reps 1`): POST maxRetries 0, no reruns because of latency, every attempt recorded
 (`runs/dev/r4/<name>.attempts.jsonl`), corrected stop gate (every platform error event; only PUB-10's injected
@@ -31,10 +32,12 @@ simulation.
 
 ## Order (arm order alternates per round to balance platform swings)
 
-eng.4 r1 (incl. E1-AB) -> challenger r1 (incl. E1-AB) -> challenger r2 -> eng.4 r2 -> eng.4 r3 -> challenger r3.
+eng.4 r1 -> challenger r1 -> challenger r2 -> eng.4 r2 -> eng.4 r3 -> challenger r3; within a round: styled-ab-all,
+styled-a, E1-A, E1-AB.
 While the challenger is not built, eng.4 r1 runs first. Cut lines: if more than 10 min behind at 16:05 UTC, round 3 of
-**both** arms drops the E1-A item; never cut one arm only. No new simulation starts after 16:40 UTC. Decision 16:40-16:55.
-Calls: 2 arms x (28 + 26 + 26) = 160 (ledger 343 -> 503 of 789).
+**both** arms drops the E1-A and E1-AB items (path-case coverage then reported as INCOMPLETE: 2 of 3 reps); never cut
+one arm only. No new simulation starts after 16:40 UTC. Decision 16:40-16:55.
+Calls: 2 arms x 3 rounds x 28 = 168 (ledger 343 -> 511 of 789).
 
 ## Offline, in parallel (Methodology, `--dry`, no Freya): repeated extractions
 
