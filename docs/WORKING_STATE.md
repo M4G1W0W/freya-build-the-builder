@@ -96,6 +96,13 @@ restart the dossier workflow (wf_7488b64c-9bb); add eng.6/.7 to the evidence rev
   answer: latency, not agent logic (kit: 'the phone agent was slow'). Latency flaps: 14-37 s (12:01), 0-1.5 s
   (12:10), 14-54 s (12:37). **Queue stays PAUSED** (a rep now would measure hang-ups). Ledger +1: cum **312**.
 - **12:45 UTC USER: keep the queue paused for now.** No latency probes or other simulations until the user says so.
+- **13:05 UTC: FINAL-SELECTION EVIDENCE DOSSIER ready for the user: `docs/reviews/2026-10-11-final-selection-evidence.md`**
+  (9-agent read-only workflow, every claim checked against sources; §10 eng.6/.7/.8 addendum, adversarially checked
+  and corrected: Fix 1 PUB-05 closing-row defect, cand-eng.8 4267bb0 unmeasured, matched-comparison tiers T1-T4, cap
+  arithmetic after the E4 queue). Decisions D1-D11 in §8 belong to the user; defaults: nothing runs, nothing is
+  selected or tagged. Also found: `cand-retry.4` (d53fa0e) = G1 + platform retries, renders byte-identical to the
+  measured G1 agent (the measured fallback). Outcomes read at completion during the outage are provisional (the
+  platform re-judges completed simulations).
 - `queue.txt` restored: E4-A-styledA, E4-AB-all, E4-AB-xb, E4-VE (the runner had popped E4-A before its POST failed).
 - **Resume rule (user):** only after the endpoints recover AND one bounded smoke simulation gives a complete judged
   result: `.venv/bin/python -u scripts/run_cases_retry.py f166447e-2fc1-42d0-9794-643a8b881f8f --cases

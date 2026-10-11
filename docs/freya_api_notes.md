@@ -279,6 +279,10 @@ The live spec has **no descriptions** on agent-config fields, so field meanings 
     and can be there while the run still reads `analyzing` or ends `error`/`inconclusive` 'analysis never arrived'
     [C: 94c9e350 call 6af560aa; 6d0c9464 calls ed7f5328, babc4608]. Run verdict == call-record verdict on 50/50
     calls where both exist (43 from M3/M2 r3, 7 from 6d0c9464) [C, 11 Oct 12:20-12:29 UTC].
+  - **Outcomes can change after a simulation is `completed`**: the platform re-judges runs with no new calls
+    (6d0c9464: completed 12:26:29; updatedAt 12:34:43 -> 12:40:20 -> 12:51:11; outcomes pass 5/fail 1/error 6/
+    inconclusive 1 at 12:36 -> pass 8/fail 1/error 4 at 12:51; runs error->pass and inconclusive->pass) [C, Service
+    Check reads 11 Oct]. A score read right at completion during an outage is provisional.
   - `GET /simulations/{id}/iterations` gives passed, failed, inconclusive, error and analyzing counts, `passRate` and `agentVersionId`.
   - `GET /simulations/version-checks` and `GET /simulations/version-persona-runs` take `workspaceId` and `entityVersionId`.
   - `POST /simulations/{id}/rerun` starts a new iteration [C].
