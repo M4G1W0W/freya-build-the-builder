@@ -3,54 +3,68 @@
 Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **current** state. Before acting, check
 `date` and `git status` and compare them with the snapshot below.
 
-**Snapshot:** 2026-10-11 13:35 Istanbul (10:35 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
+**Snapshot:** 2026-10-11 14:25 Istanbul (11:25 UTC Sun). Last commit: see `git log`. Hidden briefs open Sun 11 Oct
 17:00 UTC (about 16 h from now). Tags: `good-pre-f1` = the builder before Saturday night's FACTS changes;
 `cand-f2` = bd4da7c (F2); `cand-f3` = a069dd2 (F3, the builder code at HEAD).
 
-## SIMULATION CHAT STATE (11 Oct 10:35 UTC; read this first after a context clear)
+## SIMULATION CHAT HANDOFF (11 Oct 11:25 UTC; read this first after a context clear)
 
-**Two chats now.** This one runs SIMULATIONS ONLY (queue, deploys of measurement slots, results, analysis). A separate
-ENGINE chat fixes the builder from `docs/plans/2026-10-11-engine-fixes-brief.md` on branch `cand-eng` (off
-`cand-final.1`) and hands fixes over as tags `cand-eng.N` (log: `docs/plans/2026-10-11-engine-fixes-log.md`).
-Detailed event log and results: `docs/plans/2026-10-11-overnight-report.md` (handoff at the top, event log below).
+**Roles.** This chat owns ALL deployments and simulations. The Methodology Developer (engine) chat fixes the
+builder on its own branches and hands over tags; its log is `docs/plans/2026-10-11-engine-fixes-log.md`
+(hand-off sections at lines ~57, ~125, ~197). Detailed event log/results: `docs/plans/2026-10-11-overnight-report.md`.
 
-**Candidate to measure next: `cand-final.1` = ca80d52** (worktree `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-final`): G1 83f8263 + identity fix v2 +
-builder platform retries + offer-wait fix + precedence ending_wins with 2 guards. 820 tests; offline checks and a
-fresh-clone `--dry` rehearsal passed. Not merged to main (user decision). NOT yet deployed or simulated.
+**State now: NOTHING is running, nothing new deployed.**
+- Current item stopped on the user's instruction: M5r2-ab1W-all-c5 (G1 fresh A+B build exp-ab1-w, M5 re-run reps 2-3
+  at concurrency 5). Client terminated 11:14:50 (exit 143); its simulation 6d0c9464 PUT `paused` at ~11:22 (API
+  confirmed). **It produced no valid rep:** rep 1 (sim 3d8c7da4, 10:12-~10:45) was discarded because PUB-02 and PUB-13
+  had no judge verdict (its judged calls: PUB-04, 06, 08, 12 failed, unclassified; see `runs/dev/r4/M5r2-ab1W-all-c5.log`);
+  the repeat (6d0c9464) was stopped before its results were collected.
+- Runner `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh` has exited; `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/STOP` is SET. Ledger `runs/dev/r4/calls.tsv`: **257 calls** (M5r2
+  counted 26 = 2 simulations launched). CAP in qrun4.sh is 500. Last credits reading ~406 (10:09).
+- Platform: outage 09:38-10:08 UTC, badly degraded since (GETs 504 after ~60 s, list endpoint 500/504, a 13-call rep
+  took ~33 min instead of ~4, judge verdicts missing). Check with `.venv/bin/python scripts/credits.py "check"`.
 
-**Queue (user decision 10:33: measure cand-final first, but do not start until the user says so):**
-- Runner: `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh` (CAP 500; queue `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt` "name slot casefile reps"; slot table
-  `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/slots.tsv`; output `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.out`; ledger `runs/dev/r4/calls.tsv` + `<name>.meta.json` sidecars).
-  `STOP` file is SET: the runner stops after the item now running (M5r2-ab1W-all-c5: M5 re-run reps 2-3 at concurrency
-  5 on exp-ab1-w, simulation 3d8c7da4; the platform was very slow at 10:31: 3/13 calls done after 19 min).
-- `scripts/run_cases_retry.py` (every item uses it): GET retries ~17 min, health gate before start, auto-pause of stuck
-  simulations (standing user approval), one automatic repeat of a rep without judge verdicts, concurrency 5 (kit
-  default; 13 caused latency hang-ups on A+B).
-- Staged order: FINAL-A-styledA (exp-final-a, styled-a x3), FINAL-AB-all (exp-final-ab, styled-ab-all x3),
-  FINAL-AB-xb (exp-final-ab, styled-extra-b x3), then O4 (precedence fresh builds), identity A/B (exp-i12-a vs
-  exp-g1-a), offer-wait A/B (exp-idw-a vs exp-i12-a), M2 extra-B re-run, O1. Old order saved as queue-before-reorder.txt.
-- **To start (only on the user's go):** (1) deploy the two slots from wt-final:
-  `cd /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-final && set -a && . ./.env && set +a && uv run python builder/build.py "$R/kit/briefs/brief-a.md" "$R/kit/tools/openapi.json" --spec "$R/runs/dev/spec-a-llm.json" --slot exp-final-a`
-  and the same with `"$R/kit/briefs/brief-a.md" "$R/kit/briefs/brief-b.md"` + `--spec "$R/runs/dev/spec-ab-llm-c45758f.json" --slot exp-final-ab`
-  (R = repo root; exit 3 with only a chat 504 = deployed; see RUNBOOK). (2) Add both to slots.tsv (agent id, workflow
-  id, version 1, build cand-final.1 ca80d52, spec path). (3) Export check: `freya.export_workflow(<wf>, runs/dev/r4/exports/<slot>.json)`,
-  render with `--dry` into `runs/dev/r4/renders/<slot>.json`, `python3 runs/dev/r4/exportdiff.py <slot> <render> <export>`
-  (0 changed, 0 render-only). (4) `rm /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/STOP; bash /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh >> /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.out 2>&1` (background).
-- Matched controls: styled-a: M3 G1 exp-g1-a 10/10 strict (`runs/dev/r4/M3-G1-styledA.json`), F2 v8 8/10
-  (`runs/dev/r3/styledA-a2-bd4da7c.json`); styled-ab-all: M2 F2 v14 dev-ab-llm 8/13 (reps 1-2 in `M2-ABv14-all.log`,
-  rep 3 `M2-ABv14-all-r3.json`), same saved spec as exp-final-ab; extra-B: M2 (partly unjudged) and M5.
-- Ledger: 231 calls before M5r2 (+26 when it ends). Credits ~406 at 10:09.
+**Candidate selection comes FIRST (user, after the context restore), then deployment.** All engine tags are UNMEASURED.
+| Tag | Commit | Branch | What |
+|---|---|---|---|
+| `cand-final.1` | ca80d52 | cand-final | G1 + identity fix v2 + builder retries + offer-wait fix + precedence (ending_wins + 2 guards); 820 tests; offline checks + fresh-clone `--dry` rehearsal passed |
+| `cand-eng.4` | cfa4d9d | cand-eng-safe | cand-eng.3 + review-2 fixes (01b7a80) + fixtures (variant-e brief, 4 cases); 859 tests; prompts for A, A+B, raw-A byte-identical to cand-final.1 (code nodes differ); single-product FACTS/setup equal cand-final.1 on 8000 states each |
+| `cand-eng.5` | 27f5647 | cand-eng | cand-eng.4 + item 3 (PUB-12 multi-product paragraph, 4006d5c); 861 tests; changes Brief B FACTS by design |
+| `cand-eng.3` | 57e6e66 | | **superseded** (do not measure) |
+Engine items in cand-eng.4/5: all-at-once verify_identity (6c80c5d, d54a850); a brief's own "too much" rule
+(0267b60, 17eddb0, 01b7a80/c737844); "this <weekday>" from the brief (fd705de); percentage floor half-up, hint, stdout
+flush (57e6e66). The engine chat's measurement request (log ~:197): cand-eng.5 vs cand-eng.4 (or cand-final.1) on
+styled-extra-b x3 (PUB-12 target) and styled-b x3, fresh A+B builds, strict 3/3; adopt eng.5 only if PUB-12 reaches
+3/3 and no B case falls below; also verify the A set. Behavioural cases for the new paths:
+`tests/fixtures/cases/eng-variant-e.json` with an agent built from `tests/fixtures/briefs/variant-e.md` + kit openapi.
+Engine note: the styled-extra-b PUB-12 check "asks for no payment on it" is misread by the judge (official wording:
+"takes no promise"); rewording that fixture is the user's call.
 
-**Measured so far (strict 3/3 per case, raw):** M1 PUB-06 block: G1 3/4 cases, G2 2/4, F2 1/4 (W = G1). M3 G1
-styled-a 10/10 vs F2 8/10. M4 G1 fresh raw-A 8/10 (PUB-06 r3 agent-caused re-offer -> blocked G1 under the
-binding rule; offer-wait fix targets it). M5 G1 fresh A+B 7/13 vs M2 F2 8/13, but its new failures were latency
-hang-ups at concurrency 13 (re-run pending). M2 A+B control 8/13. PUB-12 extra-B fails on every build (Brief B gap,
-engine item 3).
+**Queue staged (not started):** `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/queue.txt` begins FINAL-A-styledA (exp-final-a), FINAL-AB-all and
+FINAL-AB-xb (exp-final-ab) for cand-final.1, then O4, identity A/B, offer-wait A/B, M2 extra-B re-run, O1
+(old order in queue-before-reorder.txt). **After the user selects the candidate, re-point these lines** to slots built
+from that tag (e.g. exp-eng4-a / exp-eng4-ab), and drop or keep the component A/Bs as the user decides.
 
-**11:12 UTC update:** M5r2 rep 1 (sim 3d8c7da4, 10:12-~10:45) had 2 unjudged calls -> discarded and repeated (sim 6d0c9464, running since ~10:46; Freya GETs 504 at 11:12); rep 2 not started. cand-final still not deployed (waiting for the user's go). At ~30 min per 13-call rep, the 78-call cand-final set would take ~3 h.
+**Deploy + start procedure (only on the user's go):**
+1. Worktree for the chosen tag (cand-final.1 already has `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-final`; for an engine tag:
+   `git worktree add /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/wt-<tag> <tag>` then symlink `.env` and `.freya-agents.json` from the main tree).
+2. From that worktree: `set -a; . ./.env; set +a; uv run python builder/build.py "$R/kit/briefs/brief-a.md" "$R/kit/tools/openapi.json" --spec "$R/runs/dev/spec-a-llm.json" --slot <slot-a>`
+   and with `"$R/kit/briefs/brief-a.md" "$R/kit/briefs/brief-b.md"` + `--spec "$R/runs/dev/spec-ab-llm-c45758f.json" --slot <slot-ab>`
+   (saved specs: matched to the M2/M3 controls). Exit 3 with only a chat 503/504 = deployed (RUNBOOK). For the
+   engine's "fresh build" requests, build without `--spec` (fresh extraction) into separate slots.
+3. Add the slots to `/private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/slots.tsv` (name, agent id, workflow id, 1, build tag+commit, spec path).
+4. Export check: `freya.export_workflow(<wf>, runs/dev/r4/exports/<slot>.json)`; `--dry` render into
+   `runs/dev/r4/renders/<slot>.json`; `python3 runs/dev/r4/exportdiff.py <slot> <render> <export>` (0 changed, 0 render-only).
+5. Edit the queue, `rm /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/STOP`, start `bash /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun4.sh >> /private/tmp/claude-501/-Users-atlasdenizakbulut-Desktop-Freya-Hackathon/ababcede-be05-48a1-9009-b4b2dae0baeb/scratchpad/sim/qrun.out 2>&1` in the background,
+   re-arm a monitor on qrun.out ("done |CAP:|Traceback").
+- `scripts/run_cases_retry.py` (a5f1514): GET retries ~17 min, health gate before start, auto-pause of stuck
+  simulations (standing user approval), one repeat of a rep without judge verdicts, concurrency 5.
 
-**Platform:** outage 09:38-10:08 UTC; degraded after (list endpoint 500/504, slow runs, chat 504s). Check with
-`.venv/bin/python scripts/credits.py "check"` before blaming code.
+**Matched controls:** styled-a: M3 G1 exp-g1-a 10/10 (`runs/dev/r4/M3-G1-styledA.json`), F2 v8 8/10
+(`runs/dev/r3/styledA-a2-bd4da7c.json`); styled-ab-all: M2 F2 v14 dev-ab-llm 8/13 (`M2-ABv14-all.log` reps 1-2,
+`M2-ABv14-all-r3.json`); extra-B: M2 (partly unjudged), M5. Measured so far: M1 W=G1; M3 G1 10/10; M4 G1 fresh
+raw-A 8/10 (PUB-06 agent re-offer, which the offer-wait fix targets); M5 G1 fresh A+B 7/13 (latency hang-ups at
+concurrency 13; no valid re-run); PUB-12 extra-B fails on every build (engine item 3 in cand-eng.5).
 
 ## TONIGHT: execute the APPROVED overnight plan v2 (start here)
 
