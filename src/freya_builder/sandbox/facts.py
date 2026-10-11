@@ -493,12 +493,15 @@ def _product(k, raw, today, C, vs):
             + (" (ONE offer only)" if allowed == 1 else "")
         )
         afns = C.get("fn_attempt") or []
+        first = None
         for ai, attempt in enumerate(C.get("attempts") or []):
             n = int(attempt.get("n") or 0)
             names = attempt.get("bands") or []
             if n > allowed or (names and band.get("name") not in names) or ai >= len(afns):
                 continue
             when = _ev(afns[ai], today, deadline, days_late)
+            if first is None:
+                first = (attempt.get("amount"), when)
             plan.append(
                 str(n)
                 + ") "
@@ -512,6 +515,20 @@ def _product(k, raw, today, C, vs):
             if when is not None and deadline is not None and when > deadline:
                 line += " (after the deadline)"
             lines.append(line + ": " + _attempt_amount(attempt.get("amount"), past_due, floor))
+        if (
+            first is not None
+            and first[0] == "full_or_floor"
+            and first[1] is not None
+            and floor is not None
+        ):
+            lines.append(
+                "- IF THE CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH before your first offer: offer"
+                + " exactly the floor "
+                + _amount(floor)
+                + " on "
+                + _ds(first[1])
+                + "; this IS attempt 1 (no other date: not today unless that is this date)"
+            )
         if allowed > 0:
             lines.append(
                 "- after attempt "

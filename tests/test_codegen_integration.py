@@ -118,13 +118,12 @@ def test_facts_state_when_offers_must_stop():
     )
 
 
-def test_attempt_1_line_names_the_floor_and_its_date_without_a_separate_too_much_line():
+def test_attempt_1_line_names_the_floor_and_its_date_with_a_too_much_line():
     # 676e9df styled PUB-06: the floor was offered "today", then again on attempt 1's date. The
     # attempt-1 line says the floor and the date, and the negotiate ATTEMPTS line says a floor offer
-    # after "too much" is attempt 1 on attempt 1's date. The separate "IF THE CUSTOMER SAYS THE FULL
-    # AMOUNT IS TOO MUCH" line (35c030a) is gone: with it the model answered PUB-07's holiday with the
-    # after-deadline line (exp07: 5 of 6 calls) and offered the floor on a cut-off "can't afford"
-    # (styled-ab-a PUB-09 r1, c45758f).
+    # after "too much" is attempt 1 on attempt 1's date. G1 (cand-g1) restores a separate "IF THE
+    # CUSTOMER SAYS THE FULL AMOUNT IS TOO MUCH" line that names the floor and attempt 1's date
+    # (F1 removed the older version of it; without it F1-F3 offered the floor "today" on PUB-06).
     card = {
         "product_id": "p1",
         "type": "credit_card",
@@ -136,7 +135,8 @@ def test_attempt_1_line_names_the_floor_and_its_date_without_a_separate_too_much
     facts = _account(SPEC_A, "2026-10-14T11:00", card)
     line = next(x for x in facts.splitlines() if x.startswith("- attempt 1, on "))
     assert "2026-10-16 (Friday 16 October 2026)" in line and "the floor 637.50" in line
-    assert "SAYS THE FULL AMOUNT IS TOO MUCH" not in facts
+    too = next(x for x in facts.splitlines() if "SAYS THE FULL AMOUNT IS TOO MUCH" in x)
+    assert "exactly the floor 637.50 on 2026-10-16" in too and "this IS attempt 1" in too
     # F1 styled PUB-06 r2, r3 (15bcbad): without that line the floor was offered "today" again.
     # The rule now sits in the two lines that already carry attempt 1's date.
     assert "either amount only on this date (not today, unless today is this date)" in line
