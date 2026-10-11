@@ -1,0 +1,238 @@
+[
+ {
+  "id": "PUB-11",
+  "case_key": "XB-PUB-11",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "X-B1 Refuses all three",
+  "variables": {
+   "first_name": "Sofia",
+   "last_name": "Almeida",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1987-06-03",
+   "phone_last4": "2288"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "2288",
+    "past_due": 220.0,
+    "days_late": 9,
+    "minimum_payment": 66.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 640.0,
+    "days_late": 9,
+    "instalment_amount": 213.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 75.0,
+    "days_late": 3,
+    "instalment_amount": 25.0
+   }
+  ],
+  "script": "Gives both security answers correctly. Cannot pay anything today. Flatly refuses to pay any of the three products, whatever is offered, without giving a reason.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "refused",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p2",
+     "reason": "refused"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "all three products stated before any ask; paying today is asked once, not again per product",
+   "credit card: the full 220 on Friday 16 October, then 66 on Friday 23 October",
+   "personal loan: the full 640 on Friday 16 October, then 213 on Friday 23 October",
+   "car loan: exactly one attempt, the full 75 on Friday 16 October",
+   "no offer repeated after a refusal, and an add_note with reason refused for each of the three products"
+  ],
+  "derivation": {
+   "rules": [
+    "A18",
+    "A24",
+    "A25",
+    "A30",
+    "A31",
+    "B3",
+    "B4",
+    "B5",
+    "B8",
+    "B-Closing"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card days_late 9 -> late, 2 attempts, deadline 2026-10-23, floor 66.0; p2 personal loan days_late 9 -> late, 2 attempts, deadline 2026-10-23, floor 213.0; p3 car loan days_late 3 -> early, 1 attempt. B4: each product starts at attempt 1 = full amount on the last BD of this week, Fri 2026-10-16; attempt 2 (late only) = floor on 2026-10-23. All refused -> B8 add_note refused for p1, p2, p3. No promise; not every note is paid -> no_promise with the reason of the first product in get_account order whose note is not paid = p1 refused.",
+   "ambiguities": "Refusing to pay is not 'does not want to talk' (A45), so no early close; the ledger is the same either way."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-12",
+  "case_key": "XB-PUB-12",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "X-B2 Paid, disputed, refused",
+  "variables": {
+   "first_name": "Marcus",
+   "last_name": "Bell",
+   "title": "Mr",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1983-10-19",
+   "phone_last4": "4410"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "9015",
+    "past_due": 510.0,
+    "days_late": 16,
+    "minimum_payment": 153.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 1320.0,
+    "days_late": 16,
+    "instalment_amount": 440.0
+   },
+   {
+    "type": "car_loan",
+    "past_due": 140.0,
+    "days_late": 7,
+    "instalment_amount": 46.0
+   }
+  ],
+  "script": "Gives both security answers correctly. Says the credit card's overdue amount was already paid yesterday. Says the personal loan is not theirs: they never had a personal loan with this bank. Flatly refuses to pay the car loan, whatever is offered.",
+  "expected": {
+   "outcome": "no_promise",
+   "reason": "dispute",
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "dispute"
+    },
+    {
+     "product_id": "p3",
+     "reason": "refused"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "the agent says payments can take one business day to appear and takes no promise on the credit card",
+   "the agent does not argue about the personal loan and takes no promise on it",
+   "car loan: exactly one attempt, the full 140 on Friday 16 October, and no further offer after the refusal",
+   "the call continues after the paid and dispute claims",
+   "one add_note per product: credit card paid, personal loan dispute, car loan refused"
+  ],
+  "derivation": {
+   "rules": [
+    "A30",
+    "A31",
+    "A39",
+    "A40",
+    "B4",
+    "B8",
+    "B9",
+    "B-Closing"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 credit card: overdue amount already paid yesterday -> A39 (payment of this past-due amount) -> note p1 paid. p2: 'never had a personal loan' -> A40 dispute -> note p2 dispute. p3 car loan days_late 7 -> early band, 1 attempt: full 140.0 on Fri 2026-10-16 refused -> A31 stop, note p3 refused. B9: the call continues after each claim. No promise; not all paid -> first product in get_account order whose note is not paid = p2 -> no_promise/dispute.",
+   "ambiguities": "A40: a claim that a product was paid off in the past is a dispute; here the script says the overdue amount was paid yesterday, which is A39 (paid)."
+  },
+  "oracle": "D1/D2 exact match"
+ },
+ {
+  "id": "PUB-13",
+  "case_key": "XB-PUB-13",
+  "brief": "B",
+  "family": "Multi-product",
+  "level": "hard",
+  "title": "X-B3 Both already paid",
+  "variables": {
+   "first_name": "Elena",
+   "last_name": "Rossi",
+   "title": "Ms",
+   "now": "2026-10-14T11:00"
+  },
+  "identity": {
+   "date_of_birth": "1991-01-08",
+   "phone_last4": "6604"
+  },
+  "products": [
+   {
+    "type": "credit_card",
+    "card_last4": "6604",
+    "past_due": 300.0,
+    "days_late": 4,
+    "minimum_payment": 90.0
+   },
+   {
+    "type": "personal_loan",
+    "past_due": 900.0,
+    "days_late": 20,
+    "instalment_amount": 300.0
+   }
+  ],
+  "script": "Gives both security answers correctly. Says both the credit card and the personal loan overdue amounts were paid in full this morning.",
+  "expected": {
+   "outcome": "paid",
+   "reason": null,
+   "promises": [],
+   "notes": [
+    {
+     "product_id": "p1",
+     "reason": "paid"
+    },
+    {
+     "product_id": "p2",
+     "reason": "paid"
+    }
+   ],
+   "callbacks": [],
+   "transfers": []
+  },
+  "checks": [
+   "both products stated before any ask",
+   "the agent says payments can take one business day to appear",
+   "an add_note with reason paid for each of the two products"
+  ],
+  "derivation": {
+   "rules": [
+    "A39",
+    "B2",
+    "B8",
+    "B9",
+    "B-Closing"
+   ],
+   "calc": "Calendar from now = Wed 2026-10-14 (today, not counted): Thu 10-15 BD1, Fri 10-16 BD2, Sat 10-17/Sun 10-18 weekend, Mon 10-19 BD3, Tue 10-20 BD4, Wed 10-21 BD5, Thu 10-22 BD6, Fri 10-23 BD7, Sat 10-24/Sun 10-25 weekend, Mon 10-26 Freya holiday (skipped), Tue 10-27 BD8, Wed 10-28 BD9, Thu 10-29 BD10, Fri 10-30 BD11, Sat 10-31/Sun 11-01 weekend, Mon 11-02 BD12. Late-band deadline (A18, 7th BD) = 2026-10-23; early-band deadline (A18, 12th BD) = 2026-11-02. This week = Mon 10-12..Sun 10-18, its last business day = Fri 10-16 (A30 attempt 1 date). p1 and p2: overdue amounts paid in full this morning -> A39 for each -> add_note p1 paid, p2 paid (B8). No promise recorded and every product is noted paid -> B closing: outcome paid, no reason.",
+   "ambiguities": ""
+  },
+  "oracle": "D1/D2 exact match"
+ }
+]
