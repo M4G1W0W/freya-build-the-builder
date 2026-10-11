@@ -97,6 +97,8 @@ call ledger `calls.tsv`, exports/renders, provenance.md, precedence-report.md.
 | 09:22 | **M5: G1 fresh single-file A+B build (exp-ab1-w) on styled-ab-all x3 = 7/13 strict** vs M2 control (F2 v14) 8/13; newly failing PUB-04, PUB-10, PUB-11 (x2). All 4 newly failing calls are customer hang-ups after 20-60 s agent turns (PUB-04 r1 19.6 s; PUB-11 r1 51.6 s; PUB-10 r3 59.9 s; PUB-11 r3 59.5 s, mostly right after create_promise); rep 3 was discarded once for slowness (median 28 s) and its repeat kept at 11 s. M2 at concurrency 5 had 2-7 s. Reading: latency from concurrency 13 (+ platform degradation), not agent logic |
 | 09:25 | User decisions: concurrency back to 5 (82c0b7b) from the next item; **re-run M5 x3 at 5** (39 calls) first; runner handover to qrun3 (CAP 450). Offer-wait fix being implemented on branch cand-idw (off cand-id.5), proposal `docs/proposals/2026-10-11-offer-wait-fix.md` |
 | 09:27 | M5 extra-B (exp-ab1-w, styled-extra-b x3, concurrency 13): PUB-11 2/3 (r2 not_verified/declined in identity: I2), PUB-12 0/3 (judge: car loan asked "today" again after the opening question / no persuasion attempt on the car loan), PUB-13 3/3; vs M2 control 1/3, 0/3, 2/3 (partly unjudged): nothing newly failing. **PUB-12 extra-B fails on every build (F2 and G1, all reps): a consistent Brief B gap (rule 4 no today re-ask per product; per-product attempt on the early-band car loan)** |
+| 09:12-09:33 | **Offer-wait fix implemented** (user instruction) on branch `cand-idw` off cand-id.5: b726812 (cand-idw.1) -> 3 verifier lenses (all PASS-WITH-ISSUES; 7 HIGH/MED) -> fix round 9e3c6f0 (cand-idw.2: dates/amounts inside small talk are part of the remark; "maybe"/"we'll see" are non-answers; answer any other question and stop, never re-ask) -> recheck LOW only -> 7c2a0e4 (cand-idw.3: two wording LOWs). 795 passed; render vs cand-id.5 differs only in system_prompt and nodes.negotiate.task_message (A, A+B, raw-A specs) |
+| 09:34 | exp-idw-a deployed (agent 363717a9, wf 347b82c3) from cand-idw.3, `--spec spec-a-llm`; dry-run PASS, saved; **chat smoke test FAIL after the new retries (3x 504, chat endpoint degraded all morning) -> exit 3 = agent saved**. Export check pending (GET /workspaces 504s; retrying with long backoff). Offer-wait A/B (54 calls) queued after the identity A/B, before O1 (user decision); runner handover to qrun4 (CAP 500) |
 | 02:00 | G1 candidate review: PROMOTE-WITH-CAVEATS (`runs/dev/r4/g1-review.md`) |
 | 02:02 | Identity regression cases (D1/D2 4/4 exact) committed ffab7f3: `tests/fixtures/cases/identity-rd.json` |
 | 02:04-02:23 | Identity-fix design v1 (f6f4824) -> 3 adversarial reviews, all ADOPT-WITH-AMENDMENTS (888fcdc) -> v2 resolving every HIGH/MED point (55cec38): `docs/proposals/2026-10-11-identity-fix-v2.md`. Not implemented |
@@ -130,6 +132,12 @@ Rule 26 "offer the floor, once": a 2nd small-talk turn after the dated floor off
 promote G1 anyway (its PUB-06 record 8/9 vs F2 2/6 on the same case), or fix the ATTEMPTS gap first (generic: after an
 offer, any number of turns that are only small talk or cut off get "Please go on."/a short acknowledgement and never a
 repeated offer) and re-measure PUB-06 talkative.
+
+## Sunday RUNBOOK note (09:37): exit 3 with a chat 504
+With the chat endpoint degraded, a build can end exit 3 ("agent saved, smoke test failed") purely because POST
+/api/v2/chat/message returns 504 while simulations work. If the trace shows CREATED/saved, platform dry-run PASS and
+only the smoke test failing with 504/503, the agent is deployed; re-running costs build time (tie-break) and adds no
+information. Update `docs/RUNBOOK.md` before the freeze.
 
 ## Demonstrated correctness gaps (morning proposals; generic; NOT implemented overnight)
 1. **Identity: a complete security answer inside a cut-off message is not submitted** (LEDGER failures: M1 G1 r3
