@@ -26,6 +26,21 @@ ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand
 - `cand-final.2` not tagged yet (`cand-final-2-work` = 3abfd22 at 16:28). **16:30: Methodology tagged `cand-final.2` =
   3abfd22** (941 passed; merge with main clean). Freeze decision (new tag vs moving `freeze-final`) = the user's.
 
+## UPDATE 17:05 UTC: FROZEN `freeze-final-2` = cand-final.4 e2635e9, merged into main; repo pushed
+
+- **Build the final from `main` (builder code == `freeze-final-2`).** cand-final.4 = cand-final.3 + date-language fix
+  (language.localize_dates: for a non-English call the negotiate step says FACTS dates in the call language, not 'as
+  written'; English byte-identical). Verified (`verify_tag.sh`, log verify-cf4.log): 947 tests; spec-a-llm render
+  byte-identical to cand-final.2; Turkish folder --dry ok=True, prompt 15,310 chars, no contract in the BANK BRIEF,
+  negotiate has no 'as written' and says 'said in Turkish'. Merge 38a076d: 947 passed, ruff clean.
+- **Prepared, NOT adopted (user decides):** `cand-final-dates` 385b326 (fix (a): upper-case/diacritic-less Turkish months
+  in `now`; +137 bytes per facts node) -> adopt only if the final data's `now` is worded that way. `cand-final-3-work`
+  0f943d4 (customer_field, xlsx, docx, unknown suffix, PDFKit, contract normalisation, ...; needs a rebase onto .4).
+- **Size watch (Methodology):** 40,000 bytes per code node is OUR test guard, not a documented platform limit. Turkish
+  1-product spec: account_facts 39,632 bytes; 3-product + Turkish months can pass 40 KB. The real build's platform
+  dry-run/save shows whether Freya accepts it.
+- Repo https://github.com/M4G1W0W/freya-build-the-builder (private): main + tag `freeze-final-2` pushed.
+
 ## UPDATE 16:57 UTC: cand-final.3 VERIFIED; user D5 = cand-final.4 (date-language fix) then freeze; D9 = private repo
 
 - **cand-final.3 = 4cd9e92** (user go 16:50: folder-as-brief fix ONLY; Methodology): folder input -> `_prompt_brief` =
