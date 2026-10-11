@@ -14,6 +14,7 @@ from .spec import (
     PLACEHOLDER,
     call_var,
     customer_field,
+    early_lines,
     identity_all_at_once,
     too_much_separate,
 )
@@ -71,6 +72,36 @@ def _note_rows(spec: dict, note_reasons: tuple[str, ...]) -> dict[str, str]:
 
 def exit_tool_name(row_id: str) -> str:
     return f"transition_to_ev_{row_id}"
+
+
+def _split_early_lines(spec: dict) -> dict:
+    """Moves early_lines out of the endings' "First say" lists into each step's rules, said once.
+
+    A spec without them is returned unchanged, so its render is byte-identical.
+    """
+    early = early_lines(spec)
+    if not early:
+        return spec
+    rules = dict(spec["stage_rules"])
+    for stage in STAGES:
+        groups: dict[tuple[str, ...], list[str]] = {}
+        for r in _rows_for(spec, stage):
+            if r["id"] in early:
+                groups.setdefault(tuple(early[r["id"]]), []).append(exit_tool_name(r["id"]))
+        if groups:
+            rules[stage] += (
+                "\nSAID BEFORE THE CUSTOMER ANSWERS: say these once, when the situation comes up, "
+                "and never again in the goodbye:\n"
+                + "\n".join(
+                    f"- {' '.join(_quote(s) for s in says)} (before {' or '.join(exits)})"
+                    for says, exits in groups.items()
+                )
+            )
+    rows = [
+        dict(r, say_before_end=[s for s in r["say_before_end"] if s not in early.get(r["id"], [])])
+        for r in spec["rows"]
+    ]
+    return dict(spec, rows=rows, stage_rules=rules)
 
 
 def _endings_text(spec: dict, stage: str) -> str:
@@ -532,7 +563,7 @@ def opening_line(spec: dict) -> str:
 
 
 def render(spec: dict, tools: list[Tool], brief_text: str = "") -> dict:
-    spec = dict(spec, _customer_field=customer_field(spec, tools))
+    spec = dict(_split_early_lines(spec), _customer_field=customer_field(spec, tools))
     by = _tools_by_name(tools)
     k = codegen._slots(spec)
     notes = bool(spec["notes"]["used"]) and "add_note" in by

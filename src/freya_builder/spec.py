@@ -610,6 +610,41 @@ def too_much_separate(spec: dict) -> bool:
     return too_much(spec)["offer"] == "separate"
 
 
+def _words(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
+
+
+def early_lines(spec: dict) -> dict[str, list[str]]:
+    """Per row id, the say_before_end sentences said BEFORE the customer answers, not at the end.
+
+    An ending's sentences are said in the goodbye message together with its transition, so such a
+    sentence was said twice and a question could never be answered (Fix 1 audit: the support offer
+    question and the sympathy line in both the accept and the decline ending, "Can I help you
+    first?" in the human-transfer ending; 9 of 16 fresh extractions, 0 of 13 before Fix 1). Early:
+    a question, or a sentence shared by a transfer ending and a non-transfer ending (said before the
+    customer picks one of them), unless it is common to every ending of one step (a closing line).
+    """
+    rows = spec["rows"]
+    sayers: dict[str, list[dict]] = {}
+    for r in rows:
+        for s in r["say_before_end"]:
+            sayers.setdefault(_words(s), []).append(r)
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        for s in r["say_before_end"]:
+            shared = sayers[_words(s)]
+            ids = {x["id"] for x in shared}
+            mixed = len({bool(x["queue"]) for x in shared}) == 2
+            common = any(
+                {q["id"] for q in rows if p in q["phases"]} <= ids
+                for x in shared
+                for p in x["phases"]
+            )
+            if s.strip().endswith("?") or (mixed and not common):
+                out.setdefault(r["id"], []).append(s)
+    return out
+
+
 def _lower(names: list[str]) -> set[str]:
     return {n.lower() for n in names}
 
