@@ -2,66 +2,78 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { findCard, serve } from "../src/services.js";
 
-// Synthetic pack in the shape of a test-customer file (no case data).
+// Synthetic pack and config in the shape of the real ones (no case data).
 const PACK = {
   customers: [
     {
       customerNo: "10000001",
       services: {
-        "lib.list": { http: 200, response: { data: { items: ["A"] } } },
-        "lib.item": {
+        "x.list": { http: 200, response: { data: { cards: ["A"] } } },
+        "x.balance": {
           "111111******2222": { http: 200, response: { data: { due: "01.01.2027" } } },
-          "111111******3333": { http: 500, response: { result: { code: "E" } }, delaySeconds: 2 },
+          "222222******2222": { http: 500, response: { result: { code: "E" } }, delaySeconds: 2 },
         },
-        "lib.renew": { "111111******2222": { "2": { http: 200, response: { ok: true } } } },
-        "lib.old": { "111111******2222": { http: 200, yanit: { old: true }, gecikmeSaniye: 3 } },
+        "x.week": { "111111******2222": { "2": { http: 200, response: { ok: true } } } },
       },
     },
+    { customerNo: "10000002", services: { "x.list": { http: 200, yanit: { old: true }, gecikmeSaniye: 3 } } },
   ],
 };
-const ROUTES = {
-  "lib.list": { method: "POST", path: "/svc/list", customer: "memberNo" },
-  "lib.item": { method: "POST", path: "/svc/item", customer: "memberNo", card: "itemNo" },
-  "lib.renew": { method: "POST", path: "/svc/{memberNo}/renew", customer: "memberNo", card: "itemNo", week: "week" },
-  "lib.old": { method: "GET", path: "/svc/old", customer: "memberNo", card: "itemNo" },
-  "lib.unset": { method: "POST", path: "", customer: "memberNo" },
+const CFG = {
+  base: ["/voice/v1", ""],
+  errorOrigin: "test",
+  services: {
+    "x.list": { by: ["customerNo"], required: ["customerNo"], notFound: "NF_LIST" },
+    "x.balance": { by: ["cardNumber"], required: ["cardNumber"], notFound: "NF_BAL" },
+    "x.week": { by: ["cardNumber", "newStatementWeek"], required: ["cardNumber", "newStatementWeek"], notFound: null },
+    "x.mail": { by: ["customerNo"], required: ["customerNo", "kind"], notFound: null },
+  },
+  fieldLabels: { cardNumber: "card number" },
+  codes: {
+    INVALID_ARGUMENTS_ERROR: { status: 400, type: "ERROR", message: "invalid" },
+    NF_LIST: { status: 404, type: "WARNING", message: "no card" },
+    NF_BAL: { status: 404, type: "WARNING", message: "card not found" },
+  },
 };
-const ERR = {
-  unknownCustomer: { status: 404, body: { e: "cust" } },
-  notAvailable: { status: 404, body: { e: "svc" } },
-  unknownCard: { status: 404, body: { e: "card" } },
-  unknownWeek: { status: 400, body: { e: "week" } },
-};
-const call = (m, p, q, b) => serve(PACK, ROUTES, ERR, m, p, q, b);
+const call = (path, data, method = "POST") => serve(PACK, CFG, method, path, { data, call: { ani: "x", lang: "tr" } }, "g");
 
-test("a customer's documented answer, status and body", () => {
-  const r = call("POST", "/svc/list", {}, { memberNo: "10000001" });
-  assert.deepEqual([r.status, r.body, r.service, r.delaySeconds], [200, { data: { items: ["A"] } }, "lib.list", 0]);
+test("documented answer by customer number (string or number), under every base path", () => {
+  for (const p of ["/voice/v1/x.list", "/x.list", "/x.list/"]) {
+    const r = call(p, { customerNo: 10000001 });
+    assert.deepEqual([r.status, r.body, r.service], [200, { data: { cards: ["A"] } }, "x.list"]);
+  }
+  const old = call("/x.list", { customerNo: "10000002" });
+  assert.deepEqual([old.body, old.delaySeconds], [{ old: true }, 3]);
 });
 
-test("card by exact key, by last four digits, and an error status with its delay", () => {
-  assert.deepEqual(call("POST", "/svc/item", {}, { memberNo: "10000001", itemNo: "111111******2222" }).body, { data: { due: "01.01.2027" } });
-  assert.deepEqual(call("POST", "/svc/item", {}, { memberNo: 10000001, itemNo: "1111********2222" }).body, { data: { due: "01.01.2027" } });
-  const r = call("POST", "/svc/item", {}, { memberNo: "10000001", itemNo: "3333" });
+test("card found across customers: exact, then by visible digits; the error entry keeps its status and delay", () => {
+  assert.deepEqual(call("/x.balance", { cardNumber: "111111******2222" }).body, { data: { due: "01.01.2027" } });
+  assert.deepEqual(call("/x.balance", { cardNumber: "1111********2222" }).body, { data: { due: "01.01.2027" } });
+  const r = call("/x.balance", { cardNumber: "222222******2222" });
   assert.deepEqual([r.status, r.delaySeconds], [500, 2]);
-  assert.equal(findCard({ "1111": 1, "x1111": 2 }, "991111"), null); // ambiguous last four -> no card
+  assert.equal(findCard(["111111******2222", "222222******2222"], "2222"), null); // last four alone is ambiguous
+  assert.equal(findCard(["111111******2222", "111122******2222"], "1111********2222"), null); // two prefixes fit
 });
 
-test("path params, week key, and the pack's alternative field names (yanit, gecikmeSaniye)", () => {
-  assert.deepEqual(call("POST", "/svc/10000001/renew", {}, { itemNo: "2222", week: 2 }).body, { ok: true });
-  const r = call("GET", "/svc/old", { memberNo: "10000001", itemNo: "2222" }, null);
-  assert.deepEqual([r.body, r.delaySeconds], [{ old: true }, 3]);
+test("week entry by number or string; the card's current week (no entry) -> 400 INVALID_ARGUMENTS_ERROR", () => {
+  assert.deepEqual(call("/x.week", { cardNumber: "111111******2222", newStatementWeek: 2 }).body, { ok: true });
+  const r = call("/x.week", { cardNumber: "111111******2222", newStatementWeek: "1" });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.result.code, "INVALID_ARGUMENTS_ERROR");
+  assert.equal(r.body.data, undefined);
 });
 
-test("documented errors for unknown customer, card, week, and a service the customer lacks", () => {
-  assert.deepEqual(call("POST", "/svc/list", {}, { memberNo: "999" }).body, { e: "cust" });
-  assert.deepEqual(call("POST", "/svc/item", {}, { memberNo: "10000001", itemNo: "9999" }).body, { e: "card" });
-  assert.deepEqual(call("POST", "/svc/10000001/renew", {}, { itemNo: "2222", week: 5 }).body, { e: "week" });
-  const pack2 = { customers: [{ customerNo: "1", services: {} }] };
-  assert.deepEqual(serve(pack2, ROUTES, ERR, "POST", "/svc/list", {}, { memberNo: "1" }).body, { e: "svc" });
+test("unknown customer or card -> the service's 404 in the contract's error shape", () => {
+  const r = call("/x.list", { customerNo: "99" });
+  assert.equal(r.status, 404);
+  assert.deepEqual(r.body.result, { guid: "g", returnCode: "NF_LIST", messageText: "no card", code: "NF_LIST", message: "no card", type: "WARNING", details: { guid: "g", rootCause: null, errorOrigin: "test" } });
+  assert.equal(call("/x.balance", { cardNumber: "999999******9999" }).body.result.code, "NF_BAL");
 });
 
-test("no route (or an unset path, or another method) -> null, so the worker falls through", () => {
-  assert.equal(call("POST", "/svc/nothing", {}, {}), null);
-  assert.equal(call("GET", "/svc/list", {}, {}), null);
+test("missing or empty required field -> 400 naming it; top-level fields accepted; non-services fall through", () => {
+  assert.equal(call("/x.balance", { cardNumber: "" }).body.result.message, "card number cannot be empty");
+  assert.equal(call("/x.mail", { customerNo: "10000001" }).body.result.message, "kind cannot be empty");
+  assert.equal(serve(PACK, CFG, "POST", "/x.list", { customerNo: "10000001" }).status, 200);
+  assert.equal(call("/voice/v1/other", {}), null);
+  assert.equal(call("/x.list", { customerNo: "10000001" }, "GET").status, 400);
 });

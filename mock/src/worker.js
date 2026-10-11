@@ -108,7 +108,7 @@ export default {
         body = raw;
       }
     }
-    const sv = serve(pack, routes.services || {}, routes.errors || {}, request.method, url.pathname, query, body);
+    const sv = serve(pack, routes, request.method, url.pathname, body, crypto.randomUUID().replace(/-/g, ""));
     if (sv) {
       if (sv.delaySeconds > 0) await new Promise((done) => setTimeout(done, sv.delaySeconds * 1000));
       const entry = { at: new Date().toISOString(), method: request.method, path: url.pathname, query, body, status: sv.status, service: sv.service, delaySeconds: sv.delaySeconds, response: sv.body, headers: safeHeaders(request) };
