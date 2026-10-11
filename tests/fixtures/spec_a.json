@@ -47,6 +47,7 @@
    "2027-01-01"
   ],
   "next_weekday": "following_week",
+  "this_weekday": "current_week",
   "numeric_date_order": "dmy"
  },
  "products": {

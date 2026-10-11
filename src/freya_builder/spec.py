@@ -111,6 +111,7 @@ SPEC_SCHEMA = obj(
                 "business_weekdays": arr(INT),
                 "holidays": arr(STR),
                 "next_weekday": {"type": "string", "enum": ["following_week", "next_occurrence"]},
+                "this_weekday": {"type": "string", "enum": ["current_week", "next_occurrence"]},
                 "numeric_date_order": {"type": "string", "enum": ["dmy", "mdy", "ymd"]},
             }
         ),

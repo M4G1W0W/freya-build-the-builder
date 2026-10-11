@@ -93,10 +93,13 @@ def _slots(spec: dict) -> int:
 
 def _calendar(spec: dict) -> dict:
     cal = spec["calendar"]
+    this_next = cal.get("this_weekday") == "next_occurrence"
     return {
         "workdays": sorted({int(w) for w in cal["business_weekdays"]}),
         "holidays": sorted({str(h)[:10] for h in cal["holidays"]}),
         "next_weekday": cal["next_weekday"],
+        # only when the brief says so: saved specs have no this_weekday (rehearsal P1)
+        **({"this_weekday": "next_occurrence"} if this_next else {}),
         "date_order": cal["numeric_date_order"],
         "now_var": call_var(spec, "now") or "now",
     }

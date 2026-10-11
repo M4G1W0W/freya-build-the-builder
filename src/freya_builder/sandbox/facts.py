@@ -251,10 +251,13 @@ def date_table(today, end, C):
     lines.append("Every other date in that range is a business day.")
     tomorrow = today + datetime.timedelta(days=1)
     lines.append("tomorrow = " + _wd(tomorrow))
-    this_days = [weekday_in_week(today, wd, 0) for wd in range(7)]
-    lines.append(
-        "this <weekday> (this Monday-to-Sunday week): " + ", ".join(_wd(x) for x in this_days)
-    )
+    if C.get("this_weekday") == "next_occurrence":
+        this_days = [next_occurrence(today, wd, False) for wd in range(7)]
+        this_rule = "this <weekday> (the first such weekday after today): "
+    else:
+        this_days = [weekday_in_week(today, wd, 0) for wd in range(7)]
+        this_rule = "this <weekday> (this Monday-to-Sunday week): "
+    lines.append(this_rule + ", ".join(_wd(x) for x in this_days))
     following = C.get("next_weekday") != "next_occurrence"
     if following:
         nxt = [weekday_in_week(today, wd, 1) for wd in range(7)]

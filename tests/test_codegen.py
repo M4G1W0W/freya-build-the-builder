@@ -1093,3 +1093,24 @@ def test_date_table_has_no_period_rows(mode):
     table = run(codegen.setup_source(spec_a()), {"now": NOW}, mode)["date_table"]
     assert not any(x.startswith(("next week", "the week after next")) for x in table.splitlines())
     assert "Monday-to-Sunday): " not in table.replace("this <weekday> (this Monday-to-Sunday", "")
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_this_weekday_follows_the_brief(mode):
+    # Engine-fixes item 4 (rehearsal P1 I3): "this <weekday>" = the first such weekday after
+    # today. The table said the Monday-to-Sunday week, so "this Wednesday" on a Friday was past.
+    spec = spec_a()
+    spec["calendar"]["this_weekday"] = "next_occurrence"
+    table = run(codegen.setup_source(spec), {"now": "2026-10-23T11:00"}, mode)["date_table"]
+    line = next(x for x in table.splitlines() if x.startswith("this <weekday>"))
+    assert line.startswith("this <weekday> (the first such weekday after today): Mon 2026-10-26")
+    assert "Wed 2026-10-28" in line and "Fri 2026-10-30" in line and "2026-10-21" not in line
+
+
+def test_this_weekday_default_and_missing_field_keep_the_week_reading():
+    old = spec_a()
+    del old["calendar"]["this_weekday"]
+    for spec in (old, spec_a()):
+        assert codegen.setup_source(spec) == codegen.setup_source(spec_a())
+        table = run(codegen.setup_source(spec), {"now": "2026-10-23T11:00"})["date_table"]
+        assert "this <weekday> (this Monday-to-Sunday week): Mon 2026-10-19" in table
