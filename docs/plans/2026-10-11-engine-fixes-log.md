@@ -204,3 +204,51 @@ fresh extraction (`runs/dev/r4/final/spec-AB1.json`) dropped it from the `paid` 
 The styled-extra-b PUB-12 check wording "asks for no payment on it" is read by the judge as "must say no
 payment is needed" (the official checks and extra-b-rederived.json say "takes no promise"): reword that
 fixture (sim chat's file).
+
+## Hand-off: `cand-eng.6` = a170935 (Fix 1 on cand-eng.4; branch `cand-eng-fix1`), tagged 11:46 UTC
+
+User-approved after the read-only assessment (11:33). cand-eng.4 and cand-eng.5 are unchanged
+(cfa4d9d, 27f5647). Fix 1 is NOT on cand-eng.5; it cherry-picks cleanly if wanted.
+
+**Cause (read-only trace, brief -> spec -> instructions).** In a multi-product brief a reason noted
+per product (already paid) has its own sentence, said mid-call. The extractor always writes that
+reason's row as the end-of-call row ("every product is noted paid"); `say_before_end` is defined as
+"before ending this way", so in 6 of 16 recent multi-product extractions (A+B 1/7, incl.
+`runs/dev/r4/final/spec-AB1.json` at ca80d52; variant-c 4/5; p3b 1/2; variant-r 0/3) the sentence
+went to `unmodeled` instead. `unmodeled` is never rendered (it only makes trace WARN lines), although
+the extraction prompt said those rules "stay in the agent's prompt". The agent then saw the sentence
+only in the raw brief, and the NOTES line pointed to that row's "Thank you. Goodbye.". Single-product
+extractions had it in all ~15. Same root as the open too-much date finding (a rule with no exact slot
+goes to unmodeled while a generated line states the default), but a different fix: that one is
+deferred (Fix 2), as is "the rest stays overdue" in FACTS (Fix 3).
+
+**Change (2 files + tests).** `pipeline.py` extraction prompt: (1) say_before_end of a per-product
+noted reason's row also holds the sentence required when the customer raises it for one product,
+even if the row's trigger is the end of the call; (2) "The agent never sees this list, only the
+specification text: a sentence the agent must say belongs in a field above, never only here."
+`spec.py` `check_spec`: when notes are used, a said, quoted sentence (>= 4 words) on an unmodeled line
+that names an add_note reason, and that no row's say_before_end holds, is a problem (repair round).
+
+**Evidence (all local, no Freya).**
+- Tests: lint clean, **861 passed** (cand-eng.4: 859); the guard test fails on cand-eng.4.
+- Guard on all 50 saved specs, each with its own tool API: fires on exactly the 6 known misses,
+  identical problems to cand-eng.4 on the other 44 (none of them A/raw-A single-product: the guard is
+  off when notes are unused). An earlier broad version fired on 12 specs with sentences that have no
+  slot (robot answer, "I do not have that information", "how much can you pay?"), so it was narrowed.
+- Render scope: all 7 saved-spec renders (A, A+B, raw-A, p1, p2, p3, p3b) byte-identical to
+  cand-eng.4 (the change acts on extraction only).
+- 16 fresh `--dry` extractions at a170935: sentence in its row in **12/12 multi-product** (A+B x4,
+  incl. two as brief-a + brief-b files; variant-c x4; p3b x2; variant-r x2) and 4/4 single-product
+  (A x2, raw-A x2). The guard never had to fire. All rc=0; 14 passed spec check in round 1 (94-137 s);
+  both variant-r builds needed one repair round (182-186 s) for "attempt 3 date: empty expression",
+  which cand-final.1 also hits (`runs/dev/r4/final/build-VR.log`). Specs/traces:
+  `<scratchpad>/fresh6/`.
+- Limit: an unquoted sentence on an unmodeled line (as in the committed `spec_variant_c.json`
+  fixture: "say exactly: Thank you ...") is not caught by the guard; the prompt change is the main fix.
+
+**Still requires Freya (Simulation Developer), strict 3/3 on fresh builds before promotion.**
+Whether the agent actually says the sentence is unmeasured: PUB-12 failure (c) happened in 1 of 5
+judged reps even with the sentence in the row. Suggested: cand-eng.6 vs cand-eng.4, fresh A+B builds,
+styled-extra-b x3 (PUB-12 paid check) and the B set x3; the A set x3 because the extraction prompt
+changed for every brief (A's saved-spec render is identical, but each fresh build re-extracts). Any
+difference from cand-eng.4 is to be investigated, not called noise.
