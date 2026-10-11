@@ -8,6 +8,14 @@ Read `docs/PROJECT_OVERVIEW.md` first (the whole project). This file is the **cu
 `cand-f3` = a069dd2 (F3 = **the builder code on main**), `cand-g1.1` 83f8263, `cand-retry.4` d53fa0e, `cand-final.1`
 ca80d52, `cand-eng.4` cfa4d9d, `cand-eng.5` 27f5647, `cand-eng.6` a170935, `cand-eng.7` a985076, `cand-eng.8` 4267bb0.
 
+## UPDATE 14:40 UTC: FINAL COMPARISON RUNNING (user go 14:35): eng.4 vs challenger, fresh raw-A + A+B builds
+
+- Pre-registered plan: `docs/plans/2026-10-11-final-comparison-plan.md` (arms, slots exp-eng4-fr/fab and exp-ch-fr/fab,
+  case sets, order, cut lines, decision rule). Driver `plan_run.sh` (this session's scratchpad; copies in
+  `runs/dev/r4/harness/`), plan file `plan.txt`, done log `plan-done.txt`, stop file `PLANSTOP`. Path cases
+  `runs/cases/e1-a.json`, `e1-ab.json` (from 898223d). Methodology messaged 14:35 (challenger tag by 15:00 or eng.8;
+  24-build `--dry` battery; main->challenger merge trial by 16:30). Queue (`sim/queue.txt`) still paused; not used.
+
 ## UPDATE 14:20 UTC: housekeeping (user ~14:05): E4-A-styledA COMPLETED and dequeued; challenger arm eng.6 -> eng.8 (eng.4 stays the comparison candidate); cap 789
 
 - **Authorizes housekeeping only: no builds, deployments, simulations, promotion or freeze. Queue PAUSED (`sim/STOP`

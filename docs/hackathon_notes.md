@@ -416,6 +416,13 @@ _One entry per major decision: time, decision, alternatives, reason, evidence._
   user's 13:45 bounded-raise authorization (dossier §11.4). Found: the Brief-A-ledger PUB-05 cases would fail the
   ledger on the A+B ab4 agent (Brief B rule 8 note; prediction); only `styled-ab-a.json` PUB-05 fits today. Run
   items only through `run_one.sh` + `suite_once.py` (`qrun4.sh` reruns slow reps and uses platform retries).
+- 2026-10-11 17:40 (14:40 UTC) — **Final comparison pre-registered (user go 14:35): eng.4 vs challenger on FRESH
+  builds.** A arm from `raw-a.md` (raw-material hidden shape; clean brief-a covered by Methodology's repeated `--dry`
+  extractions), A+B arm from `ab-single.md`; per round styled-ab-all + styled-a + path cases (E1-AB round 1 only);
+  rounds alternate arms; harness `run_one.sh`/`suite_once.py` via `plan_run.sh` (maxRetries 0, no reruns, gate stop ->
+  health-check and continue, never repeat). Challenger = Methodology's narrow closing protection if tagged with green
+  tests by 15:00 UTC, else eng.8. D8 replaced by the dry goodbye metric + live path cases; E2 deferred. 160 calls planned.
+  Plan, thresholds and decision rule: `docs/plans/2026-10-11-final-comparison-plan.md`.
 
 ## Score log
 
