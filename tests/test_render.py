@@ -409,7 +409,8 @@ def test_prompts_handle_customer_speech_styles():
     assert (
         "answer it as the brief says and stop there: do not repeat your question or offer" in nego
     )
-    assert "a question, a request or a situation" in nego
+    assert "a question about a date or an amount for paying, a request or a situation" in nego
+    assert "follow the brief for those messages instead of this paragraph" in nego
     assert "If the BANK BRIEF itself says how to treat small talk" in nego
     assert "only after the customer has described that situation" in nego
     # Voice test 577a2cd4: "can we make it in instalments" got "would you like me to connect you
